@@ -57,6 +57,9 @@ class Generator(object):
         return B
 
     def compute_example(self):
+        """
+        Compute pairs (Adjacency, noisy Adjacency)
+        """
         if self.generative_model == 'ErdosRenyi':
             W = self.ErdosRenyi_netx(self.edge_density, self.n_vertices)
         elif self.generative_model == 'Regular':
