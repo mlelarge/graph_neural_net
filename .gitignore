@@ -1,0 +1,6 @@
+#Custom
+*.np
+*.npz
+*.png
+*.pt
+*.py.swp
