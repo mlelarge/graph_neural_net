@@ -9,7 +9,7 @@ class Simamese_Model(nn.Module):
         take a batch of pair of graphs 
         ((bs, n_vertices, n_vertices, in_features) (bs,n_vertices, n_vertices, in_features))
         and return a batch of node similarities (bs, n_vertices, n_vertices)
-        for each node the sum over the second dim should be one: sum(out[b,i,:])==1
+        for each node the sum over the second dim should be one: sum(torch.exp(out[b,i,:]))==1
         graphs must have same size inside the batch
         """
         super().__init__()
@@ -25,4 +25,4 @@ class Simamese_Model(nn.Module):
         x1 = self.node_embedder(x1)
         x2 = self.node_embedder(x2)
         raw_scores = torch.einsum('bif,bjf->bij',x1,x2)
-        return F.softmax(raw_scores, dim = 2)
+        return F.log_softmax(raw_scores, dim = 2)
