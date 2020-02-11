@@ -2,8 +2,6 @@
 
 ## Project structure
 
-The project is structured as follows:
-
 ```bash
 .
 ├── loaders
