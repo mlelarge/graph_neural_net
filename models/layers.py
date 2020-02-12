@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-##### CODE FROM github.com/hadarser/ProvablyPowerfulGraphNetworks_torch #####
-
 class RegularBlock(nn.Module):
     """
     Imputs: N x input_depth x m x m

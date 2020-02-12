@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.base_model import Simple_Node_Embedding
 
-class Simamese_Model(nn.Module):
+class Siamese_Model(nn.Module):
     def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp):
         """
         take a batch of pair of graphs 

@@ -10,15 +10,21 @@ class Generator(torch.utils.data.Dataset):
     """
     Build a numpy dataset of pairs of (Graph, noisy Graph)
     """
-    def __init__(self, name, path_dataset='dataset', n_vertices = 50 ,num_examples=10):
+    def __init__(self, name, args):
         self.name = name
-        self.path_dataset = os.path.join(path_dataset,name)
-        self.num_examples = num_examples
+        self.path_dataset = args['--path_dataset']
+        self.path_dataset = os.path.join(self.path_dataset,name)
+        if name == 'train':
+            self.num_examples = args['--num_examples_train']
+        elif name == 'test':
+            self.num_examples = args['--num_examples_test']
+        elif name == 'val':
+            self.num_examples = args['--num_examples_val']
         self.data = []
+        self.n_vertices = args['--n_vertices']
+        self.generative_model = args['--generative_model']
+        self.edge_density = args['--edge_density']
         # to be modified...
-        self.n_vertices = n_vertices
-        self.generative_model = 'ErdosRenyi'
-        self.edge_density = 0.2
         self.random_noise = False
         self.noise = 0.03
         self.noise_model = 2
@@ -107,6 +113,7 @@ class Generator(torch.utils.data.Dataset):
                 self.data = list(data)
             saving  = False
         if len(self.data) == 0 or len(self.data) != self.num_examples:
+            saving = True
             print('Creating dataset.')
             self.data = []
             self.create_dataset()
