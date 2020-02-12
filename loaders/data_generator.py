@@ -15,6 +15,7 @@ class Generator(torch.utils.data.Dataset):
         self.path_dataset = os.path.join(path_dataset,name)
         self.num_examples = num_examples
         self.data = []
+        # to be modified...
         self.n_vertices = n_vertices
         self.generative_model = 'ErdosRenyi'
         self.edge_density = 0.2
