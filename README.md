@@ -15,11 +15,11 @@
 |   └── siamese_net.py # GNN to match graphs
 ├── toolbox
 |   └── optimizer and losses selectors
-|   └── logger.py  # tbc
-|   └── metrics.py # tbc
-|   └── plotter.py # tbd
-|   └── losses.py  # compute losses
+|   └── logger.py  # keeping track of most results during training
+|   └── metrics.py # computing scores
+|   └── losses.py  # computing losses
 |   └── optimizer.py # optimizers
+|   └── utility.py
 ├── commander.py # tbc main file from the project serving for calling all necessary functions for training and testing
 ├── trainer.py # tbc pipelines for training, validation and testing
 ```
