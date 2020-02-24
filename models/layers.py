@@ -93,3 +93,27 @@ class MlpBlock1d(nn.Module):
         out = self.convs[-1](out)
 
         return out
+
+# to do: change order to be consistent
+class Features_2_to_1(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        # in: N x d x m x m
+        # out: N x (d * basis) x m
+        N = x.size(0)
+        m = x.size(-1)
+        diag_part = torch.diagonal(x, dim1=2, dim2=3)
+        max_diag_part = torch.max(diag_part, 2)[0].unsqueeze(-1)
+        max_of_rows = torch.max(x, 3)[0]
+        max_of_cols = torch.max(x, 2)[0]
+        max_all = torch.max(torch.max(x, 2)[0], 2)[0].unsqueeze(-1)
+
+        op1 = diag_part
+        op2 = max_diag_part.expand_as(op1)
+        op3 = max_of_rows
+        op4 = max_of_cols
+        op5 = max_all.expand_as(op1)
+
+        return torch.stack([op1, op2, op3, op4, op5]).permute(1, 0, 2, 3).reshape(N, -1, m)
