@@ -26,7 +26,7 @@ class Generator(torch.utils.data.Dataset):
         self.edge_density = args['--edge_density']
         # to be modified...
         self.random_noise = False
-        self.noise = 0.03
+        self.noise = 0.05
         self.noise_model = 2
 
     def ErdosRenyi_netx(self, p, N):
