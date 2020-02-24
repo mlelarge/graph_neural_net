@@ -77,7 +77,7 @@ def type_args(args):
 
 def update_args(args):
     args['--log_dir'] = '{}/runs/{}/'.format(args['--root_dir'], args['--name'])
-    args['--res_dir'] = '{}/runs/{}/res'.format(args['--root_dir'], args['--name'])
+    #args['--res_dir'] = '{}/runs/{}/res'.format(args['--root_dir'], args['--name'])
     return args
 
 def main():
