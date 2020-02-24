@@ -3,6 +3,7 @@ import json
 import copy
 import os
 from collections import defaultdict
+from toolbox import utils
 
 '''
 Object of the Experiment class keep track of scores and metrics across epochs.
@@ -19,7 +20,7 @@ class Experiment(object):
         self.options = options
         self.date_and_time = time.strftime('%d-%m-%Y--%H-%M-%S')
 
-        self.info = defaultdict(dict)
+        #self.info = defaultdict(dict)
         self.logged = defaultdict(dict)
         self.meters = defaultdict(dict)
 
@@ -61,15 +62,15 @@ class Experiment(object):
         assert name in list(self.meters[tag].keys())
         return self.meters[tag][name]
 
-    def to_json(self, filename):
-        os.system('mkdir -p ' + os.path.dirname(filename))
+    def to_json(self, log_dir, filename):
+        json_file = os.path.join(log_dir,filename)
         var_dict = copy.copy(vars(self))
         var_dict.pop('meters')
-        for key in ('viz', 'viz_dict'):
-            if key in list(var_dict.keys()):
-                var_dict.pop(key)    
-        with open(filename, 'w') as f:
-            json.dump(var_dict, f)
+        #for key in ('viz', 'viz_dict'):
+        #    if key in list(var_dict.keys()):
+        #        var_dict.pop(key)    
+        with open(json_file, 'w') as f:
+            json.dump(var_dict, f, cls=utils.NpEncoder)
 
     def from_json(self, filename):
         with open(filename, 'r') as f:
@@ -78,8 +79,8 @@ class Experiment(object):
         xp.date_and_time = var_dict['date_and_time']
         xp.logged        = var_dict['logged']
         
-        if 'info' in var_dict:
-            xp.info          = var_dict['info']
+        #if 'info' in var_dict:
+        #    xp.info          = var_dict['info']
         xp.options       = var_dict['options']
         xp.name          = var_dict['name']
         return xp

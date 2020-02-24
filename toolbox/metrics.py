@@ -15,7 +15,7 @@ class Meter(object):
 
     def update(self, val, n=1):
         self.val = val
-        self.sum += val * n
+        self.sum += val 
         self.count += n
         self.avg = self.sum / self.count
 
@@ -24,6 +24,23 @@ class Meter(object):
 
     def get_sum(self):
         return self.sum
+    
+    def value(self):
+        return self.sum
+
+class ValueMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+
+    def update(self, val):
+        self.val = val
+
+    def value(self):
+        return self.val
 
 def make_meter_matching():
     meters_dict = {
@@ -36,27 +53,32 @@ def make_meter_matching():
     }
     return meters_dict
 
-def accuracy_linear_assigment(weights,labels):
+def accuracy_linear_assigment(weights,labels=None):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
     bs = weights.shape[0]
     n = weights.shape[1]
+    if labels is None:
+        labels = np.stack([np.arange(n) for _ in range(bs)])
     acc = 0
     for i in range(bs):
         cost = -weights[i,:,:]
         _ , preds = linear_sum_assignment(cost)
         acc += np.sum(preds == labels[i,:])
-    return acc/(n*bs)
+    return acc, n, bs
 
-def accuracy_max(weights,labels):
+def accuracy_max(weights,labels=None):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
-    bs = weightd.shape[0]
+    bs = weights.shape[0]
     n = weights.shape[1]
+    if labels is None:
+        labels = np.stack([np.arange(n) for _ in range(bs)])
     acc = 0
     for i in range(bs):
-        preds = np.armax(weights[i,:,:], 2)
+        preds = np.argmax(weights[i,:,:], 0)
+        #print(preds)
         acc += np.sum(preds == labels[i,:])
-    return acc/(n*bs)
+    return acc, n, bs

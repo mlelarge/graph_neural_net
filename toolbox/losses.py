@@ -17,8 +17,7 @@ class triplet_loss(nn.Module):
         ide = torch.arange(n_vertices)
         target = torch.cat([ide for _ in range(bs)]).to(self.device)
         out_reshape = out.view(-1,n_vertices)
-        out_reshape = out_reshape.contiguous()
-        return self.loss(out_reshape,target.contiguous())
+        return self.loss(out_reshape,target)
 
 def get_criterion(device):
     return triplet_loss(device)
