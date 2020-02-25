@@ -119,6 +119,7 @@ class Generator(torch.utils.data.Dataset):
             self.create_dataset()
         if saving:
             print('Saving datatset at {}'.format(path))
+            os.makedirs(self.path_dataset, exist_ok=True)
             with open(path, 'wb') as f:
                     np.save(f, self.data)
 
