@@ -11,6 +11,7 @@ Option:
     --num_examples_test=<int>       [default: 10]
     --num_examples_val=<int>        [default: 1000]
     --edge_density=<float>          [default: 0.2]
+    --noise=<float>                 [default: 0.05]
     --n_vertices=<int>              [default: 50]
     --path_dataset=<str>            path where datasets are stored [default: dataset]
     --root_dir=<str>                [default: .]
@@ -45,7 +46,7 @@ from toolbox import utils
 import trainer as trainer
 import json
 
-list_float = ['--lr', '--edge_density', '--lr_decay']
+list_float = ['--lr', '--edge_density', '--lr_decay', '--noise']
 
 list_int = ['--num_blocks', '--original_features_num',
             '--in_features', '--out_features',
