@@ -59,6 +59,5 @@ class Simple_Node_Embedding(nn.Module):
 
     def forward(self, x):
         x = self.base_model(x)
-        x = x.permute(0,3,1,2)
         x = self.suffix(x)
-        return  x.permute(0,2,1)
+        return  x

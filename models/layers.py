@@ -94,21 +94,23 @@ class MlpBlock1d(nn.Module):
 
         return out
 
-# to do: change order to be consistent
 class Features_2_to_1(nn.Module):
     def __init__(self):
+        """
+        take a batch (bs, n_vertices, n_vertices, in_features)
+        and returns (bs, n_vertices, basis * in_features)
+        where basis = 5
+        """
         super().__init__()
 
     def forward(self, x):
-        # in: N x d x m x m
-        # out: N x (d * basis) x m
-        N = x.size(0)
-        m = x.size(-1)
-        diag_part = torch.diagonal(x, dim1=2, dim2=3)
-        max_diag_part = torch.max(diag_part, 2)[0].unsqueeze(-1)
-        max_of_rows = torch.max(x, 3)[0]
-        max_of_cols = torch.max(x, 2)[0]
-        max_all = torch.max(torch.max(x, 2)[0], 2)[0].unsqueeze(-1)
+        b, n, _, in_features = x.size()
+        basis = 5
+        diag_part = torch.diagonal(x, dim1=1, dim2=2).permute(0,2,1)
+        max_diag_part = torch.max(diag_part, 1)[0].unsqueeze(1)
+        max_of_rows = torch.max(x, 2)[0]
+        max_of_cols = torch.max(x, 1)[0]
+        max_all = torch.max(torch.max(x, 1)[0], 1)[0].unsqueeze(1)
 
         op1 = diag_part
         op2 = max_diag_part.expand_as(op1)
@@ -116,4 +118,6 @@ class Features_2_to_1(nn.Module):
         op4 = max_of_cols
         op5 = max_all.expand_as(op1)
 
-        return torch.stack([op1, op2, op3, op4, op5]).permute(1, 0, 2, 3).reshape(N, -1, m)
+        output = torch.stack([op1, op2, op3, op4, op5], dim=2)
+        assert output.size() == (b, n, basis, in_features), output.size()
+        return output.view(b, n, basis*in_features)
