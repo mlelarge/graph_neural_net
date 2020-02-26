@@ -14,6 +14,8 @@ def setup_env(args):
 def init_output_env(args):
     check_dir(os.path.join(args['--root_dir'],'runs'))
     check_dir(args['--log_dir'])
+    for name in ['train', 'test', 'val']:
+        check_dir(os.path.join(args['--path_dataset'], name))
     #check_dir(os.path.join(args.log_dir,'tensorboard'))
     #check_dir(args['--res_dir'])
     with open(os.path.join(args['--log_dir'], 'config.json'), 'w') as f:

@@ -63,7 +63,7 @@ class Experiment(object):
         return self.meters[tag][name]
 
     def to_json(self, log_dir, filename):
-        os.makedirs(log_dir, exist_ok=True)
+        utils.check_dir(log_dir)
         json_file = os.path.join(log_dir,filename)
         var_dict = copy.copy(vars(self))
         var_dict.pop('meters')
