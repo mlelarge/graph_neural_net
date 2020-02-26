@@ -34,9 +34,12 @@ Option:
 
 
 import os
+import shutil
+import json
+from docopt import docopt
+
 import torch
 from toolbox import logger, metrics
-from docopt import docopt
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
 from loaders.data_generator import Generator
@@ -44,7 +47,7 @@ from toolbox.optimizer import get_optimizer
 from toolbox.losses import get_criterion
 from toolbox import utils
 import trainer as trainer
-import json
+
 
 list_float = ['--lr', '--edge_density', '--lr_decay', '--noise']
 
@@ -81,6 +84,25 @@ def update_args(args):
     #args['--res_dir'] = '{}/runs/{}/res'.format(args['--root_dir'], args['--name'])
     return args
 
+def save_checkpoint(args, state, is_best, filename='checkpoint.pth.tar'):
+    utils.check_dir(args['--log_dir'])
+    filename = os.path.join(args['--log_dir'], filename)
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, os.path.join(args['--log_dir'], 'model_best.pth.tar'))
+
+    fn = os.path.join(args['--log_dir'], 'checkpoint_epoch{}.pth.tar')
+    torch.save(state, fn.format(state['epoch']))
+
+    if (state['epoch'] - 1 ) % 5 != 0:
+      #remove intermediate saved models, e.g. non-modulo 5 ones
+      if os.path.exists(fn.format(state['epoch'] - 1 )):
+          os.remove(fn.format(state['epoch'] - 1 ))
+
+    path_logger = os.path.join(args['--log_dir'], 'logger.json')
+    state['exp_logger'].to_json(log_dir=args['--log_dir'],filename='logger.json')
+
+
 def main():
     """ Main func.
     """
@@ -115,6 +137,8 @@ def main():
     exp_logger = init_logger(args)
 
     model.to(device)
+
+    is_best = True
     for epoch in range(args['--epoch']):
         print('Current epoch: ', epoch)
         trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max)
@@ -123,7 +147,19 @@ def main():
 
         acc = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assigment)
 
-    exp_logger.to_json(log_dir=args['--log_dir'],filename='logger.json')
+        # remember best acc and save checkpoint
+        is_best = acc > best_score
+        best_score = max(acc, best_score)
+        if True == is_best:
+            best_epoch = epoch
+
+        save_checkpoint(args, {
+            'epoch': epoch + 1,
+            'state_dict': model.state_dict(),
+            'best_score': best_score,
+            'best_epoch': best_epoch,
+            'exp_logger': exp_logger,
+        }, is_best)
 
 if __name__ == '__main__':
     main()
