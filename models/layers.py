@@ -1,18 +1,21 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class RegularBlock(nn.Module):
     """
-    Imputs: N x input_depth x m x m
-    Take the input through 2 parallel MLP routes, multiply the result, and add a skip-connection at the end.
-    At the skip-connection, reduce the dimension back to output_depth
+    Imputs: N x input_depth x n_vertices x n_vertices
+    Take the input through 2 parallel MLP routes, multiply the result 
+    and pass the concatenation of this result with the input through a MLP
+    with no activation for the last layer.
     """
     def __init__(self, in_features, out_features, depth_of_mlp):
         super().__init__()
 
         self.mlp1 = MlpBlock(in_features, out_features, depth_of_mlp)
         self.mlp2 = MlpBlock(in_features, out_features, depth_of_mlp)
-        self.mlp3 = MlpBlock(in_features+out_features, out_features, depth_of_mlp)
+        self.mlp3 = MlpBlock(in_features+out_features, out_features,depth_of_mlp)
+        self.last_layer = nn.Conv2d(out_features,out_features,kernel_size=1, padding=0, bias=True)
 
     def forward(self, inputs):
         mlp1 = self.mlp1(inputs)
@@ -20,6 +23,7 @@ class RegularBlock(nn.Module):
         mult = torch.matmul(mlp1, mlp2)
         out = torch.cat((inputs, mult), dim=1)
         out = self.mlp3(out)
+        out = self.last_layer(out)
         return out
 
 
@@ -27,11 +31,12 @@ class MlpBlock(nn.Module):
     """
     Block of MLP layers with activation function after each (1x1 conv layers).
     """
-    def __init__(self, in_features, out_features, depth_of_mlp, activation_fn=nn.functional.relu):
+    def __init__(self, in_features, out_features, depth_of_mlp, activation_fn = F.relu):
         super().__init__()
         self.activation = activation_fn
+        self.depth_mlp = depth_of_mlp
         self.convs = nn.ModuleList()
-        for i in range(depth_of_mlp):
+        for _ in range(depth_of_mlp):
             self.convs.append(nn.Conv2d(in_features, out_features, kernel_size=1, padding=0, bias=True))
             _init_weights(self.convs[-1])
             in_features = out_features
@@ -40,7 +45,6 @@ class MlpBlock(nn.Module):
         out = inputs
         for conv_layer in self.convs:
             out = self.activation(conv_layer(out))
-
         return out
 
 
