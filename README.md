@@ -23,3 +23,10 @@
 ├── commander.py # tbc main file from the project serving for calling all necessary functions for training and testing
 ├── trainer.py # tbc pipelines for training, validation and testing
 ```
+
+### Install
+Run
+```
+pip install -r requirements.txt --pre -f https://download.pytorch.org/whl/nightly/cu101/torch_nightly.html
+```
+
