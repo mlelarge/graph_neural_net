@@ -14,19 +14,17 @@ def setup_env(args):
 def init_output_env(args):
     check_dir(os.path.join(args['--root_dir'],'runs'))
     check_dir(args['--log_dir'])
-    for name in ['train', 'test', 'val']:
-        check_dir(os.path.join(args['--path_dataset'], name))
+    check_dir(args['--path_dataset'])
     #check_dir(os.path.join(args.log_dir,'tensorboard'))
     #check_dir(args['--res_dir'])
     with open(os.path.join(args['--log_dir'], 'config.json'), 'w') as f:
         json.dump(args, f)
 
 
-# check if folder exists, otherwise create it
+# create directory if it does not exist
 def check_dir(dir_path):
     dir_path = dir_path.replace('//','/')
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)   
+    os.makedirs(dir_path, exist_ok=True)
 
 # from https://stackoverflow.com/questions/50916422/python-typeerror-object-of-type-int64-is-not-json-serializable/50916741
 class NpEncoder(json.JSONEncoder):
