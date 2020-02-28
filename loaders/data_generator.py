@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.utils
 import torch.nn.functional as F
+from toolbox import utils
 
 class Generator(torch.utils.data.Dataset):
     """
@@ -12,8 +13,6 @@ class Generator(torch.utils.data.Dataset):
     """
     def __init__(self, name, args):
         self.name = name
-        self.path_dataset = args['--path_dataset']
-        self.path_dataset = os.path.join(self.path_dataset,name)
         if name == 'train':
             self.num_examples = args['--num_examples_train']
         elif name == 'test':
@@ -25,9 +24,13 @@ class Generator(torch.utils.data.Dataset):
         self.generative_model = args['--generative_model']
         self.edge_density = args['--edge_density']
         self.noise = args['--noise']
-        # to be modified...
-        self.random_noise = False
-        self.noise_model = 2
+        subfolder_name = 'QAP_{}_{}_{}_{}'.format(self.generative_model,
+                                                  self.num_examples,
+                                                  self.n_vertices,
+                                                  self.noise, self.edge_density)
+        self.path_dataset = os.path.join(args['--path_dataset'],
+                                         subfolder_name)
+        utils.check_dir(self.path_dataset)
 
     def ErdosRenyi_netx(self, p, N):
         g = networkx.erdos_renyi_graph(N, p)
@@ -74,22 +77,11 @@ class Generator(torch.utils.data.Dataset):
         else:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
-        if self.random_noise:
-            self.noise = np.random.uniform(0.000, 0.050, 1)
-        if self.noise_model == 1:
-            # use noise model from [arxiv 1602.04181], eq (3.8)
-            noise = self.ErdosRenyi(self.noise, self.n_vertices)
-            W_noise = W*(1-noise) + (1-W)*noise
-        elif self.noise_model == 2:
-            # use noise model from [arxiv 1602.04181], eq (3.9)
-            pe1 = self.noise
-            pe2 = (self.edge_density*self.noise)/(1.0-self.edge_density)
-            noise1 = self.ErdosRenyi_netx(pe1, self.n_vertices)
-            noise2 = self.ErdosRenyi_netx(pe2, self.n_vertices)
-            W_noise = W*(1-noise1) + (1-W)*noise2
-        else:
-            raise ValueError('Noise model {} not implemented'
-                             .format(self.noise_model))
+        pe1 = self.noise
+        pe2 = (self.edge_density*self.noise)/(1.0-self.edge_density)
+        noise1 = self.ErdosRenyi_netx(pe1, self.n_vertices)
+        noise2 = self.ErdosRenyi_netx(pe2, self.n_vertices)
+        W_noise = W*(1-noise1) + (1-W)*noise2
         B = self.adjacency_matrix_to_tensor_representation(W)
         B_noise = self.adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
@@ -100,28 +92,24 @@ class Generator(torch.utils.data.Dataset):
             self.data.append(np.asarray(example))
 
     def load_dataset(self, saving=True):
-        if self.random_noise:
-            filename = 'QAP_RN.np'
-        else:
-            filename = ('QAP_{}_{}_{}_{}.np'.format(self.name,self.generative_model,
-                        self.noise, self.edge_density))
+        """
+        Look for required dataset in files and create it if
+        it does not exist
+        """
+        filename = self.name + '.pkl'
         path = os.path.join(self.path_dataset, filename)
         if os.path.exists(path):
             print('Reading dataset at {}'.format(path))
             with open(path, 'rb') as f:
                 data = np.load(f, allow_pickle=True)
                 self.data = list(data)
-            saving  = False
-        if len(self.data) == 0 or len(self.data) != self.num_examples:
-            saving = True
+        else:
             print('Creating dataset.')
             self.data = []
             self.create_dataset()
-        if saving:
             print('Saving datatset at {}'.format(path))
             with open(path, 'wb') as f:
                     np.save(f, self.data)
-
         return self.data
 
     def __getitem__(self ,i):
