@@ -179,7 +179,7 @@ def torch_max(masked_tensor, dim):
     for mask in masked_tensor.mask_dict.values():
         aligned_mask = mask.align_as(tensor)
         tensor = tensor * aligned_mask + min_value * (1 - aligned_mask)
-    max_tensor, indices = torch.max(masked_tensor.tensor, dim)
+    max_tensor, indices = torch.max(tensor, dim)
     new_masked_tensor = MaskedTensor(max_tensor, masked_tensor.mask_dict,
                                      adjust_mask=True, apply_mask=True)
     return new_masked_tensor, indices
