@@ -7,6 +7,7 @@ import pytest
 import torch
 import torch.nn as nn
 import maskedtensor
+from models.base_model import Simple_Node_Embedding
 
 def apply_list_tensors(lst, func):
     """ Apply func on each tensor (with batch dim) """
@@ -41,6 +42,7 @@ TEST_FUNCS = [
     lambda t: torch.add(t, 1),
     lambda t: torch.mul(t, 2),
     lambda t: torch.sum(t, 2),
+    lambda t: torch.max(t, 2)[0],
     # keep first dim not to perturb apply_list_tensors
     lambda t: t.permute(0, 3, 2, 1),
     GraphConv2d(N_FEATURES, 2*N_FEATURES)]

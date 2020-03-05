@@ -53,6 +53,8 @@ class MaskedTensor:
     - Unless you know what you are doing, should not be created with __init__,
       use from_list instead
     - Mask is always copied; data is copied iff copy is set to True
+    - Individual tensors of a masked tensor mt can be retrived using list(mt),
+      iterating with for tensor in mt or with indexing mt[i]
     """
     def __init__(self, data, mask, adjust_mask=True, apply_mask=False, copy=False, batch_name='B'):
         self.tensor = torch.tensor(data) if copy else data
@@ -158,13 +160,28 @@ def implements(torch_function):
         return func
     return decorator
 
+def get_dtype_min_value(dtype):
+    """ Get the min value of given dtype, whether int or float """
+    try:
+        return torch.finfo(dtype).min
+    except TypeError:
+        pass
+    try:
+        return torch.iinfo(dtype).min
+    except TypeError:
+        raise TypeError("dtype is neither float nor int")
 
 @implements(torch.max)
 def torch_max(masked_tensor, dim):
     """ Implements torch.max """
-    tensor, indices = torch.max(masked_tensor.tensor, dim)
-    new_masked_tensor = MaskedTensor(tensor, masked_tensor.mask_dict,
-                                     adjust_mask=True, apply_mask=False)
+    tensor = masked_tensor.tensor
+    min_value = get_dtype_min_value(tensor.dtype)
+    for mask in masked_tensor.mask_dict.values():
+        aligned_mask = mask.align_as(tensor)
+        tensor = tensor * aligned_mask + min_value * (1 - aligned_mask)
+    max_tensor, indices = torch.max(masked_tensor.tensor, dim)
+    new_masked_tensor = MaskedTensor(max_tensor, masked_tensor.mask_dict,
+                                     adjust_mask=True, apply_mask=True)
     return new_masked_tensor, indices
 
 @implements(F.conv2d)
