@@ -2,3 +2,4 @@ torch>=1.5.0.dev20200108
 scipy
 docopt
 networkx
+pytest

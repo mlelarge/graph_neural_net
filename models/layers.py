@@ -125,3 +125,14 @@ class Features_2_to_1(nn.Module):
         output = torch.stack([op1, op2, op3, op4, op5], dim=2)
         assert output.size() == (b, n, basis, in_features), output.size()
         return output.view(b, n, basis*in_features)
+
+class ColumnMaxPooling(nn.Module):
+    """
+    take a batch (bs, n_vertices, n_vertices, in_features)
+    and returns (bs, n_vertices, in_features)
+    """
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return torch.max(x, 2)[0]

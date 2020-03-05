@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from models.layers import RegularBlock, Features_2_to_1
+from models.layers import RegularBlock, ColumnMaxPooling
 
 
 class BaseModel(nn.Module):
@@ -55,7 +55,7 @@ class Simple_Node_Embedding(nn.Module):
         self.out_features = out_features
         self.depth_of_mlp =depth_of_mlp
         self.base_model = BaseModel(original_features_num, num_blocks, in_features,out_features, depth_of_mlp)
-        self.suffix = Features_2_to_1()
+        self.suffix = ColumnMaxPooling()
 
     def forward(self, x):
         x = self.base_model(x)
