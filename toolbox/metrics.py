@@ -60,12 +60,14 @@ def accuracy_linear_assigment(weights,labels=None):
     bs = weights.shape[0]
     n = weights.shape[1]
     acc = 0
-    if labels is None:
-        labels = np.stack([np.arange(len(weight)) for weight in weights])
     for i, weight in enumerate(weights):
+        if labels:
+            label = labels[i]
+        else:
+            label = np.arange(len(weight))
         cost = -weight.cpu().detach().numpy()
         _ , preds = linear_sum_assignment(cost)
-        acc += np.sum(preds == labels[i,:])
+        acc += np.sum(preds == label)
     return acc, n, bs
 
 def accuracy_max(weights,labels=None):
@@ -75,11 +77,13 @@ def accuracy_max(weights,labels=None):
     bs = weights.shape[0]
     n = weights.shape[1]
     acc = 0
-    if labels is None:
-        labels = np.stack([np.arange(len(weight)) for weight in weights])
     for i, weight in enumerate(weights):
+        if labels:
+            label = labels[i]
+        else:
+            label = np.arange(len(weight))
         weight = weight.cpu().detach().numpy()
         preds = np.argmax(weight, 0)
         #print(preds)
-        acc += np.sum(preds == labels[i,:])
+        acc += np.sum(preds == label)
     return acc, n, bs
