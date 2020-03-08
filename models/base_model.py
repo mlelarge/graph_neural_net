@@ -30,7 +30,7 @@ class BaseModel(nn.Module):
 
     def forward(self, x):
         #here x.shape = (bs, n_vertices, n_vertices, n_features)
-        if x.shape[3] != self.original_features_num:
+        if x.size(3) != self.original_features_num:
             print("expected input feature {} and got {}".format(self.original_features_num,x.shape[3]))
             return
         x = x.permute(0, 3, 1, 2)

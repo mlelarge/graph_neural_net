@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from toolbox.maskedtensor import dispatch_cat
 
 class RegularBlock(nn.Module):
     """
@@ -21,7 +22,8 @@ class RegularBlock(nn.Module):
         mlp1 = self.mlp1(inputs)
         mlp2 = self.mlp2(inputs)
         mult = torch.matmul(mlp1, mlp2)
-        out = torch.cat((inputs, mult), dim=1)
+        # Temporary workaround to pytorch issue
+        out = dispatch_cat((inputs, mult), dim=1)
         out = self.mlp3(out)
         out = self.last_layer(out)
         return out
