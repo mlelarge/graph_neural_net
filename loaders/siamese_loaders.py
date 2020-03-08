@@ -11,7 +11,7 @@ def collate_fn(samples_list):
 
 def siamese_loader(data, batch_size, constant_n_vertices, shuffle=True):
     assert len(data) > 0
-    if constant_n_vertices and False:
+    if constant_n_vertices:
         return torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=shuffle,
                                            num_workers=4)
     return torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=shuffle,

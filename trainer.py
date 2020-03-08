@@ -33,7 +33,7 @@ def train_triplet(train_loader,model,criterion,optimizer,
         if i % print_freq == 0:
             if eval_score is not None:
                 #print(np_out.shape)
-                acc_max, n, bs = eval_score(np_out)
+                acc_max, n, bs = eval_score(output)
                 #print(acc_max, n, bs)
                 meters['acc_max'].update(acc_max,n*bs)
             print('Epoch: [{0}][{1}/{2}]\t'
@@ -63,9 +63,8 @@ def val_triplet(val_loader,model,criterion,
         meters['loss'].update(loss.data.item(), n=1)
     
         if eval_score is not None:
-            np_out = output.cpu().detach().numpy()
                 #print(np_out.shape)
-            acc, n, bs = eval_score(np_out)
+            acc, n, bs = eval_score(output)
                 #print(acc_max, n, bs)
             meters['acc_la'].update(acc,n*bs)
         if i % print_freq == 0:
