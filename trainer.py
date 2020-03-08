@@ -32,7 +32,6 @@ def train_triplet(train_loader,model,criterion,optimizer,
     
         if i % print_freq == 0:
             if eval_score is not None:
-                np_out = output.cpu().detach().numpy()
                 #print(np_out.shape)
                 acc_max, n, bs = eval_score(np_out)
                 #print(acc_max, n, bs)
