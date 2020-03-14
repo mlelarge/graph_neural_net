@@ -21,6 +21,9 @@ def generate_regular_graph_netx(p, N):
     """ Generate random regular graph """
     d = p * N
     d = int(d)
+    # Make sure N * d is even
+    if N * d % 2 == 1:
+        d += 1
     g = networkx.random_regular_graph(d, N)
     W = networkx.adjacency_matrix(g).todense()
     return torch.as_tensor(W, dtype=torch.float)
