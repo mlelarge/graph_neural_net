@@ -12,7 +12,8 @@ Option:
     --num_examples_val=<int>        [default: 1000]
     --edge_density=<float>          [default: 0.2]
     --noise=<float>                 [default: 0.05]
-    --n_vertices=<int>              [default: 50]
+    --n_vertices=<int>              number of vertices [default: 50]
+    --vertex_proba=<float>          parameter of the binomial distribution of vertices [default: 1.]
     --path_dataset=<str>            path where datasets are stored [default: dataset]
     --root_dir=<str>                [default: .]
     --epoch=<int>                   [default: 5]
@@ -49,7 +50,8 @@ from toolbox import utils
 import trainer as trainer
 
 
-list_float = ['--lr', '--edge_density', '--lr_decay', '--noise']
+list_float = ['--lr', '--edge_density', '--lr_decay', '--noise',
+              '--vertex_proba']
 
 list_int = ['--num_blocks', '--original_features_num',
             '--in_features', '--out_features',
@@ -124,12 +126,13 @@ def main():
     
     print(args['--batch_size'])
     gene_train = Generator('train', args)
-    _ = gene_train.load_dataset()
-    train_loader = siamese_loader(gene_train,args['--batch_size'])
+    gene_train.load_dataset()
+    train_loader = siamese_loader(gene_train, args['--batch_size'],
+                                  gene_train.constant_n_vertices)
     gene_val = Generator('val', args)
-    _ = gene_val.load_dataset()
-    val_loader = siamese_loader(gene_val,args['--batch_size'])
-
+    gene_val.load_dataset()
+    val_loader = siamese_loader(gene_val, args['--batch_size'],
+                                gene_val.constant_n_vertices)
     model = get_model(args)
     optimizer, scheduler = get_optimizer(args,model)
     criterion = get_criterion(device)

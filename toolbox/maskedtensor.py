@@ -128,6 +128,11 @@ class MaskedTensor:
         """ Return size of the underlying tensor """
         return self.tensor.size(*args)
 
+    @property
+    def shape(self):
+        """ Return shape of the underlying tensor """
+        return self.tensor.size()
+
     def permute(self, *dims):
         """ Permute the tensor """
         # Unfortunately, permute is not yet implemented for named tensors
@@ -142,7 +147,7 @@ class MaskedTensor:
 
     def to(self, *args, **kwargs):
         """ Apply the method .to() to both tensor and mask """
-        new_dict = {name:mask.to(*args, **kwargs) for name, mask in self.mask_dict.item()}
+        new_dict = {name:mask.to(*args, **kwargs) for name, mask in self.mask_dict.items()}
         new_tensor = self.tensor.to(*args, **kwargs)
         return MaskedTensor(new_tensor, new_dict, adjust_mask=False, apply_mask=False)
 
@@ -193,3 +198,38 @@ def torch_conv2d(inp, *args, **kwargs):
     nameless_res_tensor = F.conv2d(nameless_tensor, *args, **kwargs)
     res_tensor = nameless_res_tensor.rename(*names)
     return MaskedTensor(res_tensor, inp.mask_dict, adjust_mask=False, apply_mask=True)
+
+@implements(torch.cat)
+def torch_cat(tensors, dim=0):
+    """
+    Implements torch.cat for masked tensors
+    We have to implement it manually for the same reason as the issue
+    mentionned below
+    """
+    # Improvement: find a more elegant way when pytorch finds an elegant way
+    # for the issues mentionned below
+    new_args = [a.tensor if isinstance(a, MaskedTensor) else a for a in tensors]
+    masks = (a.mask_dict for a in tensors if isinstance(a, MaskedTensor))
+    new_mask = dict(item for mask_dict in masks for item in mask_dict.items())
+    ret = torch.cat(new_args, dim=dim)
+    return MaskedTensor(ret, new_mask, adjust_mask=False, apply_mask=False)
+
+def dispatch_cat(tensors, dim=0):
+    """
+    Temporary workaround to dispatch issue with torch.cat
+    See https://github.com/pytorch/pytorch/issues/34294
+    """
+    tensor = tensors[0]
+    if isinstance(tensor, torch.Tensor):
+        return torch.cat(tensors, dim=dim)
+    return tensor.__torch_function__(torch.cat, (tensors,), {'dim':dim})
+
+@implements(torch.flatten)
+def torch_flatten(inp, start_dim=0, end_dim=-1):
+    """ Implements torch.flatten """
+    # Unfortunately, does not support named tensors yet...
+    names = inp.tensor.names
+    new_names = names[0:start_dim] + (None,) + names[end_dim+1:]
+    res_tensor = torch.flatten(inp.tensor.rename(None), start_dim=start_dim, end_dim=end_dim)
+    res_tensor = res_tensor.refine_names(*new_names)
+    return MaskedTensor(res_tensor, inp.mask_dict, adjust_mask=True, apply_mask=False)

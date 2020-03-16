@@ -24,5 +24,5 @@ class Siamese_Model(nn.Module):
     def forward(self, x1, x2):
         x1 = self.node_embedder(x1)
         x2 = self.node_embedder(x2)
-        raw_scores = torch.einsum('bif,bjf->bij',x1,x2)
+        raw_scores = torch.matmul(x1,torch.transpose(x2, 1, 2))
         return F.log_softmax(raw_scores, dim = 2)

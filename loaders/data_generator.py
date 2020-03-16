@@ -21,6 +21,9 @@ def generate_regular_graph_netx(p, N):
     """ Generate random regular graph """
     d = p * N
     d = int(d)
+    # Make sure N * d is even
+    if N * d % 2 == 1:
+        d += 1
     g = networkx.random_regular_graph(d, N)
     W = networkx.adjacency_matrix(g).todense()
     return torch.as_tensor(W, dtype=torch.float)
@@ -47,37 +50,40 @@ class Generator(torch.utils.data.Dataset):
         elif name == 'val':
             self.num_examples = args['--num_examples_val']
         self.data = []
-        self.n_vertices = args['--n_vertices']
+        n_vertices = args['--n_vertices']
+        vertex_proba = args['--vertex_proba']
+        self.constant_n_vertices = (vertex_proba == 1.)
+        self.n_vertices_sampler = torch.distributions.Binomial(n_vertices, vertex_proba)
         self.generative_model = args['--generative_model']
         self.edge_density = args['--edge_density']
         self.noise = args['--noise']
-        subfolder_name = 'QAP_{}_{}_{}_{}'.format(self.generative_model,
-                                                  self.num_examples,
-                                                  self.n_vertices,
-                                                  self.noise, self.edge_density)
+        subfolder_name = 'QAP_{}_{}_{}_{}_{}'.format(self.generative_model,
+                                                     self.num_examples,
+                                                     n_vertices, vertex_proba,
+                                                     self.noise, self.edge_density)
         self.path_dataset = os.path.join(args['--path_dataset'],
                                          subfolder_name)
         utils.check_dir(self.path_dataset)
-
 
     def compute_example(self):
         """
         Compute pairs (Adjacency, noisy Adjacency)
         """
+        n_vertices = int(self.n_vertices_sampler.sample().item())
         if self.generative_model == 'ErdosRenyi':
-            W = generate_erdos_renyi_netx(self.edge_density, self.n_vertices)
+            W = generate_erdos_renyi_netx(self.edge_density, n_vertices)
         elif self.generative_model == 'Regular':
-            W = generate_regular_graph_netx(self.edge_density, self.n_vertices)
+            W = generate_regular_graph_netx(self.edge_density, n_vertices)
         elif self.generative_model == 'BarabasiAlbert':
-            W = generate_barabasi_albert_netx(self.edge_density, self.n_vertices)
+            W = generate_barabasi_albert_netx(self.edge_density, n_vertices)
 
         else:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
         pe1 = self.noise
         pe2 = (self.edge_density*self.noise)/(1-self.edge_density)
-        noise1 = generate_erdos_renyi_netx(pe1, self.n_vertices)
-        noise2 = generate_erdos_renyi_netx(pe2, self.n_vertices)
+        noise1 = generate_erdos_renyi_netx(pe1, n_vertices)
+        noise2 = generate_erdos_renyi_netx(pe2, n_vertices)
         W_noise = W*(1-noise1) + (1-W)*noise2
         B = adjacency_matrix_to_tensor_representation(W)
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
