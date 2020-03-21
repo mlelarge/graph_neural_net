@@ -3,3 +3,5 @@ scipy
 docopt
 networkx
 pytest
+sacred
+PyYAML

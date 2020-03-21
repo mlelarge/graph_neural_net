@@ -1,43 +1,7 @@
-"""
-Usage:
-    commander.py [options]
-
-Option:
-    -h --help                       show this screen.
-    --name=<str>                    name of experiment [default: ER_std]
-    --cpu=<str>                     use CPU [default: yes]
-    --generative_model=<str>        so far ErdosRenyi, Regular or BarabasiAlbert [default: ErdosRenyi]
-    --num_examples_train=<int>      [default: 20000]
-    --num_examples_test=<int>       [default: 10]
-    --num_examples_val=<int>        [default: 1000]
-    --edge_density=<float>          [default: 0.2]
-    --noise=<float>                 [default: 0.05]
-    --n_vertices=<int>              number of vertices [default: 50]
-    --vertex_proba=<float>          parameter of the binomial distribution of vertices [default: 1.]
-    --path_dataset=<str>            path where datasets are stored [default: dataset]
-    --root_dir=<str>                [default: .]
-    --epoch=<int>                   [default: 5]
-    --batch_size=<int>              [default: 32]
-    --arch=<str>                    [default: Siamese_Model]
-    --model_name=<str>              [default: Simple_Node_Embedding]
-    --num_blocks=<int>              number of blocks [default: 2]
-    --original_features_num=<int>   [default: 2]
-    --in_features=<int>             [default: 64]
-    --out_features=<int>            [default: 64]
-    --depth_of_mlp=<int>            [default: 3]
-    --print_freq=<int>              [default: 100]
-    --lr=<float>                    learning rate [default: 1e-3]
-    --step=<int>                    scheduler step [default: 5]
-    --lr_decay=<float>              scheduler decay [default: 0.9]
-    --seed=<int>                    random seed [default: 42]
-
-"""
-
-
 import os
 import shutil
 import json
-from docopt import docopt
+from sacred import Experiment
 
 import torch
 from toolbox import logger, metrics
@@ -49,18 +13,17 @@ from toolbox.losses import get_criterion
 from toolbox import utils
 import trainer as trainer
 
+ex = Experiment()
+ex.add_config('conf.yaml')
 
-list_float = ['--lr', '--edge_density', '--lr_decay', '--noise',
-              '--vertex_proba']
+@ex.config
+def update_config(name, root_dir, data):
+    log_dir = '{}/runs/{}/'.format(root_dir, name)
+    # Some funcs need path_dataset while not requiring the whole data dict
+    path_dataset = data['path_dataset']
+    # res_dir = '{}/runs/{}/res'.format(root_dir, name)
 
-list_int = ['--num_blocks', '--original_features_num',
-            '--in_features', '--out_features',
-            '--depth_of_mlp','--print_freq',
-            '--epoch', '--batch_size', '--n_vertices',
-            '--num_examples_train', '--num_examples_test',
-            '--num_examples_val', '--step', '--seed']
-
-
+# TODO
 def init_logger(args):
     # set loggers
     exp_name = args['--name']
@@ -69,31 +32,34 @@ def init_logger(args):
     exp_logger.add_meters('val', metrics.make_meter_matching())
     exp_logger.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
     return exp_logger
+ 
+@ex.capture
+def setup_env(cpu):
+    # Randomness is already controlled by Sacred
+    # See https://sacred.readthedocs.io/en/stable/randomness.html
+    if not cpu:
+        cudnn.benchmark = True
 
-def type_args(args):
-    for k in list_int:
-        args[k] = int(args[k])
-    for k in list_float:
-        args[k] = float(args[k])
-    if args['--cpu'] == 'yes':
-        args['--cpu'] = True
-    else:
-        args['--cpu'] = False
-    return args
+# create necessary folders and config files
+@ex.capture
+def init_output_env(_config, root_dir, log_dir, path_dataset):
+    utils.check_dir(os.path.join(root_dir,'runs'))
+    utils.check_dir(log_dir)
+    utils.check_dir(path_dataset)
+    #check_dir(os.path.join(args.log_dir,'tensorboard'))
+    #check_dir(args['--res_dir'])
+    with open(os.path.join(log_dir, 'config.json'), 'w') as f:
+        json.dump(_config, f)
 
-def update_args(args):
-    args['--log_dir'] = '{}/runs/{}/'.format(args['--root_dir'], args['--name'])
-    #args['--res_dir'] = '{}/runs/{}/res'.format(args['--root_dir'], args['--name'])
-    return args
-
-def save_checkpoint(args, state, is_best, filename='checkpoint.pth.tar'):
-    utils.check_dir(args['--log_dir'])
-    filename = os.path.join(args['--log_dir'], filename)
+@ex.capture
+def save_checkpoint(log_dir, state, is_best, filename='checkpoint.pth.tar'):
+    utils.check_dir(log_dir)
+    filename = os.path.join(log_dir, filename)
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, os.path.join(args['--log_dir'], 'model_best.pth.tar'))
+        shutil.copyfile(filename, os.path.join(log_dir, 'model_best.pth.tar'))
 
-    fn = os.path.join(args['--log_dir'], 'checkpoint_epoch{}.pth.tar')
+    fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')
     torch.save(state, fn.format(state['epoch']))
 
     if (state['epoch'] - 1 ) % 5 != 0:
@@ -101,48 +67,45 @@ def save_checkpoint(args, state, is_best, filename='checkpoint.pth.tar'):
       if os.path.exists(fn.format(state['epoch'] - 1 )):
           os.remove(fn.format(state['epoch'] - 1 ))
 
-    path_logger = os.path.join(args['--log_dir'], 'logger.json')
-    state['exp_logger'].to_json(log_dir=args['--log_dir'],filename='logger.json')
+    path_logger = os.path.join(log_dir, 'logger.json')
+    state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
 
 
-def main():
+@ex.automain
+def main(name, cpu, data, train, arch):
     """ Main func.
     """
-    global args, best_score, best_epoch
+    global best_score, best_epoch
     best_score, best_epoch = -1, -1
-    args = docopt(__doc__)
-    args = type_args(args)
-    args = update_args(args)
-    use_cuda = not bool(args['--cpu']) and torch.cuda.is_available()
+    use_cuda = not cpu and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
     print('Using device:', device)
 
     # init random seeds 
-    utils.setup_env(args)
+    setup_env()
 
-    utils.init_output_env(args)
+    init_output_env()
 
-    exp_logger = init_logger(args)
+    exp_logger = None #init_logger(args)
     
-    print(args['--batch_size'])
-    gene_train = Generator('train', args)
+    gene_train = Generator('train', data)
     gene_train.load_dataset()
-    train_loader = siamese_loader(gene_train, args['--batch_size'],
+    train_loader = siamese_loader(gene_train, train['batch_size'],
                                   gene_train.constant_n_vertices)
-    gene_val = Generator('val', args)
+    gene_val = Generator('val', data)
     gene_val.load_dataset()
-    val_loader = siamese_loader(gene_val, args['--batch_size'],
+    val_loader = siamese_loader(gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
-    model = get_model(args)
-    optimizer, scheduler = get_optimizer(args,model)
+    model = get_model(arch)
+    optimizer, scheduler = get_optimizer(train,model)
     criterion = get_criterion(device)
 
-    exp_logger = init_logger(args)
+    # exp_logger = init_logger(args)
 
     model.to(device)
 
     is_best = True
-    for epoch in range(args['--epoch']):
+    for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
         trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max)
         scheduler.step()
@@ -156,13 +119,10 @@ def main():
         if True == is_best:
             best_epoch = epoch
 
-        save_checkpoint(args, {
+        save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
             'best_score': best_score,
             'best_epoch': best_epoch,
             'exp_logger': exp_logger,
         }, is_best)
-
-if __name__ == '__main__':
-    main()
