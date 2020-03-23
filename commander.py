@@ -14,7 +14,7 @@ from toolbox import utils
 import trainer as trainer
 
 ex = Experiment()
-ex.add_config('conf.yaml')
+ex.add_config('default.yaml')
 
 @ex.config
 def update_config(name, root_dir, data):
@@ -23,11 +23,10 @@ def update_config(name, root_dir, data):
     path_dataset = data['path_dataset']
     # res_dir = '{}/runs/{}/res'.format(root_dir, name)
 
-# TODO
-def init_logger(args):
+@ex.capture
+def init_logger(name, _config, _run):
     # set loggers
-    exp_name = args['--name']
-    exp_logger = logger.Experiment(exp_name, args)
+    exp_logger = logger.Experiment(name, _config, run=_run)
     exp_logger.add_meters('train', metrics.make_meter_matching())
     exp_logger.add_meters('val', metrics.make_meter_matching())
     exp_logger.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
@@ -52,7 +51,7 @@ def init_output_env(_config, root_dir, log_dir, path_dataset):
         json.dump(_config, f)
 
 @ex.capture
-def save_checkpoint(log_dir, state, is_best, filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     utils.check_dir(log_dir)
     filename = os.path.join(log_dir, filename)
     torch.save(state, filename)
@@ -86,7 +85,7 @@ def main(name, cpu, data, train, arch):
 
     init_output_env()
 
-    exp_logger = None #init_logger(args)
+    exp_logger = init_logger()
     
     gene_train = Generator('train', data)
     gene_train.load_dataset()
