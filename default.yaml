@@ -30,3 +30,8 @@ arch: # Architecture and model
     in_features: 64
     out_features: 64
     depth_of_mlp: 3
+
+observers:
+    neptune:
+        enable: Yes
+        project: wazizian/graph-neural-net

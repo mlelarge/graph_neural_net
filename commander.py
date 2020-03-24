@@ -13,15 +13,31 @@ from toolbox.losses import get_criterion
 from toolbox import utils
 import trainer as trainer
 
+### BEGIN Sacred setup
 ex = Experiment()
 ex.add_config('default.yaml')
 
-@ex.config
-def update_config(name, root_dir, data):
-    log_dir = '{}/runs/{}/'.format(root_dir, name)
-    # Some funcs need path_dataset while not requiring the whole data dict
-    path_dataset = data['path_dataset']
-    # res_dir = '{}/runs/{}/res'.format(root_dir, name)
+@ex.config_hook
+def set_experiment_name(config, command_name, logger):
+    ex.path = config['name']
+    return config
+
+@ex.config_hook
+def update_config(config, command_name, logger):
+    config.update(log_dir='{}/runs/{}/'.format(config['root_dir'], config['name']),
+                   # Some funcs need path_dataset while not requiring the whole data dict
+                   path_dataset=config['data']['path_dataset'])
+                   #res_dir='{}/runs/{}/res'.format(config['root_dir'], config['name'])
+    return config
+
+@ex.config_hook
+def init_observers(config, command_name, logger):
+    neptune = config['observers']['neptune']
+    if neptune['enable']:
+        from neptunecontrib.monitoring.sacred import NeptuneObserver
+        ex.observers.append(NeptuneObserver(project_name=neptune['project']))
+    return config
+### END Sacred setup
 
 @ex.capture
 def init_logger(name, _config, _run):
@@ -66,12 +82,11 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
       if os.path.exists(fn.format(state['epoch'] - 1 )):
           os.remove(fn.format(state['epoch'] - 1 ))
 
-    path_logger = os.path.join(log_dir, 'logger.json')
     state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
 
 
 @ex.automain
-def main(name, cpu, data, train, arch):
+def main(cpu, data, train, arch):
     """ Main func.
     """
     global best_score, best_epoch
@@ -84,7 +99,6 @@ def main(name, cpu, data, train, arch):
     setup_env()
 
     init_output_env()
-
     exp_logger = init_logger()
     
     gene_train = Generator('train', data)

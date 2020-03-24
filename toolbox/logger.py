@@ -50,8 +50,6 @@ class Experiment(object):
 
     def update_meter(self, tag, name, val, n=1):
         meter = self.get_meter(tag, name).update(val, n=n)
-        if self.run:
-            self.run.log_scalar("{}.{}".format(tag, name), val/n)
     
     def update_value_meter(self, tag, name, val):
         meter = self.get_meter(tag, name).update(val)
@@ -61,6 +59,12 @@ class Experiment(object):
         if name not in self.logged[tag]:
             self.logged[tag][name] = {}
         self.logged[tag][name][n] = meter.value()
+        try:
+            is_active = meter.is_active()
+        except AttributeError:
+            is_active = True
+        if self.run and is_active:
+            self.run.log_scalar("{}.{}".format(tag, name), meter.value())
 
     def log_meters(self, tag, n=1):
         for name, meter in self.get_meters(tag).items():
