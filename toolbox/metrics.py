@@ -26,7 +26,11 @@ class Meter(object):
         return self.sum
     
     def value(self):
-        return self.sum
+        """ Returns the value over one epoch """
+        return self.avg
+
+    def is_active(self):
+        return self.count > 0
 
 class ValueMeter(object):
     """Computes and stores the average and current value"""

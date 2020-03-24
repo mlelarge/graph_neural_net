@@ -3,3 +3,7 @@ scipy
 docopt
 networkx
 pytest
+sacred
+PyYAML
+neptune-contrib
+psutil

@@ -44,24 +44,24 @@ class Generator(torch.utils.data.Dataset):
     def __init__(self, name, args):
         self.name = name
         if name == 'train':
-            self.num_examples = args['--num_examples_train']
+            self.num_examples = args['num_examples_train']
         elif name == 'test':
-            self.num_examples = args['--num_examples_test']
+            self.num_examples = args['num_examples_test']
         elif name == 'val':
-            self.num_examples = args['--num_examples_val']
+            self.num_examples = args['num_examples_val']
         self.data = []
-        n_vertices = args['--n_vertices']
-        vertex_proba = args['--vertex_proba']
+        n_vertices = args['n_vertices']
+        vertex_proba = args['vertex_proba']
         self.constant_n_vertices = (vertex_proba == 1.)
         self.n_vertices_sampler = torch.distributions.Binomial(n_vertices, vertex_proba)
-        self.generative_model = args['--generative_model']
-        self.edge_density = args['--edge_density']
-        self.noise = args['--noise']
+        self.generative_model = args['generative_model']
+        self.edge_density = args['edge_density']
+        self.noise = args['noise']
         subfolder_name = 'QAP_{}_{}_{}_{}_{}'.format(self.generative_model,
                                                      self.num_examples,
                                                      n_vertices, vertex_proba,
                                                      self.noise, self.edge_density)
-        self.path_dataset = os.path.join(args['--path_dataset'],
+        self.path_dataset = os.path.join(args['path_dataset'],
                                          subfolder_name)
         utils.check_dir(self.path_dataset)
 

@@ -11,8 +11,10 @@ This data is saved to json files after each epoch.
 '''
 class Experiment(object):
 
-    def __init__(self, name, options=dict()):
+    def __init__(self, name, options=dict(), run=None):
         """ Create an experiment
+            run, if provided, must be a sacred Run object,
+            to be used for logging
         """
         super(Experiment, self).__init__()
 
@@ -24,6 +26,15 @@ class Experiment(object):
         self.logged = defaultdict(dict)
         self.meters = defaultdict(dict)
 
+        self.run = run
+
+    def __getstate__(self):
+        """ Overrides default pickle behaviour for this cls (run is not serializable) """
+        # shallow copy
+        d = self.__dict__.copy()
+        d['run'] = None
+        return d
+        
     def add_meters(self, tag, meters_dict):
         assert tag not in (self.meters.keys())
         for name, meter in meters_dict.items():
@@ -37,11 +48,23 @@ class Experiment(object):
     def update_options(self, options_dict):
         self.options.update(options_dict)
 
+    def update_meter(self, tag, name, val, n=1):
+        meter = self.get_meter(tag, name).update(val, n=n)
+    
+    def update_value_meter(self, tag, name, val):
+        meter = self.get_meter(tag, name).update(val)
+
     def log_meter(self, tag, name, n=1):
         meter = self.get_meter(tag, name)
         if name not in self.logged[tag]:
             self.logged[tag][name] = {}
         self.logged[tag][name][n] = meter.value()
+        try:
+            is_active = meter.is_active()
+        except AttributeError:
+            is_active = True
+        if self.run and is_active:
+            self.run.log_scalar("{}.{}".format(tag, name), meter.value())
 
     def log_meters(self, tag, n=1):
         for name, meter in self.get_meters(tag).items():
@@ -51,7 +74,6 @@ class Experiment(object):
         meters = self.get_meters(tag)
         for name, meter in meters.items():
             meter.reset()
-        return meters
 
     def get_meters(self, tag):
         assert tag in list(self.meters.keys())
@@ -67,6 +89,7 @@ class Experiment(object):
         json_file = os.path.join(log_dir,filename)
         var_dict = copy.copy(vars(self))
         var_dict.pop('meters')
+        var_dict.pop('run')
         #for key in ('viz', 'viz_dict'):
         #    if key in list(var_dict.keys()):
         #        var_dict.pop(key)    
