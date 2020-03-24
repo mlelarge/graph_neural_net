@@ -1,7 +1,6 @@
 import os
 import json
 import torch
-import torch.backends.cudnn as cudnn
 import numpy as np
 
 # create directory if it does not exist

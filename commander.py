@@ -4,6 +4,7 @@ import json
 from sacred import Experiment
 
 import torch
+import torch.backends.cudnn as cudnn
 from toolbox import logger, metrics
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
