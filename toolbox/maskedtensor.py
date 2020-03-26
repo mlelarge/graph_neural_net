@@ -92,7 +92,7 @@ class MaskedTensor:
                             apply_mask=True, copy=True)
 
     ## Torch function override
-    def __torch_function__(self, func, args=(), kwargs=None):
+    def __torch_function__(self, func, types, args=(), kwargs=None):
         """
         Support torch.* functions, derived from pytorch doc
         See https://pytorch.org/docs/master/notes/extending.html
