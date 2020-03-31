@@ -112,7 +112,7 @@ def main(cpu, data, train, arch):
                                 gene_val.constant_n_vertices)
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
-    criterion = get_criterion(device)
+    criterion = get_criterion(device, train['loss_reduction'])
 
     # exp_logger = init_logger(args)
 
