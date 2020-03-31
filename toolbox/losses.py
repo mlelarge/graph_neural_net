@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class triplet_loss(nn.Module):
-    def __init__(self, device='cpu', loss_reduction='mean', loss=nn.NLLLoss(reduction='sum')):
+    def __init__(self, device='cpu', loss_reduction='mean', loss=nn.CrossEntropyLoss(reduction='sum')):
         super(triplet_loss, self).__init__()
         self.device = device
         self.loss = loss
