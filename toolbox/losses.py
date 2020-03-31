@@ -26,7 +26,7 @@ class triplet_loss(nn.Module):
             incrs = self.increments(self.loss(out, target), n_vertices)
             loss += incrs[0]
             total += incrs[1]
-        return loss
+        return loss/total
 
 def get_criterion(device, loss_reduction):
     return triplet_loss(device, loss_reduction)
