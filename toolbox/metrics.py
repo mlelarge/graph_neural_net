@@ -61,8 +61,7 @@ def accuracy_linear_assignment(weights,labels=None):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
-    bs = weights.shape[0]
-    n = weights.shape[1]
+    total_n_vertices = 0
     acc = 0
     for i, weight in enumerate(weights):
         if labels:
@@ -72,15 +71,15 @@ def accuracy_linear_assignment(weights,labels=None):
         cost = -weight.cpu().detach().numpy()
         _ , preds = linear_sum_assignment(cost)
         acc += np.sum(preds == label)
-    return acc, n, bs
+        total_n_vertices += len(weight)
+    return acc, total_n_vertices
 
 def accuracy_max(weights,labels=None):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
-    bs = weights.shape[0]
-    n = weights.shape[1]
     acc = 0
+    total_n_vertices = 0
     for i, weight in enumerate(weights):
         if labels:
             label = labels[i]
@@ -90,4 +89,5 @@ def accuracy_max(weights,labels=None):
         preds = np.argmax(weight, 0)
         #print(preds)
         acc += np.sum(preds == label)
-    return acc, n, bs
+        total_n_vertices += len(weight)
+    return acc, total_n_vertices

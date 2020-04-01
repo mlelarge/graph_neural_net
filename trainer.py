@@ -34,9 +34,9 @@ def train_triplet(train_loader,model,criterion,optimizer,
         if i % print_freq == 0:
             if eval_score is not None:
                 #print(np_out.shape)
-                acc_max, n, bs = eval_score(output)
+                acc_max, total_n_vertices = eval_score(output)
                 #print(acc_max, n, bs)
-                logger.update_meter('train', 'acc_max', acc_max, n=n*bs)
+                logger.update_meter('train', 'acc_max', acc_max, n=total_n_vertices)
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
@@ -65,8 +65,8 @@ def val_triplet(val_loader,model,criterion,
         logger.update_meter('val', 'loss', loss.data.item(), n=1)
     
         if eval_score is not None:
-            acc_la, n, bs = eval_score(output)
-            logger.update_meter('val', 'acc_la', acc_la, n=n*bs)
+            acc_la, total_n_vertices = eval_score(output)
+            logger.update_meter('val', 'acc_la', acc_la, n=total_n_vertices)
         if i % print_freq == 0:
             print('Validation set, epoch: [{0}][{1}/{2}]\t'
                     'Loss {loss.val:.4f} ({loss.avg:.4f})\t'

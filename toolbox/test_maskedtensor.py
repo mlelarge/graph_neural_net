@@ -69,7 +69,7 @@ def accuracy_wrapper(func):
         # remove features
         new_weights = torch.sum(weights, -1)
         ret = func(new_weights, *args, **kwargs)
-        return torch.Tensor([ret[0]])
+        return torch.Tensor(ret)
     return wrapped_func
 
 # the third parameter specifies whether the base_name of the second maskedtensor
