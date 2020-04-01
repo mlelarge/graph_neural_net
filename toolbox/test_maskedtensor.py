@@ -15,6 +15,7 @@ from models.layers import MlpBlock, RegularBlock
 from models.base_model import Simple_Node_Embedding
 from models.siamese_net import Siamese_Model
 from losses import get_criterion
+from metrics import accuracy_linear_assignment, accuracy_max
 
 def apply_list_tensors(lst, func):
     """ Apply func on each tensor (with batch dim) """
@@ -59,6 +60,16 @@ def graph_conv_wrapper(func):
         new_args = [x.permute(0, 3, 1, 2) for x in args]
         ret = func(*new_args, **kwargs)
         return ret.permute(0, 2, 3, 1)
+    return wrapped_func
+
+def accuracy_wrapper(func):
+    """ Wraps accuracy funcs so that they behave like the other funcs """
+    @functools.wraps(func)
+    def wrapped_func(weights, *args, **kwargs):
+        # remove features
+        new_weights = torch.sum(weights, -1)
+        ret = func(new_weights, *args, **kwargs)
+        return torch.Tensor([ret[0]])
     return wrapped_func
 
 # the third parameter specifies whether the base_name of the second maskedtensor
@@ -118,5 +129,16 @@ def test_score_func(score_list, func_data):
     masked_tensor = maskedtensor.from_list(score_list, dims=(0, 1))
     res_mt = func(masked_tensor)
     res_lst = func(torch.stack(score_list))
-    assert res_mt.size() == res_lst.size()
+    assert torch.allclose(res_mt, res_lst, atol=ATOL), torch.norm(res_mt - res_lst, p=float('inf'))
+
+TEST_ACCURACY_FUNCS = [
+    (accuracy_wrapper(accuracy_linear_assignment), 'accuracy_linear_assignment'),
+    (accuracy_wrapper(accuracy_max), 'accuracy_max')]
+
+@pytest.mark.parametrize('func_data', TEST_ACCURACY_FUNCS, ids=lambda func_data: func_data[1])
+def test_accuracy_func(tensor_list, func_data):
+    func, _ = func_data
+    masked_tensor = maskedtensor.from_list(tensor_list, dims=(0, 1))
+    res_mt = func(masked_tensor)
+    res_lst = sum(apply_list_tensors(tensor_list, func))
     assert torch.allclose(res_mt, res_lst, atol=ATOL), torch.norm(res_mt - res_lst, p=float('inf'))

@@ -57,7 +57,7 @@ def make_meter_matching():
     }
     return meters_dict
 
-def accuracy_linear_assigment(weights,labels=None):
+def accuracy_linear_assignment(weights,labels=None):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """

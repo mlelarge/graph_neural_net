@@ -125,7 +125,7 @@ def main(cpu, data, train, arch):
         scheduler.step()
     #print(args['--num_examples_train'])
 
-        acc = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assigment)
+        acc = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment)
 
         # remember best acc and save checkpoint
         is_best = acc > best_score
