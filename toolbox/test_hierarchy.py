@@ -8,18 +8,23 @@ import scipy.optimize
 
 N_VERTICES_RANGE = range(40, 50)
 DEVICE = torch.device('cpu')
-OPT_SCALE = False
+OPT_SCALE = True
 
 def perturb(target):
     target[0, :] = 2
     return target
 
 @pytest.fixture
-def batch():
-    tensor_lst = [perturb(torch.eye(n_vertices, n_vertices)) for n_vertices in N_VERTICES_RANGE]
+def batch(request):
+    transpose = request.param
+    if transpose:
+        tensor_lst = [torch.t(perturb(torch.eye(n_vertices, n_vertices)))
+                      for n_vertices in N_VERTICES_RANGE]
+    else:
+        tensor_lst = [perturb(torch.eye(n_vertices, n_vertices)) for n_vertices in N_VERTICES_RANGE]
     return maskedtensor.from_list(tensor_lst, dims=(0, 1))
 
-@pytest.mark.xfail
+@pytest.mark.parametrize('batch', [False, True], indirect=['batch'])
 def test_hierarchy(batch):
     correct, total = metrics.accuracy_max(batch)
     acc = correct/total
