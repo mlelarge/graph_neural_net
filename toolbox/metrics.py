@@ -86,7 +86,7 @@ def accuracy_max(weights,labels=None):
         else:
             label = np.arange(len(weight))
         weight = weight.cpu().detach().numpy()
-        preds = np.argmax(weight, 0)
+        preds = np.argmax(weight, 1)
         #print(preds)
         acc += np.sum(preds == label)
         total_n_vertices += len(weight)
