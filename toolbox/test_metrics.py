@@ -24,10 +24,3 @@ def test_perfect_accuracy(correct_batch, func_data):
 def batch():
     tensor_lst = [torch.empty(n_vertices, n_vertices).normal_() for n_vertices in N_VERTICES_RANGE]
     return from_list(tensor_lst, dims=(0, 1))
-
-@pytest.mark.xfail
-def test_acc_comp(batch):
-    correct_la, total_la = accuracy_linear_assignment(batch)
-    correct_max, total_max = accuracy_max(batch)
-    assert total_la == total_max
-    assert correct_la >= correct_max
