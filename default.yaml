@@ -21,6 +21,9 @@ train: # Training parameters
     scheduler_step: 5
     scheduler_decay: 0.9
     print_freq: 100
+    # How to reduce the loss over several examples:
+    # mean, mean_of_mean
+    loss_reduction: mean
 
 arch: # Architecture and model
     arch: Siamese_Model
