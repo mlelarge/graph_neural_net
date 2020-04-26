@@ -4,12 +4,23 @@ import torch
 import torch.utils
 from toolbox import utils
 
+GENERATOR_FUNCTIONS = {}
+
+def generates(name):
+    """ Register a generator function for a graph distribution """
+    def decorator(func):
+        GENERATOR_FUNCTIONS[name] = func
+        return func
+    return decorator
+
+@generates("ErdosRenyi")
 def generate_erdos_renyi_netx(p, N):
     """ Generate random Erdos Renyi graph """
     g = networkx.erdos_renyi_graph(N, p)
     W = networkx.adjacency_matrix(g).todense()
     return torch.as_tensor(W, dtype=torch.float)
 
+@generates("BarabasiAlbert")
 def generate_barabasi_albert_netx(p, N):
     """ Generate random Barabasi Albert graph """
     m = int(p*(N -1)/2)
@@ -17,6 +28,7 @@ def generate_barabasi_albert_netx(p, N):
     W = networkx.adjacency_matrix(g).todense()
     return torch.as_tensor(W, dtype=torch.float)
 
+@generates("Regular")
 def generate_regular_graph_netx(p, N):
     """ Generate random regular graph """
     d = p * N
@@ -43,12 +55,7 @@ class Generator(torch.utils.data.Dataset):
     """
     def __init__(self, name, args):
         self.name = name
-        if name == 'train':
-            self.num_examples = args['num_examples_train']
-        elif name == 'test':
-            self.num_examples = args['num_examples_test']
-        elif name == 'val':
-            self.num_examples = args['num_examples_val']
+        self.num_examples = args['num_examples_' + name]
         self.data = []
         n_vertices = args['n_vertices']
         vertex_proba = args['vertex_proba']
@@ -70,14 +77,9 @@ class Generator(torch.utils.data.Dataset):
         Compute pairs (Adjacency, noisy Adjacency)
         """
         n_vertices = int(self.n_vertices_sampler.sample().item())
-        if self.generative_model == 'ErdosRenyi':
-            W = generate_erdos_renyi_netx(self.edge_density, n_vertices)
-        elif self.generative_model == 'Regular':
-            W = generate_regular_graph_netx(self.edge_density, n_vertices)
-        elif self.generative_model == 'BarabasiAlbert':
-            W = generate_barabasi_albert_netx(self.edge_density, n_vertices)
-
-        else:
+        try:
+            W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
+        except KeyError:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
         pe1 = self.noise
