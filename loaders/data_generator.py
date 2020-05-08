@@ -1,4 +1,6 @@
 import os
+import random
+import itertools
 import networkx
 import torch
 import torch.utils
@@ -18,7 +20,7 @@ def generate_erdos_renyi_netx(p, N):
     """ Generate random Erdos Renyi graph """
     g = networkx.erdos_renyi_graph(N, p)
     W = networkx.adjacency_matrix(g).todense()
-    return torch.as_tensor(W, dtype=torch.float)
+    return g, torch.as_tensor(W, dtype=torch.float)
 
 @generates("BarabasiAlbert")
 def generate_barabasi_albert_netx(p, N):
@@ -26,7 +28,7 @@ def generate_barabasi_albert_netx(p, N):
     m = int(p*(N -1)/2)
     g = networkx.barabasi_albert_graph(N, m)
     W = networkx.adjacency_matrix(g).todense()
-    return torch.as_tensor(W, dtype=torch.float)
+    return g, torch.as_tensor(W, dtype=torch.float)
 
 @generates("Regular")
 def generate_regular_graph_netx(p, N):
@@ -38,7 +40,54 @@ def generate_regular_graph_netx(p, N):
         d += 1
     g = networkx.random_regular_graph(d, N)
     W = networkx.adjacency_matrix(g).todense()
-    return torch.as_tensor(W, dtype=torch.float)
+    return g, torch.as_tensor(W, dtype=torch.float)
+
+NOISE_FUNCTIONS = {}
+
+def noise(name):
+    """ Register a noise function """
+    def decorator(func):
+        NOISE_FUNCTIONS[name] = func
+        return func
+    return decorator
+
+@noise("ErdosRenyi")
+def noise_erdos_renyi(g, W, noise, edge_density):
+    n_vertices = len(W)
+    pe1 = noise
+    pe2 = (edge_density*noise)/(1-edge_density)
+    noise1 = generate_erdos_renyi_netx(pe1, n_vertices)
+    noise2 = generate_erdos_renyi_netx(pe2, n_vertices)
+    W_noise = W*(1-noise1) + (1-W)*noise2
+    return W_noise
+
+def is_swappable(g, u, v, s, t):
+    """
+    Check whether we can swap
+    the edges u,v and s,t
+    to get u,t and s,v
+    """
+    actual_edges = g.has_edge(u, v) and g.has_edge(s, t)
+    no_self_loop = (u != t) and (s != v)
+    no_parallel_edge = not (g.has_edge(u, t) or g.has_edge(s, v))
+    return actual_edges and no_self_loop and no_parallel_edge
+
+def do_swap(g, u, v, s, t):
+    g.remove_edge(u, v)
+    g.remove_edge(s, t)
+    g.add_edge(u, t)
+    g.add_edge(s, v)
+
+@noise("EdgeSwap")
+def noise_edge_swap(g, W, noise, edge_density):
+    g_noise = g.copy()
+    edges_iter = itertools.chain(iter(g.edges), ((v, u) for (u, v) in g.edges))
+    for u,v in edges_iter:
+        for s, t in edges_iter:
+            if random.random() < noise and is_swappable(g_noise, u, v, s, t):
+                do_swap(g_noise, u, v, s, t)
+    W_noise = networkx.adjacency_matrix(g_noise).todense()
+    return torch.as_tensor(W_noise, dtype=torch.float)
 
 def adjacency_matrix_to_tensor_representation(W):
     """ Create a tensor B[:,:,1] = W and B[i,i,0] = deg(i)"""
@@ -62,9 +111,11 @@ class Generator(torch.utils.data.Dataset):
         self.constant_n_vertices = (vertex_proba == 1.)
         self.n_vertices_sampler = torch.distributions.Binomial(n_vertices, vertex_proba)
         self.generative_model = args['generative_model']
+        self.noise_model = args['noise_model']
         self.edge_density = args['edge_density']
         self.noise = args['noise']
-        subfolder_name = 'QAP_{}_{}_{}_{}_{}'.format(self.generative_model,
+        subfolder_name = 'QAP_{}_{}_{}_{}_{}_{}'.format(self.generative_model,
+                                                     self.noise_model,
                                                      self.num_examples,
                                                      n_vertices, vertex_proba,
                                                      self.noise, self.edge_density)
@@ -78,15 +129,15 @@ class Generator(torch.utils.data.Dataset):
         """
         n_vertices = int(self.n_vertices_sampler.sample().item())
         try:
-            W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
+            g, W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
         except KeyError:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
-        pe1 = self.noise
-        pe2 = (self.edge_density*self.noise)/(1-self.edge_density)
-        noise1 = generate_erdos_renyi_netx(pe1, n_vertices)
-        noise2 = generate_erdos_renyi_netx(pe2, n_vertices)
-        W_noise = W*(1-noise1) + (1-W)*noise2
+        try:
+            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, self.edge_density)
+        except KeyError:
+            raise ValueError('Noise model {} not supported'
+                             .format(self.noise_model))
         B = adjacency_matrix_to_tensor_representation(W)
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
