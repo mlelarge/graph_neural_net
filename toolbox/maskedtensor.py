@@ -222,7 +222,7 @@ def dispatch_cat(tensors, dim=0):
     tensor = tensors[0]
     if isinstance(tensor, torch.Tensor):
         return torch.cat(tensors, dim=dim)
-    return tensor.__torch_function__(torch.cat, (tensors,), {'dim':dim})
+    return tensor.__torch_function__(torch.cat, [type(t) for t in tensors], (tensors,), {'dim':dim})
 
 @implements(torch.flatten)
 def torch_flatten(inp, start_dim=0, end_dim=-1):
