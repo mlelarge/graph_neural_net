@@ -29,7 +29,7 @@
 ### Install
 Run
 ```
-pip install -r requirements.txt --pre -f https://download.pytorch.org/whl/nightly/cu101/torch_nightly.html
+pip install -r requirements.txt
 ```
 ### Run
 Run the main file ```commander.py```
