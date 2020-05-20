@@ -56,8 +56,8 @@ def noise_erdos_renyi(g, W, noise, edge_density):
     n_vertices = len(W)
     pe1 = noise
     pe2 = (edge_density*noise)/(1-edge_density)
-    noise1 = generate_erdos_renyi_netx(pe1, n_vertices)
-    noise2 = generate_erdos_renyi_netx(pe2, n_vertices)
+    _,noise1 = generate_erdos_renyi_netx(pe1, n_vertices)
+    _,noise2 = generate_erdos_renyi_netx(pe2, n_vertices)
     W_noise = W*(1-noise1) + (1-W)*noise2
     return W_noise
 
