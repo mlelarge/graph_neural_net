@@ -8,7 +8,7 @@ data: # Data related parameters
     num_examples_test: 10
     num_examples_val: 1000
     generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
-    noise_model: ErodsRenyi
+    noise_model: ErdosRenyi
     edge_density: 0.2
     n_vertices: 50
     vertex_proba: 1. # Parameter of the binomial distribution of vertices
