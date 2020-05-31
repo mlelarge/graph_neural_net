@@ -11,6 +11,7 @@ for noise in noise_list:
     for _ in range(repeat):
         ex.run(config_updates={
             'name': 'ErdosRenyi',
+            'cpu': False,
             'data': {'noise': noise},
             })
 
@@ -19,6 +20,7 @@ for noise in noise_list:
     for repeat in range(repeat):
         ex.run(config_updates={
             'name': 'Regular',
+            'cpu': False,
             'data': {
                 'generative_model': 'Regular',
                 'noise': noise},
@@ -29,6 +31,7 @@ for noise in extended_noise_list:
     for repeat in range(repeat):
         ex.run(config_updates={
             'name': 'Regular',
+            'cpu': False,
             'data': {
                 'generative_model': 'Regular',
                 'noise': noise,
