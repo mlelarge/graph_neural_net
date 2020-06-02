@@ -38,6 +38,15 @@ def init_observers(config, command_name, logger):
         from neptunecontrib.monitoring.sacred import NeptuneObserver
         ex.observers.append(NeptuneObserver(project_name=neptune['project']))
     return config
+
+@ex.post_run_hook
+def clean_observer(observers):
+    """ Observers that are added in a config_hook need to be cleaned """
+    neptune = observers['neptune']
+    if neptune['enable']:
+        from neptunecontrib.monitoring.sacred import NeptuneObserver
+        ex.observers = [obs for obs in ex.observers if not isinstance(obs, NeptuneObserver)]
+
 ### END Sacred setup
 
 @ex.capture
