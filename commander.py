@@ -55,6 +55,7 @@ def init_logger(name, _config, _run):
     exp_logger = logger.Experiment(name, _config, run=_run)
     exp_logger.add_meters('train', metrics.make_meter_matching())
     exp_logger.add_meters('val', metrics.make_meter_matching())
+    exp_logger.add_meters('test', metrics.make_meter_matching())
     exp_logger.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
     return exp_logger
  
@@ -119,6 +120,10 @@ def main(cpu, data, train, arch):
     gene_val.load_dataset()
     val_loader = siamese_loader(gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
+    gene_test = Generator('test', data)
+    gene_test.load_dataset()
+    test_loader = siamese_loader(gene_test, train['batch_size'],
+                                gene_test.constant_n_vertices)
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
     criterion = get_criterion(device, train['loss_reduction'])
@@ -131,16 +136,23 @@ def main(cpu, data, train, arch):
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
         trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max)
-        scheduler.step()
-    #print(args['--num_examples_train'])
+        
 
-        acc = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment)
 
+        acc, loss = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment)
+        scheduler.step(loss)
         # remember best acc and save checkpoint
         is_best = acc > best_score
+        #if acc < 0.1:
+        #    print('Restart')
+        #    model = get_model(arch)
+        #    model.to(device)
+        #    optimizer, scheduler = get_optimizer(train,model)
+        #print(is_best,acc,best_score)
         best_score = max(acc, best_score)
         if True == is_best:
             best_epoch = epoch
+            acc_test = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment,val_test='test')
 
         save_checkpoint({
             'epoch': epoch + 1,

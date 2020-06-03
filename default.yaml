@@ -5,7 +5,7 @@ root_dir: .
 
 data: # Data related parameters
     num_examples_train: 20000
-    num_examples_test: 10
+    num_examples_test: 1000
     num_examples_val: 1000
     generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
     noise_model: ErdosRenyi
@@ -16,7 +16,7 @@ data: # Data related parameters
     path_dataset: dataset # Path where datasets are stored
 
 train: # Training parameters
-    epoch: 5
+    epoch: 10
     batch_size: 32
     lr: !!float 1e-3
     scheduler_step: 5
@@ -38,4 +38,4 @@ arch: # Architecture and model
 observers:
     neptune:
         enable: Yes
-        project: wazizian/graph-neural-net
+        project: mlelarge/GNN
