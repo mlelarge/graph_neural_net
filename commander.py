@@ -143,12 +143,6 @@ def main(cpu, data, train, arch):
         scheduler.step(loss)
         # remember best acc and save checkpoint
         is_best = acc > best_score
-        #if acc < 0.1:
-        #    print('Restart')
-        #    model = get_model(arch)
-        #    model.to(device)
-        #    optimizer, scheduler = get_optimizer(train,model)
-        #print(is_best,acc,best_score)
         best_score = max(acc, best_score)
         if True == is_best:
             best_epoch = epoch
