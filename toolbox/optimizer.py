@@ -7,6 +7,6 @@ def get_optimizer(args, model):
                             lr=args['lr'],
                             amsgrad=False)
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args['scheduler_step'], gamma=args['scheduler_decay'])
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,factor = 0.5,patience=2)#StepLR(optimizer, step_size=args['scheduler_step'], gamma=args['scheduler_decay'])
 
     return optimizer, scheduler
