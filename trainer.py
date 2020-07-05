@@ -34,18 +34,18 @@ def train_triplet(train_loader,model,criterion,optimizer,
         if i % print_freq == 0:
             if eval_score is not None:
                 #print(np_out.shape)
-                acc_max, total_n_vertices = eval_score(output)
+                acc, total_n_vertices = eval_score(output)
                 #print(acc_max, n, bs)
-                logger.update_meter('train', 'acc_max', acc_max, n=total_n_vertices)
+                logger.update_meter('train', 'acc', acc, n=total_n_vertices)
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                   'LR {lr:.2e}\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Acc_Max {acc_max.avg:.3f} ({acc_max.val:.3f})'.format(
+                  'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
                    epoch, i, len(train_loader), batch_time=logger.get_meter('train', 'batch_time'),
                    data_time=logger.get_meter('train', 'data_time'), lr=learning_rate,
-                   loss=logger.get_meter('train', 'loss'), acc_max=logger.get_meter('train', 'acc_max')))
+                   loss=logger.get_meter('train', 'loss'), acc=logger.get_meter('train', 'acc')))
 
     logger.log_meters('train', n=epoch)
     logger.log_meters('hyperparams', n=epoch)
@@ -65,23 +65,23 @@ def val_triplet(val_loader,model,criterion,
         logger.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
         if eval_score is not None:
-            acc_la, total_n_vertices = eval_score(output)
-            logger.update_meter(val_test, 'acc_la', acc_la, n=total_n_vertices)
+            acc, total_n_vertices = eval_score(output)
+            logger.update_meter(val_test, 'acc', acc, n=total_n_vertices)
         if i % print_freq == 0:
-            accu = logger.get_meter(val_test, 'acc_la')
+            accu = logger.get_meter(val_test, 'acc')
             los = logger.get_meter(val_test, 'loss')
             if val_test == 'val':
                 print('Validation set, epoch: [{0}][{1}/{2}]\t'
                     'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                     'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
                     epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
-                    acc=accu))#=logger.get_meter(val_test, 'acc_la')))
+                    acc=accu))
             else:
                 print('Test set, epoch: [{0}][{1}/{2}]\t'
                     'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                     'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
                     epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
-                    acc=accu))#=logger.get_meter(val_test, 'acc_la')))
+                    acc=accu))
 
     logger.log_meters(val_test, n=epoch)
     return accu.avg, los.avg

@@ -5,7 +5,7 @@ root_dir: .
 
 data: # Data related parameters
     num_examples_train: 20000
-    num_examples_test: 1000
+    #num_examples_test: 1000
     num_examples_val: 1000
     generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
     noise_model: ErdosRenyi
@@ -16,9 +16,9 @@ data: # Data related parameters
     path_dataset: dataset # Path where datasets are stored
 
 train: # Training parameters
-    epoch: 10
+    epoch: 50
     batch_size: 32
-    lr: !!float 1e-3
+    lr: !!float 1e-4
     scheduler_step: 5
     scheduler_decay: 0.9
     print_freq: 100
@@ -38,4 +38,4 @@ arch: # Architecture and model
 observers:
     neptune:
         enable: Yes
-        project: mlelarge/GNN
+        project: mlelarge/GNN-Reg

@@ -49,8 +49,8 @@ class ValueMeter(object):
 def make_meter_matching():
     meters_dict = {
         'loss': Meter(),
-        'acc_la': Meter(),
-        'acc_max': Meter(),
+        'acc': Meter(),
+        #'acc_gr': Meter(),
         'batch_time': Meter(),
         'data_time': Meter(),
         'epoch_time': Meter(),
