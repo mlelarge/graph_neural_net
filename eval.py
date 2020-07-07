@@ -37,6 +37,28 @@ def load_model(model, filename):
         print('model does not exist!')
         return None
 
+def save_to_json(key, acc, loss, filename):
+    if os.path.exists(filename):
+        with open(filename, "r") as jsonFile:
+            data = json.load(jsonFile)
+    else:
+        data = {}
+        with open(filename, 'w') as jsonFile:
+            json.dump(data,jsonFile)
+
+    data[key] = {'loss':loss, 'acc': acc}
+
+    with open(filename, 'w') as jsonFile:
+        json.dump(data, jsonFile)
+
+def create_key(config,args):
+    return 'model_'+ config['log_dir'] + 'data_QAP_{}_{}_{}_{}_{}_{}'.format(args['generative_model'],
+                                                     args['noise_model'],
+                                                     args['num_examples_test'],
+                                                     args['n_vertices'], 
+                                                     args['vertex_proba'],
+                                                     args['noise'], 
+                                                     args['edge_density'])
 
 
 def main():
@@ -49,8 +71,9 @@ def main():
         config_model = json.load(json_file)
     
     #print(config_model['arch'])
-    #print(config_model)
+    
     args['path_dataset'] = config_model['path_dataset']
+    #print(config_model)
     use_cuda = not config_model['cpu'] and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
     print('Using device:', device)
@@ -69,7 +92,10 @@ def main():
     gene_test.load_dataset()
     test_loader = siamese_loader(gene_test, config_model['train']['batch_size'], gene_test.constant_n_vertices)
     acc, loss = trainer.val_triplet(test_loader,model,criterion,exp_logger,device,epoch=0,eval_score=metrics.accuracy_linear_assignment,val_test='test')
-    
+    key = create_key(config_model,args)
+    filename_test = os.path.join(os.path.dirname(os.path.dirname(config_model['log_dir'])), 'test.json')
+    #print(filename_test)
+    save_to_json(key, acc, loss, filename_test)
 
 if __name__ == '__main__':
     main()
