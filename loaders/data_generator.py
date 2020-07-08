@@ -81,7 +81,7 @@ def do_swap(g, u, v, s, t):
 @noise("EdgeSwap")
 def noise_edge_swap(g, W, noise, edge_density):
     g_noise = g.copy()
-    edges_iter = itertools.chain(iter(g.edges), ((v, u) for (u, v) in g.edges))
+    edges_iter = list(itertools.chain(iter(g.edges), ((v, u) for (u, v) in g.edges)))
     for u,v in edges_iter:
         for s, t in edges_iter:
             if random.random() < noise and is_swappable(g_noise, u, v, s, t):
