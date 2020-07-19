@@ -14,6 +14,9 @@ from toolbox.losses import get_criterion
 from toolbox import utils
 import trainer as trainer
 
+from sacred import SETTINGS
+SETTINGS.CONFIG.READ_ONLY_CONFIG = False
+
 ### BEGIN Sacred setup
 ex = Experiment()
 ex.add_config('default.yaml')
@@ -25,7 +28,10 @@ def set_experiment_name(config, command_name, logger):
 
 @ex.config_hook
 def update_config(config, command_name, logger):
-    config.update(log_dir='{}/runs/{}/'.format(config['root_dir'], config['name']),
+    config.update(log_dir='{}/runs/{}/QAP_{}_{}_{}_{}_{}/'.format(
+        config['root_dir'], config['name'],config['data']['generative_model'],
+        config['data']['noise_model'], config['data']['n_vertices'],
+        config['data']['vertex_proba'],config['data']['noise'],config['data']['edge_density']),
                    # Some funcs need path_dataset while not requiring the whole data dict
                    path_dataset=config['data']['path_dataset'])
                    #res_dir='{}/runs/{}/res'.format(config['root_dir'], config['name'])
@@ -55,7 +61,7 @@ def init_logger(name, _config, _run):
     exp_logger = logger.Experiment(name, _config, run=_run)
     exp_logger.add_meters('train', metrics.make_meter_matching())
     exp_logger.add_meters('val', metrics.make_meter_matching())
-    exp_logger.add_meters('test', metrics.make_meter_matching())
+    #exp_logger.add_meters('test', metrics.make_meter_matching())
     exp_logger.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
     return exp_logger
  
@@ -72,8 +78,6 @@ def init_output_env(_config, root_dir, log_dir, path_dataset):
     utils.check_dir(os.path.join(root_dir,'runs'))
     utils.check_dir(log_dir)
     utils.check_dir(path_dataset)
-    #check_dir(os.path.join(args.log_dir,'tensorboard'))
-    #check_dir(args['--res_dir'])
     with open(os.path.join(log_dir, 'config.json'), 'w') as f:
         json.dump(_config, f)
 
@@ -120,10 +124,9 @@ def main(cpu, data, train, arch):
     gene_val.load_dataset()
     val_loader = siamese_loader(gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
-    gene_test = Generator('test', data)
-    gene_test.load_dataset()
-    test_loader = siamese_loader(gene_test, train['batch_size'],
-                                gene_test.constant_n_vertices)
+    #gene_test = Generator('test', data)
+    #gene_test.load_dataset()
+    #test_loader = siamese_loader(gene_test, train['batch_size'], gene_test.constant_n_vertices)
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
     criterion = get_criterion(device, train['loss_reduction'])
@@ -133,6 +136,8 @@ def main(cpu, data, train, arch):
     model.to(device)
 
     is_best = True
+    #log_dir_ckpt = get_log_dir()
+    #print(log_dir_ckpt)
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
         trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max)
@@ -142,11 +147,11 @@ def main(cpu, data, train, arch):
         acc, loss = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment)
         scheduler.step(loss)
         # remember best acc and save checkpoint
-        is_best = acc > best_score
+        is_best = (acc > best_score)
         best_score = max(acc, best_score)
         if True == is_best:
             best_epoch = epoch
-            acc_test = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment,val_test='test')
+            #acc_test = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment,val_test='test')
 
         save_checkpoint({
             'epoch': epoch + 1,
@@ -154,4 +159,4 @@ def main(cpu, data, train, arch):
             'best_score': best_score,
             'best_epoch': best_epoch,
             'exp_logger': exp_logger,
-        }, is_best)
+            }, is_best)
