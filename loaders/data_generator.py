@@ -115,7 +115,7 @@ class Generator(torch.utils.data.Dataset):
         self.noise_model = args['noise_model']
         self.edge_density = args['edge_density']
         self.noise = args['noise']
-        subfolder_name = 'QAP_{}_{}_{}_{}_{}_{}'.format(self.generative_model,
+        subfolder_name = 'QAP_{}_{}_{}_{}_{}_{}_{}'.format(self.generative_model,
                                                      self.noise_model,
                                                      self.num_examples,
                                                      n_vertices, vertex_proba,

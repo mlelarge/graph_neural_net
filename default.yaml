@@ -1,5 +1,5 @@
 ---
-name: ER_std 
+name: Reg-ER-100 
 cpu: Yes
 root_dir: .
 
@@ -10,14 +10,14 @@ data: # Data related parameters
     generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
     noise_model: ErdosRenyi
     edge_density: 0.2
-    n_vertices: 50
+    n_vertices: 100
     vertex_proba: 1. # Parameter of the binomial distribution of vertices
     noise: 0.05
     path_dataset: dataset # Path where datasets are stored
 
 train: # Training parameters
     epoch: 50
-    batch_size: 32
+    batch_size: 16
     lr: !!float 1e-4
     scheduler_step: 5
     scheduler_decay: 0.9
@@ -38,4 +38,4 @@ arch: # Architecture and model
 observers:
     neptune:
         enable: Yes
-        project: mlelarge/GNN-Reg
+        project: mlelarge/GCP-Reg100

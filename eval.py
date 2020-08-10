@@ -94,7 +94,7 @@ def main():
     acc, loss = trainer.val_triplet(test_loader,model,criterion,exp_logger,device,epoch=0,eval_score=metrics.accuracy_linear_assignment,val_test='test')
     key = create_key(config_model,args)
     filename_test = os.path.join(os.path.dirname(os.path.dirname(config_model['log_dir'])), 'test.json')
-    #print(filename_test)
+    print('saving at: ',filename_test)
     save_to_json(key, acc, loss, filename_test)
 
 if __name__ == '__main__':

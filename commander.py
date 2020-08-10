@@ -28,7 +28,7 @@ def set_experiment_name(config, command_name, logger):
 
 @ex.config_hook
 def update_config(config, command_name, logger):
-    config.update(log_dir='{}/runs/{}/QAP_{}_{}_{}_{}_{}/'.format(
+    config.update(log_dir='{}/runs/{}/QAP_{}_{}_{}_{}_{}_{}/'.format(
         config['root_dir'], config['name'],config['data']['generative_model'],
         config['data']['noise_model'], config['data']['n_vertices'],
         config['data']['vertex_proba'],config['data']['noise'],config['data']['edge_density']),

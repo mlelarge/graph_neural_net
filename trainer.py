@@ -85,3 +85,23 @@ def val_triplet(val_loader,model,criterion,
 
     logger.log_meters(val_test, n=epoch)
     return accu.avg, los.avg
+
+def all_losses_acc(val_loader,model,criterion,
+            device,eval_score=None):
+    model.eval()
+    all_losses =[]
+    all_acc = []
+
+    for (input1, input2) in val_loader:
+        input1 = input1.to(device)
+        input2 = input2.to(device)
+        output = model(input1,input2)
+
+        loss = criterion(output)
+        #print(output.shape)
+        all_losses.append(loss.item())
+    
+        if eval_score is not None:
+            acc = eval_score(output, aggregate_score=False)
+            all_acc += acc
+    return all_losses, all_acc

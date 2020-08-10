@@ -57,12 +57,13 @@ def make_meter_matching():
     }
     return meters_dict
 
-def accuracy_linear_assignment(weights,labels=None):
+def accuracy_linear_assignment(weights,labels=None,aggregate_score = True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
     total_n_vertices = 0
     acc = 0
+    all_acc = []
     for i, weight in enumerate(weights):
         if labels:
             label = labels[i]
@@ -70,9 +71,15 @@ def accuracy_linear_assignment(weights,labels=None):
             label = np.arange(len(weight))
         cost = -weight.cpu().detach().numpy()
         _ , preds = linear_sum_assignment(cost)
-        acc += np.sum(preds == label)
-        total_n_vertices += len(weight)
-    return acc, total_n_vertices
+        if aggregate_score:
+            acc += np.sum(preds == label)
+            total_n_vertices += len(weight)
+            return acc, total_n_vertices
+        else:
+            all_acc.append(np.sum(preds == label)/len(weight))
+            return all_acc
+
+    
 
 def accuracy_max(weights,labels=None):
     """
