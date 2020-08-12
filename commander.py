@@ -128,6 +128,10 @@ def main(cpu, data, train, arch):
     #gene_test.load_dataset()
     #test_loader = siamese_loader(gene_test, train['batch_size'], gene_test.constant_n_vertices)
     model = get_model(arch)
+    model_path = './runs/ER-05/QAP_ErdosRenyi_ErdosRenyi_50_1.0_0.15_0.5'
+    model_file = os.path.join(model_path,'model_best.pth.tar')
+    checkpoint = torch.load(model_file)
+    model.load_state_dict(checkpoint['state_dict'])
     optimizer, scheduler = get_optimizer(train,model)
     criterion = get_criterion(device, train['loss_reduction'])
 
@@ -140,7 +144,7 @@ def main(cpu, data, train, arch):
     #print(log_dir_ckpt)
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
-        trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max)
+        trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max,print_freq=train['print_freq'])
         
 
 
