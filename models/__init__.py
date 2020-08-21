@@ -1,4 +1,5 @@
 from models.siamese_net import Siamese_Model
+from models.base_model import Simple_Node_Embedding, BaseModel, Simple_Edge_Embedding
 
 def get_model(args):
     model_instance = _get_model_instance(args['arch'])
@@ -12,4 +13,6 @@ def get_model(args):
     return model
 
 def _get_model_instance(arch):
-    return {'Siamese_Model': Siamese_Model}[arch]
+    return {'Siamese_Model': Siamese_Model, 
+    'Simple_Node_Embedding': Simple_Node_Embedding,
+    'Simple_Edge_Embedding': Simple_Edge_Embedding}[arch]

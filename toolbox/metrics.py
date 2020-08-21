@@ -1,5 +1,5 @@
 import numpy as np
-
+import torch
 from scipy.optimize import linear_sum_assignment
 
 class Meter(object):
@@ -57,6 +57,17 @@ def make_meter_matching():
     }
     return meters_dict
 
+def make_meter_tsp():
+    meters_dict = {
+        'loss': Meter(),
+        'f1': Meter(),
+        #'acc_gr': Meter(),
+        'batch_time': Meter(),
+        'data_time': Meter(),
+        'epoch_time': Meter(),
+    }
+    return meters_dict
+
 def accuracy_linear_assignment(weights,labels=None,aggregate_score = True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
@@ -98,3 +109,33 @@ def accuracy_max(weights,labels=None):
         acc += np.sum(preds == label)
         total_n_vertices += len(weight)
     return acc, total_n_vertices
+
+
+def f1_score(preds,labels,device = 'cuda'):
+    """
+    take 2 adjacency matrices and compute precision, recall, f1_score for a tour
+    """
+    bs, n_nodes ,_  = labels.shape
+    true_pos = 0
+    false_pos = 0
+    mask = torch.ones((n_nodes,n_nodes))-torch.eye(n_nodes)
+    mask = mask.to(device)
+    for i in range(bs):
+        true_pos += torch.sum(mask*preds[i,:,:]*labels[i,:,:]).cpu().item()
+        false_pos += torch.sum(mask*preds[i,:,:]*(1-labels[i,:,:])).cpu().item()
+        #pos += np.sum(preds[i][0,:] == labels[i][0,:])
+        #pos += np.sum(preds[i][1,:] == labels[i][1,:])
+    #prec = pos/2*n
+    prec = true_pos/(true_pos+false_pos)
+    rec = true_pos/(2*n_nodes*bs)
+    if prec+rec == 0:
+        f1 = 0.0
+    else:
+        f1 = 2*prec*rec/(prec+rec)
+    return prec, rec, f1#, n, bs
+
+def compute_f1(raw_scores,target,device):
+    _, ind = torch.topk(raw_scores, 3, dim =2)
+    y_onehot = torch.zeros_like(raw_scores).to(device)
+    y_onehot.scatter_(2, ind, 1)
+    return f1_score(y_onehot,target)
