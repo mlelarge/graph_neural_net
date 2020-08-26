@@ -8,9 +8,9 @@ import torch.backends.cudnn as cudnn
 from toolbox import logger, metrics
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
-from loaders.data_generator import Generator
+from loaders.tsp_data import TSP
 from toolbox.optimizer import get_optimizer
-from toolbox.losses import get_criterion
+from toolbox.losses import tsp_loss
 from toolbox import utils
 import trainer as trainer
 
@@ -19,7 +19,7 @@ SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 ### BEGIN Sacred setup
 ex = Experiment()
-ex.add_config('default.yaml')
+ex.add_config('default_tsp.yaml')
 
 @ex.config_hook
 def set_experiment_name(config, command_name, logger):
@@ -28,10 +28,10 @@ def set_experiment_name(config, command_name, logger):
 
 @ex.config_hook
 def update_config(config, command_name, logger):
-    config.update(log_dir='{}/runs/{}/QAP_{}_{}_{}_{}_{}_{}/'.format(
-        config['root_dir'], config['name'],config['data']['generative_model'],
-        config['data']['noise_model'], config['data']['n_vertices'],
-        config['data']['vertex_proba'],config['data']['noise'],config['data']['edge_density']),
+    config.update(log_dir='{}/runs/{}/TSP_{}_{}_{}_{}_{}_{}/'.format(
+        config['root_dir'], config['name'], config['arch']['arch'], config['data']['n_vertices'],
+        config['arch']['num_blocks'],config['arch']['in_features'],
+        config['arch']['out_features'], config['arch']['depth_of_mlp']),
                    # Some funcs need path_dataset while not requiring the whole data dict
                    path_dataset=config['data']['path_dataset'])
                    #res_dir='{}/runs/{}/res'.format(config['root_dir'], config['name'])
@@ -59,8 +59,8 @@ def clean_observer(observers):
 def init_logger(name, _config, _run):
     # set loggers
     exp_logger = logger.Experiment(name, _config, run=_run)
-    exp_logger.add_meters('train', metrics.make_meter_matching())
-    exp_logger.add_meters('val', metrics.make_meter_matching())
+    exp_logger.add_meters('train', metrics.make_meter_tsp())
+    exp_logger.add_meters('val', metrics.make_meter_tsp())
     #exp_logger.add_meters('test', metrics.make_meter_matching())
     exp_logger.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
     return exp_logger
@@ -116,24 +116,20 @@ def main(cpu, data, train, arch):
     init_output_env()
     exp_logger = init_logger()
     
-    gene_train = Generator('train', data)
-    gene_train.load_dataset()
-    train_loader = siamese_loader(gene_train, train['batch_size'],
-                                  gene_train.constant_n_vertices)
-    gene_val = Generator('val', data)
-    gene_val.load_dataset()
-    val_loader = siamese_loader(gene_val, train['batch_size'],
-                                gene_val.constant_n_vertices)
-    #gene_test = Generator('test', data)
-    #gene_test.load_dataset()
-    #test_loader = siamese_loader(gene_test, train['batch_size'], gene_test.constant_n_vertices)
+    #dataset_train = TSP('dataset_tsp',split='train')
+    dataset_train = TSP('TSP',file_name='tsp50-500_' ,split='train')
+    train_loader = siamese_loader(dataset_train,train['batch_size'],constant_n_vertices=True)
+    #dataset_val = TSP('dataset_tsp',split='val')
+    dataset_val = TSP('TSP',file_name='tsp50-500_' ,split='val')
+    val_loader = siamese_loader(dataset_val,train['batch_size'],constant_n_vertices=True)
+    
     model = get_model(arch)
-    model_path = './runs/ER-05/QAP_ErdosRenyi_ErdosRenyi_50_1.0_0.15_0.5'
+    model_path = './runs/TSP-50-new/TSP_Simple_Edge_Embedding_50_4_64_1_3'
     model_file = os.path.join(model_path,'model_best.pth.tar')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
     optimizer, scheduler = get_optimizer(train,model)
-    criterion = get_criterion(device, train['loss_reduction'])
+    criterion = tsp_loss()
 
     # exp_logger = init_logger(args)
 
@@ -144,15 +140,17 @@ def main(cpu, data, train, arch):
     #print(log_dir_ckpt)
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
-        trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max,print_freq=train['print_freq'])
+        trainer.train_tsp(train_loader,model,criterion,optimizer,
+        exp_logger,device,epoch,eval_score=metrics.compute_f1,
+        print_freq=train['print_freq'])
         
-
-
-        acc, loss = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment)
+        f1, loss = trainer.val_tsp(val_loader,model,criterion,
+        exp_logger,device,epoch,eval_score=metrics.compute_f1)
+        #print_freq=train['print_freq'])
         scheduler.step(loss)
         # remember best acc and save checkpoint
-        is_best = (acc > best_score)
-        best_score = max(acc, best_score)
+        is_best = (f1 > best_score)
+        best_score = max(f1, best_score)
         if True == is_best:
             best_epoch = epoch
             #acc_test = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment,val_test='test')

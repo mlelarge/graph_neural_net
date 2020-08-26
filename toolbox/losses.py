@@ -30,3 +30,18 @@ class triplet_loss(nn.Module):
 
 def get_criterion(device, loss_reduction):
     return triplet_loss(device, loss_reduction)
+
+# TODO refactor
+
+class tsp_loss(nn.Module):
+    def __init__(self, loss=nn.BCELoss(reduction='none')):
+        super(tsp_loss, self).__init__()
+        self.loss = loss
+        self.normalize = torch.nn.Sigmoid()#Softmax(dim=2)
+        
+    def forward(self, raw_scores, mask, target):
+        """
+        raw_scores (bs,n_vertices,n_vertices)
+        """
+        proba = self.normalize(raw_scores)
+        return torch.mean(mask*self.loss(proba,target))
