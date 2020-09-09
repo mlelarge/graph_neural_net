@@ -28,9 +28,9 @@ def parse_args():
     return argparse_dict
 
 
-def load_model(model, filename):
+def load_model(model, filename, device):
     if os.path.exists(filename):
-        checkpoint = torch.load(filename)
+        checkpoint = torch.load(filename, map_location=torch.device(device))
         model.load_state_dict(checkpoint['state_dict'])
         return model
     else:
@@ -52,7 +52,7 @@ def save_to_json(key, acc, loss, filename):
         json.dump(data, jsonFile)
 
 def create_key(config,args):
-    return 'model_'+ config['log_dir'] + 'data_QAP_{}_{}_{}_{}_{}_{}'.format(args['generative_model'],
+    return 'model_'+ config['log_dir'] + 'data_QAP_{}_{}_{}_{}_{}_{}_{}'.format(args['generative_model'],
                                                      args['noise_model'],
                                                      args['num_examples_test'],
                                                      args['n_vertices'], 
@@ -82,7 +82,7 @@ def main():
     model.to(device)
     model_file = os.path.join(args['model_path'],'model_best.pth.tar')
     print(model_file)
-    model = load_model(model, model_file)
+    model = load_model(model, model_file,device)
     
     criterion = get_criterion(device, config_model['train']['loss_reduction'])
     exp_logger = logger.Experiment(args['name'])
