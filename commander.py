@@ -19,7 +19,7 @@ SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 ### BEGIN Sacred setup
 ex = Experiment()
-ex.add_config('default.yaml')
+ex.add_config('default_phase.yaml')
 
 @ex.config_hook
 def set_experiment_name(config, command_name, logger):
@@ -124,18 +124,10 @@ def main(cpu, data, train, arch):
     gene_val.load_dataset()
     val_loader = siamese_loader(gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
-    #gene_test = Generator('test', data)
-    #gene_test.load_dataset()
-    #test_loader = siamese_loader(gene_test, train['batch_size'], gene_test.constant_n_vertices)
+    
     model = get_model(arch)
-    model_path = './runs/ER-05/QAP_ErdosRenyi_ErdosRenyi_50_1.0_0.15_0.5'
-    model_file = os.path.join(model_path,'model_best.pth.tar')
-    checkpoint = torch.load(model_file)
-    model.load_state_dict(checkpoint['state_dict'])
     optimizer, scheduler = get_optimizer(train,model)
     criterion = get_criterion(device, train['loss_reduction'])
-
-    # exp_logger = init_logger(args)
 
     model.to(device)
 
@@ -155,8 +147,7 @@ def main(cpu, data, train, arch):
         best_score = max(acc, best_score)
         if True == is_best:
             best_epoch = epoch
-            #acc_test = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=metrics.accuracy_linear_assignment,val_test='test')
-
+            
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),

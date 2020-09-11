@@ -85,12 +85,34 @@ def accuracy_linear_assignment(weights,labels=None,aggregate_score = True):
         if aggregate_score:
             acc += np.sum(preds == label)
             total_n_vertices += len(weight)
-            return acc, total_n_vertices
         else:
-            all_acc.append(np.sum(preds == label)/len(weight))
-            return all_acc
+            all_acc += [np.sum(preds == label)/len(weight)]
+        
+    if aggregate_score:
+        return acc, total_n_vertices
+    else:
+        return all_acc
 
+def all_losses_acc(val_loader,model,criterion,
+            device,eval_score=None):
+    model.eval()
+    all_losses =[]
+    all_acc = []
+
+    for (input1, input2) in val_loader:
+        input1 = input1.to(device)
+        input2 = input2.to(device)
+        output = model(input1,input2)
+
+        loss = criterion(output)
+        #print(output.shape)
+        all_losses.append(loss.item())
     
+        if eval_score is not None:
+            acc = eval_score(output, aggregate_score=False)
+            all_acc += acc
+    return all_losses, np.array(all_acc)
+   
 
 def accuracy_max(weights,labels=None):
     """

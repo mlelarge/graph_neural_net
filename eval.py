@@ -23,6 +23,7 @@ def parse_args():
     parser.add_argument('--n_vertices', type=int, default = 50)
     parser.add_argument('--vertex_proba', type=float, default=1.)
     parser.add_argument('--noise',type=float, default=0.15)
+    parser.add_argument('--output_filename',type=str, default='test.json')
     args = parser.parse_args()
     argparse_dict = vars(args)
     return argparse_dict
@@ -93,7 +94,7 @@ def main():
     test_loader = siamese_loader(gene_test, config_model['train']['batch_size'], gene_test.constant_n_vertices)
     acc, loss = trainer.val_triplet(test_loader,model,criterion,exp_logger,device,epoch=0,eval_score=metrics.accuracy_linear_assignment,val_test='test')
     key = create_key(config_model,args)
-    filename_test = os.path.join(os.path.dirname(os.path.dirname(config_model['log_dir'])), 'test.json')
+    filename_test = os.path.join(os.path.dirname(os.path.dirname(config_model['log_dir'])), args['output_filename'])
     print('saving at: ',filename_test)
     save_to_json(key, acc, loss, filename_test)
 
