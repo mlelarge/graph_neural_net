@@ -100,9 +100,10 @@ def adjacency_matrix_to_tensor_representation(W):
     return B
 
 class Base_Generator(torch.utils.data.Dataset):
-    def __init__(self, name, path_dataset):
+    def __init__(self, name, path_dataset, num_examples):
         self.path_dataset = path_dataset
         self.name = name
+        self.num_examples = num_examples
 
     def load_dataset(self):
         """
@@ -121,6 +122,11 @@ class Base_Generator(torch.utils.data.Dataset):
             self.create_dataset()
             print('Saving datatset at {}'.format(path))
             torch.save(self.data, path)
+    
+    def create_dataset(self):
+        for _ in range(self.num_examples):
+            example = self.compute_example()
+            self.data.append(example)
 
     def __getitem__(self, i):
         """ Fetch sample at index i """
@@ -140,17 +146,17 @@ class Generator(Base_Generator):
         self.noise_model = args['noise_model']
         self.edge_density = args['edge_density']
         self.noise = args['noise']
-        self.num_examples = args['num_examples_' + name]
+        num_examples = args['num_examples_' + name]
         n_vertices = args['n_vertices']
         vertex_proba = args['vertex_proba']
         subfolder_name = 'QAP_{}_{}_{}_{}_{}_{}_{}'.format(self.generative_model,
                                                      self.noise_model,
-                                                     self.num_examples,
+                                                     num_examples,
                                                      n_vertices, vertex_proba,
                                                      self.noise, self.edge_density)
         path_dataset = os.path.join(args['path_dataset'],
                                          subfolder_name)
-        super().__init__(name, path_dataset)
+        super().__init__(name, path_dataset, num_examples)
         self.data = []
         self.constant_n_vertices = (vertex_proba == 1.)
         self.n_vertices_sampler = torch.distributions.Binomial(n_vertices, vertex_proba)
@@ -177,9 +183,6 @@ class Generator(Base_Generator):
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
 
-    def create_dataset(self):
-        for _ in range(self.num_examples):
-            example = self.compute_example()
-            self.data.append(example)
+    
 
     
