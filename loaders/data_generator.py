@@ -99,54 +99,10 @@ def adjacency_matrix_to_tensor_representation(W):
     B[indices, indices, 0] = degrees
     return B
 
-class Generator(torch.utils.data.Dataset):
-    """
-    Build a numpy dataset of pairs of (Graph, noisy Graph)
-    """
-    def __init__(self, name, args):
+class Base_Generator(torch.utils.data.Dataset):
+    def __init__(self, name, path_dataset):
+        self.path_dataset = path_dataset
         self.name = name
-        self.num_examples = args['num_examples_' + name]
-        self.data = []
-        n_vertices = args['n_vertices']
-        vertex_proba = args['vertex_proba']
-        self.constant_n_vertices = (vertex_proba == 1.)
-        self.n_vertices_sampler = torch.distributions.Binomial(n_vertices, vertex_proba)
-        self.generative_model = args['generative_model']
-        self.noise_model = args['noise_model']
-        self.edge_density = args['edge_density']
-        self.noise = args['noise']
-        subfolder_name = 'QAP_{}_{}_{}_{}_{}_{}_{}'.format(self.generative_model,
-                                                     self.noise_model,
-                                                     self.num_examples,
-                                                     n_vertices, vertex_proba,
-                                                     self.noise, self.edge_density)
-        self.path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        utils.check_dir(self.path_dataset)
-
-    def compute_example(self):
-        """
-        Compute pairs (Adjacency, noisy Adjacency)
-        """
-        n_vertices = int(self.n_vertices_sampler.sample().item())
-        try:
-            g, W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        try:
-            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, self.edge_density)
-        except KeyError:
-            raise ValueError('Noise model {} not supported'
-                             .format(self.noise_model))
-        B = adjacency_matrix_to_tensor_representation(W)
-        B_noise = adjacency_matrix_to_tensor_representation(W_noise)
-        return (B, B_noise)
-
-    def create_dataset(self):
-        for _ in range(self.num_examples):
-            example = self.compute_example()
-            self.data.append(example)
 
     def load_dataset(self):
         """
@@ -173,3 +129,57 @@ class Generator(torch.utils.data.Dataset):
     def __len__(self):
         """ Get dataset length """
         return len(self.data)
+
+
+class Generator(Base_Generator):
+    """
+    Build a numpy dataset of pairs of (Graph, noisy Graph)
+    """
+    def __init__(self, name, args):
+        self.generative_model = args['generative_model']
+        self.noise_model = args['noise_model']
+        self.edge_density = args['edge_density']
+        self.noise = args['noise']
+        self.num_examples = args['num_examples_' + name]
+        n_vertices = args['n_vertices']
+        vertex_proba = args['vertex_proba']
+        subfolder_name = 'QAP_{}_{}_{}_{}_{}_{}_{}'.format(self.generative_model,
+                                                     self.noise_model,
+                                                     self.num_examples,
+                                                     n_vertices, vertex_proba,
+                                                     self.noise, self.edge_density)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset)
+        self.data = []
+        self.constant_n_vertices = (vertex_proba == 1.)
+        self.n_vertices_sampler = torch.distributions.Binomial(n_vertices, vertex_proba)
+        
+        
+        utils.check_dir(self.path_dataset)
+
+    def compute_example(self):
+        """
+        Compute pairs (Adjacency, noisy Adjacency)
+        """
+        n_vertices = int(self.n_vertices_sampler.sample().item())
+        try:
+            g, W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        try:
+            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, self.edge_density)
+        except KeyError:
+            raise ValueError('Noise model {} not supported'
+                             .format(self.noise_model))
+        B = adjacency_matrix_to_tensor_representation(W)
+        B_noise = adjacency_matrix_to_tensor_representation(W_noise)
+        return (B, B_noise)
+
+    def create_dataset(self):
+        for _ in range(self.num_examples):
+            example = self.compute_example()
+            self.data.append(example)
+
+    
