@@ -22,8 +22,8 @@ def train_triplet(train_loader,model,criterion,optimizer,
 
         rawscores = output.squeeze(-1)
         proba = torch.softmax(rawscores,-1)
-        
-        loss = criterion(proba,K[:,:,:,1])
+        loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
+        #loss = criterion(proba,K[:,:,:,1])
         logger.update_meter('train', 'loss', loss.data.item(), n=1)
         
         optimizer.zero_grad()
@@ -38,7 +38,7 @@ def train_triplet(train_loader,model,criterion,optimizer,
         if i % print_freq == 0:
             if eval_score is not None:
                 #print(np_out.shape)
-                acc, total_n_vertices = eval_score(proba,clique_size)
+                acc, total_n_vertices = eval_score(proba*input1[:,:,:,1],clique_size)
                 #print(acc_max, n, bs)
                 logger.update_meter('train', 'acc', acc, n=total_n_vertices)
             print('Epoch: [{0}][{1}/{2}]\t'
@@ -67,11 +67,11 @@ def val_triplet(val_loader,model,criterion,
         rawscores = output.squeeze(-1)
         proba = torch.softmax(rawscores,-1)
         
-        loss = criterion(proba,K[:,:,:,1])
+        loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
         logger.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
         if eval_score is not None:
-            acc, total_n_vertices = eval_score(proba,clique_size)
+            acc, total_n_vertices = eval_score(proba*input1[:,:,:,1],clique_size)
             logger.update_meter(val_test, 'acc', acc, n=total_n_vertices)
         if i % print_freq == 0:
             accu = logger.get_meter(val_test, 'acc')
