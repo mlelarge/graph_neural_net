@@ -1,0 +1,38 @@
+---
+name: MCP-100
+cpu: Yes
+root_dir: .
+
+data: # Data related parameters
+    num_examples_train: 20000
+    #num_examples_test: 1000
+    num_examples_val: 1000
+    edge_density: 0.39810717055349726 #0.1
+    n_vertices: 100
+    clique_size: 9
+    path_dataset: dataset_mcp # Path where datasets are stored
+
+train: # Training parameters
+    epoch: 10
+    batch_size: 16
+    lr: !!float 1e-4
+    scheduler_step: 5
+    scheduler_decay: 0.9
+    print_freq: 100
+    # How to reduce the loss over several examples:
+    # mean, mean_of_mean
+    loss_reduction: mean
+
+arch: # Architecture and model
+    arch: Simple_Edge_Embedding
+    model_name: Simple_Edge_Embedding
+    num_blocks: 4
+    original_features_num: 2
+    in_features: 64
+    out_features: 1
+    depth_of_mlp: 3
+
+observers:
+    neptune:
+        enable: No
+        project: mlelarge/MCP
