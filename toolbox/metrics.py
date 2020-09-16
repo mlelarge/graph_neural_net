@@ -132,6 +132,24 @@ def accuracy_max(weights,labels=None):
         total_n_vertices += len(weight)
     return acc, total_n_vertices
 
+def accuracy_max_mcp(weights,clique_size):
+    """
+    weights should be (bs,n,n) and labels (bs,n) numpy arrays
+    """
+    true_pos = 0
+    false_pos = 0
+    total_n_vertices = 0
+    for i, weight in enumerate(weights):
+        weight = weight.cpu().detach().numpy()
+        #print(weight)
+        deg = np.sum(weight, 0)
+        inds = np.argpartition(deg, -clique_size)[-clique_size:]
+        #print(preds)#, np.sum(preds[:clique_size] <= clique_size))
+        true_pos += np.sum(inds <= clique_size)
+        #false_pos += np.sum(preds[clique_size:] < 0.1*clique_size)
+        total_n_vertices += clique_size#len(weight)
+    return true_pos, total_n_vertices
+
 
 def f1_score(preds,labels,device = 'cuda'):
     """

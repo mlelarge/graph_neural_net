@@ -3,7 +3,7 @@ import time
 import torch
 
 def train_triplet(train_loader,model,criterion,optimizer,
-                logger,device,epoch,eval_score=None,print_freq=100):
+                logger,device,epoch,clique_size,eval_score=None,print_freq=100):
     model.train()
     logger.reset_meters('train')
     logger.reset_meters('hyperparams')
@@ -17,10 +17,13 @@ def train_triplet(train_loader,model,criterion,optimizer,
         logger.update_meter('train', 'data_time', time.time() - end, n=batch_size)
 
         input1 = input1.to(device)
-        input2 = input2.to(device)
-        output = model(input1,input2)
+        K = input2.to(device)
+        output = model(input1)#,input2)
 
-        loss = criterion(output)
+        rawscores = output.squeeze(-1)
+        proba = torch.softmax(rawscores,-1)
+        
+        loss = criterion(proba,K[:,:,:,1])
         logger.update_meter('train', 'loss', loss.data.item(), n=1)
         
         optimizer.zero_grad()
@@ -35,7 +38,7 @@ def train_triplet(train_loader,model,criterion,optimizer,
         if i % print_freq == 0:
             if eval_score is not None:
                 #print(np_out.shape)
-                acc, total_n_vertices = eval_score(output)
+                acc, total_n_vertices = eval_score(proba,clique_size)
                 #print(acc_max, n, bs)
                 logger.update_meter('train', 'acc', acc, n=total_n_vertices)
             print('Epoch: [{0}][{1}/{2}]\t'
@@ -53,20 +56,22 @@ def train_triplet(train_loader,model,criterion,optimizer,
 
 
 def val_triplet(val_loader,model,criterion,
-                logger,device,epoch,eval_score=None,print_freq=10,val_test='val'):
+                logger,device,epoch,clique_size,eval_score=None,print_freq=10,val_test='val'):
     model.eval()
     logger.reset_meters(val_test)
 
     for i, (input1, input2) in enumerate(val_loader):
         input1 = input1.to(device)
-        input2 = input2.to(device)
-        output = model(input1,input2)
-
-        loss = criterion(output)
+        K = input2.to(device)
+        output = model(input1)
+        rawscores = output.squeeze(-1)
+        proba = torch.softmax(rawscores,-1)
+        
+        loss = criterion(proba,K[:,:,:,1])
         logger.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
         if eval_score is not None:
-            acc, total_n_vertices = eval_score(output)
+            acc, total_n_vertices = eval_score(proba,clique_size)
             logger.update_meter(val_test, 'acc', acc, n=total_n_vertices)
         if i % print_freq == 0:
             accu = logger.get_meter(val_test, 'acc')

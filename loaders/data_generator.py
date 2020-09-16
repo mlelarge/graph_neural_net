@@ -183,6 +183,42 @@ class Generator(Base_Generator):
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
 
-    
+class MCP_Generator(Base_Generator):
+    """
+    Generator for the Maximum Clique Pb
+    """
+    def __init__(self, name, args):
+        self.edge_density = args['edge_density']
+        self.clique_size = args['clique_size']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'MCP_{}_{}_{}_{}'.format(num_examples,
+                                                           self.n_vertices, 
+                                                           self.clique_size, 
+                                                           self.edge_density)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        self.constant_n_vertices = True
+        utils.check_dir(self.path_dataset)
 
-    
+    def compute_example(self):
+        """
+        
+        """
+        try:
+            g, W = GENERATOR_FUNCTIONS["ErdosRenyi"](self.edge_density, self.n_vertices)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        W, K = add_clique(W,self.clique_size)
+        B = adjacency_matrix_to_tensor_representation(W)
+        KB = adjacency_matrix_to_tensor_representation(K)
+        return (B, KB)
+
+def add_clique(W,k):
+    K = torch.zeros((len(W),len(W)))
+    K[:k,:k] = torch.ones((k,k)) - torch.eye(k)
+    W[:k,:k] = torch.ones((k,k)) - torch.eye(k)
+    return W, K
