@@ -34,7 +34,6 @@ def update_config(config, command_name, logger):
         config['data']['vertex_proba'],config['data']['noise'],config['data']['edge_density']),
                    # Some funcs need path_dataset while not requiring the whole data dict
                    path_dataset=config['data']['path_dataset'])
-                   #res_dir='{}/runs/{}/res'.format(config['root_dir'], config['name'])
     return config
 
 @ex.config_hook
@@ -132,8 +131,6 @@ def main(cpu, data, train, arch):
     model.to(device)
 
     is_best = True
-    #log_dir_ckpt = get_log_dir()
-    #print(log_dir_ckpt)
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
         trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max,print_freq=train['print_freq'])
