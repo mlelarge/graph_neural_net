@@ -1,11 +1,10 @@
 ---
-name: Reg-ER-100 
+name: Reg-ER-100
 cpu: Yes
 root_dir: .
 
 data: # Data related parameters
     num_examples_train: 20000
-    #num_examples_test: 1000
     num_examples_val: 1000
     generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
     noise_model: ErdosRenyi
@@ -37,5 +36,5 @@ arch: # Architecture and model
 
 observers:
     neptune:
-        enable: Yes
-        project: mlelarge/GCP-RegBin
+        enable: No
+        project:

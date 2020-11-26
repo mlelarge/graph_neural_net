@@ -19,7 +19,7 @@ SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 ### BEGIN Sacred setup
 ex = Experiment()
-ex.add_config('default_phase.yaml')
+ex.add_config('default_qap.yaml')
 
 @ex.config_hook
 def set_experiment_name(config, command_name, logger):
