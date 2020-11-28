@@ -3,9 +3,19 @@ name: Reg-ER-100
 cpu: Yes
 root_dir: .
 
-data: # Data related parameters
+train_data: # Train data related parameters
     num_examples_train: 20000
     num_examples_val: 1000
+    generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
+    noise_model: ErdosRenyi
+    edge_density: 0.2
+    n_vertices: 25
+    vertex_proba: 1. # Parameter of the binomial distribution of vertices
+    noise: 0.05
+    path_dataset: dataset # Path where datasets are stored
+
+test_data: # Test data related parameters
+    num_examples_test: 1000
     generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
     noise_model: ErdosRenyi
     edge_density: 0.2
