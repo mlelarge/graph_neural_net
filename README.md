@@ -28,24 +28,6 @@
 ├── eval.py # testing models
 ```
 
-### Install
-
-### Run
-Run the main file ```commander.py```
-```
-python commander.py
-```
-To change options, use [Sacred](https://github.com/IDSIA/sacred) command-line interface and see ```default.yaml``` for the configuration structure. For instance,
-```
-python commander.py with cpu=No data.generative_model=Regular train.epoch=10 
-```
-You can also copy ```default.yaml``` and modify the configuration parameters there. Loading the configuration in ```other.yaml``` (or ```other.json```) can be done with
-```
-python commander.py with other.yaml
-```
-See [Sacred documentation](http://sacred.readthedocs.org/) for an exhaustive reference. 
-
-To save logs to [Neptune](https://neptune.ai/), you need to provide your own API key via the dedicated environment variable.
 
 ## Dependencies
 Dependencies are listed in `requirements.txt`. To install, run
@@ -53,18 +35,33 @@ Dependencies are listed in `requirements.txt`. To install, run
 pip install -r requirements.txt
 ```
 ## Training 
-Running
+Run the main file ```commander.py``` with the command ```train```
 ```
-python commander.py
+python train commander.py
 ```
-will train a model with the parameters defined in `default.yaml`.
+To change options, use [Sacred](https://github.com/IDSIA/sacred) command-line interface and see ```default.yaml``` for the configuration structure. For instance,
+```
+python commander.py train with cpu=No data.generative_model=Regular train.epoch=10 
+```
+You can also copy ```default.yaml``` and modify the configuration parameters there. Loading the configuration in ```other.yaml``` (or ```other.json```) can be done with
+```
+python commander.py train with other.yaml
+```
+See [Sacred documentation](http://sacred.readthedocs.org/) for an exhaustive reference. 
 
-The model is regularly saved in the folder `runs`. More precisely, with the current parameters in `default.yaml`, it is saved in `runs/ER_std/QAP_ErdosRenyi_ErdosRenyi_50_1_0.05`.
+To save logs to [Neptune](https://neptune.ai/), you need to provide your own API key via the dedicated environment variable.
+
+The model is regularly saved in the folder `runs`.
 
 ## Evaluating
 
-The script `eval.py` is used to test a model. With the example above,
+There are two ways of evaluating the models. If you juste ran the training with a configuration ```conf.yaml```, you can simply do,
 ```
-python eval.py --name ER_std --model-path runs/ER_std/QAP_ErdosRenyi_ErdosRenyi_50_1_0.05
+python commander.py eval with conf.yaml
 ```
-will retrieve the trained model and evaluated it on a test dataset. More options are available in `eval.py`.
+You can omit ```with conf.yaml``` if you are using the default configuartion.
+
+If you downloaded a model with a config file from here, you can edit the section ```test_data``` of this config if you wish and then run,
+```
+python commander.py eval with /path/to/config model_path=/path/to/model.pth.tar
+```
