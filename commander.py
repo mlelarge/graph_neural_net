@@ -2,7 +2,6 @@ import os
 import pathlib
 import shutil
 import json
-import yaml
 from sacred import Experiment
 
 import torch
@@ -183,21 +182,17 @@ def save_to_json(key, acc, loss, filename):
             data = json.load(jsonFile)
     else:
         data = {}
-        with open(filename, 'w') as jsonFile:
-            json.dump(data,jsonFile)
-
     data[key] = {'loss':loss, 'acc': acc}
-
     with open(filename, 'w') as jsonFile:
         json.dump(data, jsonFile)
 
 @ex.capture
-def create_key(log_dir, train_data, test_data):
+def create_key(log_dir, test_data):
     template = 'model_{}data_QAP_{}_{}_{}_{}_{}_{}_{}'
-    key=template.format(log_dir, train_data['generative_model'], train_data['noise_model'],
-                        test_data['num_examples_test'], train_data['n_vertices'],
-                        train_data['vertex_proba'], train_data['noise'],
-                        train_data['edge_density'])
+    key=template.format(log_dir, test_data['generative_model'], test_data['noise_model'],
+                        test_data['num_examples_test'], test_data['n_vertices'],
+                        test_data['vertex_proba'], test_data['noise'],
+                        test_data['edge_density'])
     return key
 
 @ex.command
@@ -223,7 +218,7 @@ def eval(name, cpu, test_data, train, arch, log_dir, model_path, output_filename
                                     val_test='test')
     key = create_key()
     filename_test = os.path.join(log_dir,  output_filename)
-    print('Saving at: ',filename_test)
+    print('Saving result at: ',filename_test)
     save_to_json(key, acc, loss, filename_test)
 
 @ex.automain
