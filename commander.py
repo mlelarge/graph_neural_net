@@ -1,4 +1,5 @@
 import os
+import pathlib
 import shutil
 import json
 from sacred import Experiment
@@ -19,42 +20,50 @@ SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 ### BEGIN Sacred setup
 ex = Experiment()
-ex.add_config('default_phase.yaml')
+ex.add_config('default_qap.yaml')
 
 @ex.config_hook
 def set_experiment_name(config, command_name, logger):
     ex.path = config['name']
     return config
 
-@ex.config_hook
-def update_config(config, command_name, logger):
-    config.update(log_dir='{}/runs/{}/QAP_{}_{}_{}_{}_{}_{}/'.format(
-        config['root_dir'], config['name'],config['data']['generative_model'],
-        config['data']['noise_model'], config['data']['n_vertices'],
-        config['data']['vertex_proba'],config['data']['noise'],config['data']['edge_density']),
-                   # Some funcs need path_dataset while not requiring the whole data dict
-                   path_dataset=config['data']['path_dataset'])
-                   #res_dir='{}/runs/{}/res'.format(config['root_dir'], config['name'])
-    return config
+@ex.config
+def update_paths(root_dir, name, train_data, test_data):
+    log_dir = '{}/runs/{}/QAP_{}_{}_{}_{}_{}_{}/'.format(
+              root_dir, name, train_data['generative_model'],
+              train_data['noise_model'], train_data['n_vertices'],
+              train_data['vertex_proba'], train_data['noise'],
+              train_data['edge_density'])
+    path_dataset = train_data['path_dataset']
+    # The two keys below are specific to testing
+    # These default values are overriden by command line
+    model_path = os.path.join(log_dir, 'model_best.pth.tar')
+    output_filename = 'test.json'
 
 @ex.config_hook
 def init_observers(config, command_name, logger):
-    neptune = config['observers']['neptune']
-    if neptune['enable']:
-        from neptunecontrib.monitoring.sacred import NeptuneObserver
-        ex.observers.append(NeptuneObserver(project_name=neptune['project']))
+    if command_name == 'train':
+        neptune = config['observers']['neptune']
+        if neptune['enable']:
+            from neptunecontrib.monitoring.sacred import NeptuneObserver
+            ex.observers.append(NeptuneObserver(project_name=neptune['project']))
     return config
 
 @ex.post_run_hook
 def clean_observer(observers):
     """ Observers that are added in a config_hook need to be cleaned """
-    neptune = observers['neptune']
-    if neptune['enable']:
-        from neptunecontrib.monitoring.sacred import NeptuneObserver
-        ex.observers = [obs for obs in ex.observers if not isinstance(obs, NeptuneObserver)]
+    try:
+        neptune = observers['neptune']
+        if neptune['enable']:
+            from neptunecontrib.monitoring.sacred import NeptuneObserver
+            ex.observers = [obs for obs in ex.observers
+                            if not isinstance(obs, NeptuneObserver)]
+    except KeyError:
+        pass
 
 ### END Sacred setup
 
+### Training
 @ex.capture
 def init_logger(name, _config, _run):
     # set loggers
@@ -100,8 +109,8 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
 
 
-@ex.automain
-def main(cpu, data, train, arch):
+@ex.command
+def train(cpu, train_data, train, arch, log_dir):
     """ Main func.
     """
     global best_score, best_epoch
@@ -112,15 +121,16 @@ def main(cpu, data, train, arch):
 
     # init random seeds 
     setup_env()
+    print("Models saved in ", log_dir)
 
     init_output_env()
     exp_logger = init_logger()
     
-    gene_train = Generator('train', data)
+    gene_train = Generator('train', train_data)
     gene_train.load_dataset()
     train_loader = siamese_loader(gene_train, train['batch_size'],
                                   gene_train.constant_n_vertices)
-    gene_val = Generator('val', data)
+    gene_val = Generator('val', train_data)
     gene_val.load_dataset()
     val_loader = siamese_loader(gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
@@ -132,8 +142,6 @@ def main(cpu, data, train, arch):
     model.to(device)
 
     is_best = True
-    #log_dir_ckpt = get_log_dir()
-    #print(log_dir_ckpt)
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
         trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=metrics.accuracy_max,print_freq=train['print_freq'])
@@ -155,3 +163,64 @@ def main(cpu, data, train, arch):
             'best_epoch': best_epoch,
             'exp_logger': exp_logger,
             }, is_best)
+
+### Testing
+@ex.capture
+def load_model(model, device, model_path):
+    """ Load model. Note that the model_path argument is captured """
+    if os.path.exists(model_path):
+        print("Reading model from ", model_path)
+        checkpoint = torch.load(model_path, map_location=torch.device(device))
+        model.load_state_dict(checkpoint['state_dict'])
+        return model
+    else:
+        raise RuntimeError('Model does not exist!')
+
+def save_to_json(key, acc, loss, filename):
+    if os.path.exists(filename):
+        with open(filename, "r") as jsonFile:
+            data = json.load(jsonFile)
+    else:
+        data = {}
+    data[key] = {'loss':loss, 'acc': acc}
+    with open(filename, 'w') as jsonFile:
+        json.dump(data, jsonFile)
+
+@ex.capture
+def create_key(log_dir, test_data):
+    template = 'model_{}data_QAP_{}_{}_{}_{}_{}_{}_{}'
+    key=template.format(log_dir, test_data['generative_model'], test_data['noise_model'],
+                        test_data['num_examples_test'], test_data['n_vertices'],
+                        test_data['vertex_proba'], test_data['noise'],
+                        test_data['edge_density'])
+    return key
+
+@ex.command
+def eval(name, cpu, test_data, train, arch, log_dir, model_path, output_filename):
+    use_cuda = not cpu and torch.cuda.is_available()
+    device = 'cuda' if use_cuda else 'cpu'
+    print('Using device:', device)
+
+    model = get_model(arch)
+    model.to(device)
+    model = load_model(model, device)
+
+    criterion = get_criterion(device, train['loss_reduction'])
+    exp_logger = logger.Experiment(name)
+    exp_logger.add_meters('test', metrics.make_meter_matching())
+
+    gene_test = Generator('test', test_data)
+    gene_test.load_dataset()
+    test_loader = siamese_loader(gene_test, train['batch_size'],
+                                 gene_test.constant_n_vertices)
+    acc, loss = trainer.val_triplet(test_loader, model, criterion, exp_logger, device,
+                                    epoch=0, eval_score=metrics.accuracy_linear_assignment,
+                                    val_test='test')
+    key = create_key()
+    filename_test = os.path.join(log_dir,  output_filename)
+    print('Saving result at: ',filename_test)
+    save_to_json(key, acc, loss, filename_test)
+
+@ex.automain
+def main():
+    pass
