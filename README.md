@@ -1,4 +1,11 @@
-# Graph neural networks for the Quadratic Assignment Problem
+# Expressive Power of Invariant and Equivaraint Graph Neural Networks 
+
+In this repository, we show how to use powerful GNN (2-FGNN) to solve a  graph alignement problem. This code was used to derive the practical results in [Expressive Power of Invariant and Equivariant Graph Neural Networks](https://arxiv.org/abs/2006.15646).
+
+
+## Problem: alignement of graphs
+
+
 
 ## Overview
 ### Project structure
