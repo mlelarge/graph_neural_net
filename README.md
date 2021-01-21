@@ -46,7 +46,9 @@ Various architectures can be used for the GNN and we find that FGNN (first intro
 Each line corresponds to a model trained at a given noise level and shows
 its accuracy across all noise levels. We see that pretrained models generalize very well at noise levels unseen during the training.
 
-We refer to our [paper](https://openreview.net/forum?id=lxHgXYN4bwl) for comparison with other algorithms (message passing GNN, spectral or SDP algorithms).
+We provide a simple [notebook](https://github.com/mlelarge/graph_neural_net/blob/master/plot_accuracy_regular.ipynb) to reproduce this result for the pretrained model released with this repository.
+
+We refer to our [paper](https://openreview.net/forum?id=lxHgXYN4bwl) for comparisons with other algorithms (message passing GNN, spectral or SDP algorithms).
 
 To cite our paper:
 ```
