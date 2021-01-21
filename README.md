@@ -1,6 +1,65 @@
-# Graph neural networks for the Quadratic Assignment Problem
+# Expressive Power of Invariant and Equivaraint Graph Neural Networks 
 
-## Overview
+In this repository, we show how to use powerful GNN (2-FGNN) to solve a  graph alignment problem. This code was used to derive the practical results in the following paper:
+
+Waiss Azizian, Marc Lelarge. Expressive Power of Invariant and Equivariant Graph Neural Networks, ICLR 2021.
+
+[arXiv](https://arxiv.org/abs/2006.15646) [OpenReview](https://openreview.net/forum?id=lxHgXYN4bwl) 
+## Problem: alignment of graphs
+The graph isomorphism problem is the computational problem of determining whether two finite graphs are isomorphic. Here we consider a noisy version of this problem: the two graphs below are noisy versions of a parent graph. There is no strict isomorphism between them. Can we still match the vertices of graph 1 with the corresponding vertices of graph 2?
+
+graph 1 | graph 2
+:---:|:---:
+![](images/01_graph1.png) | ![](images/02_graph2.png)
+
+With our GNN, we obtain the following results: green vertices are well paired vertices and red vertices are errors. Both graphs are now represented using the layout from the right above but the color of the vertices are the same on both sides. At inference, our GNN builds node embedding for the vertices of graphs 1 and 2. Finally a node of graph 1 is matched to its most similar node of graph 2 in this embedding space.
+
+graph 1 | graph 2
+:---:|:---:
+![](images/04_result_graph1.png) | ![](images/03_result_graph2.png)
+
+Below, on the left, we plot the errors made by our GNN: errors made on red vertices are represented by links corresponding to a wrong matching or cycle; on the right, we superpose the two graphs: green edges are in both graphs (they correspond to the parent graph), orange edges are in graph 1 only and blue edges are in graph 2 only. We clearly see the impact of the noisy edges (orange and blue) as each red vertex (corresponding to an error) is connected to such edges (except the isolated red vertex).
+
+Wrong matchings/cycles | Superposing the 2 graphs
+:---:|:---:
+![](images/09_preds.png) | ![](images/05_result.png)
+
+To measure the performance of our GNN, instead of looking at vertices, we can look at edges. On the left below, we see that our GNN recovers most of the green edges present in graphs 1 and 2 (edges from the parent graph). On the right, mismatched edges correspond mostly to noisy (orange and blue) edges (present in only one of the graphs 1 or 2). 
+
+Matched edges | Mismatched edges
+:---:|:---:
+![](images/07_match.png) | ![](images/08_mismatch.png)
+
+## Training GNN for the graph alignment problem
+
+For the training of our GNN, we generate synthetic datasets as follows: first sample the parent graph and then add edges to construct graphs 1 and 2. We obtain a dataset made of pairs of graphs for which we know the true matching of vertices. We then use a siamese encoder as shown below where the same GNN (i.e. shared weights) is used for both graphs. The node embeddings constructed for each graph are then used to predict the corresponding permutation index by taking the outer product and a softmax along each row. The GNN is trained with a standard cross-entropy loss.
+At inference, we can add a LAP solver to get a permutation from the matrix <img src="https://render.githubusercontent.com/render/math?math=E_1 E_2^T">.
+
+![](images/siamese.png)
+
+Various architectures can be used for the GNN and we find that FGNN (first introduced by Maron et al. in [Provably Powerful Graph Networks](https://papers.nips.cc/paper/2019/hash/bb04af0f7ecaee4aae62035497da1387-Abstract.html) NeurIPS 2019) are best performing for our task. In our paper [Expressive Power of Invariant and Equivariant Graph Neural Networks](https://openreview.net/forum?id=lxHgXYN4bwl), we substantiate these empirical findings by **proving that FGNN has a better power of approximation among all equivariant architectures working with tensors of order 2 presented so far** (this includes message passing GNN or linear GNN).
+
+## Results
+
+![](images/download.png)
+
+Each line corresponds to a model trained at a given noise level and shows
+its accuracy across all noise levels. We see that pretrained models generalize very well at noise levels unseen during the training.
+
+We refer to our [paper](https://openreview.net/forum?id=lxHgXYN4bwl) for comparison with other algorithms (message passing GNN, spectral or SDP algorithms).
+
+To cite our paper:
+```
+@inproceedings{azizian2020characterizing,
+  title={Expressive power of invariant and equivariant graph neural networks},
+  author={Azizian, Wa{\"\i}ss and Lelarge, Marc},
+  booktitle={International Conference on Learning Representations},
+  year={2021},
+  url={https://openreview.net/forum?id=lxHgXYN4bwl}
+}
+```
+
+## Overview of the code
 ### Project structure
 
 ```bash
