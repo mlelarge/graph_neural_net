@@ -50,7 +50,7 @@ def train_triplet(train_loader,model,criterion,optimizer,
                    epoch, i, len(train_loader), batch_time=logger.get_meter('train', 'batch_time'),
                    data_time=logger.get_meter('train', 'data_time'), lr=learning_rate,
                    loss=logger.get_meter('train', 'loss'), acc=logger.get_meter('train', 'acc')))
-
+    optimizer.zero_grad()   
     logger.log_meters('train', n=epoch)
     logger.log_meters('hyperparams', n=epoch)
 
@@ -59,35 +59,35 @@ def val_triplet(val_loader,model,criterion,
                 logger,device,epoch,clique_size,eval_score=None,print_freq=10,val_test='val'):
     model.eval()
     logger.reset_meters(val_test)
-
-    for i, (input1, input2) in enumerate(val_loader):
-        input1 = input1.to(device)
-        K = input2.to(device)
-        output = model(input1)
-        rawscores = output.squeeze(-1)
-        proba = torch.softmax(rawscores,-1)
+    with torch.no_grad():
+        for i, (input1, input2) in enumerate(val_loader):
+            input1 = input1.to(device)
+            K = input2.to(device)
+            output = model(input1)
+            rawscores = output.squeeze(-1)
+            proba = torch.softmax(rawscores,-1)
         
-        loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
-        logger.update_meter(val_test, 'loss', loss.data.item(), n=1)
+            loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
+            logger.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
-        if eval_score is not None:
-            acc, total_n_vertices = eval_score(proba*input1[:,:,:,1],clique_size)
-            logger.update_meter(val_test, 'acc', acc, n=total_n_vertices)
-        if i % print_freq == 0:
-            accu = logger.get_meter(val_test, 'acc')
-            los = logger.get_meter(val_test, 'loss')
-            if val_test == 'val':
-                print('Validation set, epoch: [{0}][{1}/{2}]\t'
-                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                    'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
-                    epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
-                    acc=accu))
-            else:
-                print('Test set, epoch: [{0}][{1}/{2}]\t'
-                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                    'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
-                    epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
-                    acc=accu))
+            if eval_score is not None:
+                acc, total_n_vertices = eval_score(proba*input1[:,:,:,1],clique_size)
+                logger.update_meter(val_test, 'acc', acc, n=total_n_vertices)
+            if i % print_freq == 0:
+                accu = logger.get_meter(val_test, 'acc')
+                los = logger.get_meter(val_test, 'loss')
+                if val_test == 'val':
+                    print('Validation set, epoch: [{0}][{1}/{2}]\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
+                        epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
+                        acc=accu))
+                else:
+                    print('Test set, epoch: [{0}][{1}/{2}]\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
+                        epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
+                        acc=accu))
 
     logger.log_meters(val_test, n=epoch)
     return accu.avg, los.avg
