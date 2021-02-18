@@ -225,7 +225,7 @@ def add_clique_base(W,k):
 
 def add_clique(W,k):
     K = torch.zeros((len(W),len(W)))
-    indices = random.sample(range(len(W)),k))
+    indices = random.sample(range(len(W)),k)
     l_indices = [(id_i,id_j) for id_i in indices for id_j in indices if id_i!=id_j] #Makes all the pairs of indices where we put the clique (get rid of diagonal terms)
     t_ind = torch.tensor(l_indices)
     K[t_ind[:,0],t_ind[:,1]] = 1
