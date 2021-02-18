@@ -217,8 +217,20 @@ class MCP_Generator(Base_Generator):
         KB = adjacency_matrix_to_tensor_representation(K)
         return (B, KB)
 
-def add_clique(W,k):
+def add_clique_base(W,k):
     K = torch.zeros((len(W),len(W)))
     K[:k,:k] = torch.ones((k,k)) - torch.eye(k)
     W[:k,:k] = torch.ones((k,k)) - torch.eye(k)
     return W, K
+
+def add_clique(W,k):
+    K = torch.zeros((len(W),len(W)))
+    indices = random.sample(range(len(W),k))
+    l_indices = [(id_i,id_j) for id_i in indices for id_j in indices if id_i!=id_j] #Makes all the pairs of indices where we put the clique (get rid of diagonal terms)
+    t_ind = torch.tensor(l_indices)
+    K[t_ind[:,0],t_ind[:,1]] = 1
+    W[t_ind[:,0],t_ind[:,1]] = 1
+    return W,K
+    
+
+

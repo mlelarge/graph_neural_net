@@ -4,7 +4,7 @@ cpu: Yes
 root_dir: .
 
 data: # Data related parameters
-    num_examples_train: 20000
+    num_examples_train: 2000
     #num_examples_test: 1000
     num_examples_val: 1000
     edge_density: 0.39810717055349726 #0.1
@@ -34,5 +34,5 @@ arch: # Architecture and model
 
 observers:
     neptune:
-        enable: No
-        project: mlelarge/MCP
+        enable: Yes
+        project: MauTrib/MCP
