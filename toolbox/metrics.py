@@ -150,6 +150,33 @@ def accuracy_max_mcp(weights,clique_size):
         total_n_vertices += clique_size#len(weight)
     return true_pos, total_n_vertices
 
+def accuracy_mcp(weights,clique_size,solutions,device='cpu'):
+    """
+    weights and solutions should be (bs,n,n)
+    """
+    solutions = solutions[:,:,:,1]
+    bs,n,_ = weights.shape
+    true_pos = 0
+    total_n_vertices = 0
+
+    deg = torch.sum(weights, dim=-1)
+    _,inds = torch.topk(deg, clique_size,dim=-1)
+    for i,cur_w in enumerate(weights):
+        sol = torch.sum(solutions[i],dim=1) #Sum over rows !
+        ind = inds[i]
+        for idx in ind:
+            idx = idx.item()
+            if sol[idx]:
+                true_pos += 1
+        total_n_vertices+=clique_size
+    """
+    y_onehot = torch.zeros_like(weights)
+    y_onehot.scatter_(2, inds, 1)
+    true_pos = torch.sum(y_onehot==solutions)
+    total_n_vertices = bs*clique_size"""
+    return true_pos, total_n_vertices
+
+
 
 def f1_score(preds,labels,device = 'cuda'):
     """

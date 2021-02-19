@@ -232,5 +232,8 @@ def add_clique(W,k):
     W[t_ind[:,0],t_ind[:,1]] = 1
     return W,K
     
-
+if __name__=="__main__":
+    data_args = {"edge_density":0.1, "clique_size":3, "num_examples_train":5,"path_dataset":"dataset_mcp","n_vertices":5}
+    mg = MCP_Generator("train",data_args)
+    mg.load_dataset()
 

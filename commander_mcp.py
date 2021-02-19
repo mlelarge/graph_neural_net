@@ -143,9 +143,9 @@ def main(cpu, data, train, arch):
     clique_size = data['clique_size']
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
-        trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,clique_size,eval_score=metrics.accuracy_max_mcp,print_freq=train['print_freq'])   
+        trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,clique_size,eval_score=metrics.accuracy_mcp,print_freq=train['print_freq'])   
 
-        acc, loss = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,clique_size,eval_score=metrics.accuracy_max_mcp)
+        acc, loss = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,clique_size,eval_score=metrics.accuracy_mcp)
         scheduler.step(loss)
         # remember best acc and save checkpoint
         is_best = (acc > best_score)
