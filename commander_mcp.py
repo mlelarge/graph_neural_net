@@ -8,7 +8,7 @@ import torch.backends.cudnn as cudnn
 from toolbox import logger, metrics
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
-from loaders.data_generator import MCP_Generator
+from loaders.data_generator import MCP_Generator,MCP_True_Generator
 from toolbox.optimizer import get_optimizer
 from toolbox.losses import loss_mcp
 from toolbox import utils
@@ -86,6 +86,7 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     filename = os.path.join(log_dir, filename)
     torch.save(state, filename)
     if is_best:
+        print("Best model yet saved")
         shutil.copyfile(filename, os.path.join(log_dir, 'model_best.pth.tar'))
 
     fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')

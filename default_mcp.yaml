@@ -16,7 +16,7 @@ train: # Training parameters
     epoch: 10
     batch_size: 16
     lr: !!float 1e-4
-    scheduler_step: 5
+    scheduler_step: 1
     scheduler_decay: 0.9
     print_freq: 100
     # How to reduce the loss over several examples:
@@ -26,11 +26,11 @@ train: # Training parameters
 arch: # Architecture and model
     arch: Simple_Edge_Embedding
     model_name: Simple_Edge_Embedding
-    num_blocks: 4
+    num_blocks: 5
     original_features_num: 2
-    in_features: 64
+    in_features: 128
     out_features: 1
-    depth_of_mlp: 3
+    depth_of_mlp: 5
 
 observers:
     neptune:

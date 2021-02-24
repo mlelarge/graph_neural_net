@@ -2,6 +2,7 @@ import os
 import random
 import itertools
 import networkx
+from networkx.algorithms.approximation.clique import max_clique
 import torch
 import torch.utils
 from toolbox import utils
@@ -213,6 +214,46 @@ class MCP_Generator(Base_Generator):
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
         W, K = add_clique(W,self.clique_size)
+        B = adjacency_matrix_to_tensor_representation(W)
+        KB = adjacency_matrix_to_tensor_representation(K)
+        return (B, KB)
+
+class MCP_True_Generator(Base_Generator):
+    """
+    Generator for the Maximum Clique Pb, which doesn't plant a clique
+    """
+    def __init__(self, name, args):
+        self.edge_density = args['edge_density']
+        self.clique_size = args['clique_size']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'MCP_true_{}_{}_{}_{}'.format(num_examples,
+                                                           self.n_vertices, 
+                                                           self.clique_size, 
+                                                           self.edge_density)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        self.constant_n_vertices = True
+        utils.check_dir(self.path_dataset)
+
+    def compute_example(self):
+        """
+        
+        """
+        try:
+            g, W = GENERATOR_FUNCTIONS["ErdosRenyi"](self.edge_density, self.n_vertices)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        
+        mc = max_clique(g)
+        l_indices = [(id_i,id_j) for id_i in mc for id_j in mc if id_i!=id_j]
+        t_ind = torch.tensor(l_indices)
+        K = torch.zeros_like(W)
+        K[t_ind[:,0],t_ind[:,1]] = 1
+
         B = adjacency_matrix_to_tensor_representation(W)
         KB = adjacency_matrix_to_tensor_representation(K)
         return (B, KB)
