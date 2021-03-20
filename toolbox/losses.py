@@ -14,7 +14,7 @@ class triplet_loss(nn.Module):
         else:
             raise ValueError('Unknown loss_reduction parameters {}'.format(loss_reduction))
 
-    def forward(self, outputs):
+    def forward(self, outputs, target):#Keep target for modularity
         """
         outputs is the output of siamese network (bs,n_vertices,n_vertices)
         """
@@ -57,17 +57,16 @@ class loss_mcp(nn.Module):
         target[:,:self.clique_size] = torch.ones((target.shape[0],self.clique_size),dtype=torch.long)
         return self.loss(log_probas,target)
 
-mcp_loss = torch.nn.BCELoss(reduction='none')
-
 class tsp_loss(nn.Module):
     def __init__(self, loss=nn.BCELoss(reduction='none')):
         super(tsp_loss, self).__init__()
         self.loss = loss
         self.normalize = torch.nn.Sigmoid()#Softmax(dim=2)
         
-    def forward(self, raw_scores, mask, target):
+    def forward(self, raw_scores, target):#Used to have also a mask as argument -> Ask MLelarge
         """
         raw_scores (bs,n_vertices,n_vertices)
         """
         proba = self.normalize(raw_scores)
-        return torch.mean(mask*self.loss(proba,target))
+        loss = self.loss(proba,target)
+        return torch.mean(loss) # Was return torch.mean(mask*self.loss(proba,target))

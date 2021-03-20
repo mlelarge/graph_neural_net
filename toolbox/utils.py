@@ -19,3 +19,9 @@ class NpEncoder(json.JSONEncoder):
             return obj.tolist()
         else:
             return super(NpEncoder, self).default(obj)
+
+def get_device(t):
+    if t.is_cuda:
+        return t.get_device()
+    return 'cpu'
+

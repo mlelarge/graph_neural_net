@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment
+from toolbox.utils import get_device
 
 class Meter(object):
     """Computes and stores the sum, average and current value"""
@@ -46,7 +47,7 @@ class ValueMeter(object):
     def value(self):
         return self.val
 
-def make_meter_matching():
+def make_meter_acc():
     meters_dict = {
         'loss': Meter(),
         'acc': Meter(),
@@ -57,11 +58,14 @@ def make_meter_matching():
     }
     return meters_dict
 
-def make_meter_tsp():
+def make_meter_f1():
     meters_dict = {
         'loss': Meter(),
         'f1': Meter(),
         #'acc_gr': Meter(),
+        'precision': Meter(),
+        'recall': Meter(),
+        #'acc':Meter(),
         'batch_time': Meter(),
         'data_time': Meter(),
         'epoch_time': Meter(),
@@ -121,7 +125,7 @@ def accuracy_max(weights,labels=None):
     acc = 0
     total_n_vertices = 0
     for i, weight in enumerate(weights):
-        if labels:
+        if labels is not None:
             label = labels[i]
         else:
             label = np.arange(len(weight))
@@ -150,17 +154,20 @@ def accuracy_max_mcp(weights,clique_size):
         total_n_vertices += clique_size#len(weight)
     return true_pos, total_n_vertices
 
-def accuracy_mcp(weights,clique_size,solutions,device='cpu'):
+def accuracy_mcp(weights,solutions):
     """
     weights and solutions should be (bs,n,n)
+    Careful, not completely verified with different clique sizes in same batch
     """
     solutions = solutions[:,:,:,1]
+    clique_sizes,_ = torch.max(solutions.sum(dim=-1),dim=-1) #The '+1' is because the diagonal of the solutions is 0
+    clique_sizes += 1
     bs,n,_ = weights.shape
     true_pos = 0
     total_n_vertices = 0
 
     deg = torch.sum(weights, dim=-1)
-    _,inds = torch.topk(deg, clique_size,dim=-1)
+    inds = [ (torch.topk(deg[k],int(clique_sizes[k].item()),dim=-1))[1] for k in range(bs)]
     for i,cur_w in enumerate(weights):
         sol = torch.sum(solutions[i],dim=1) #Sum over rows !
         ind = inds[i]
@@ -168,7 +175,7 @@ def accuracy_mcp(weights,clique_size,solutions,device='cpu'):
             idx = idx.item()
             if sol[idx]:
                 true_pos += 1
-        total_n_vertices+=clique_size
+        total_n_vertices+=clique_sizes[i].item()
     """
     y_onehot = torch.zeros_like(weights)
     y_onehot.scatter_(2, inds, 1)
@@ -178,10 +185,13 @@ def accuracy_mcp(weights,clique_size,solutions,device='cpu'):
 
 
 
-def f1_score(preds,labels,device = 'cuda'):
+def f1_score(preds,labels):
     """
     take 2 adjacency matrices and compute precision, recall, f1_score for a tour
     """
+    device = get_device(preds)
+
+    labels = labels[:,:,:,1]
     bs, n_nodes ,_  = labels.shape
     true_pos = 0
     false_pos = 0
@@ -201,7 +211,8 @@ def f1_score(preds,labels,device = 'cuda'):
         f1 = 2*prec*rec/(prec+rec)
     return prec, rec, f1#, n, bs
 
-def compute_f1(raw_scores,target,device):
+def compute_f1(raw_scores,target):
+    device = get_device(raw_scores)
     _, ind = torch.topk(raw_scores, 3, dim =2)
     y_onehot = torch.zeros_like(raw_scores).to(device)
     y_onehot.scatter_(2, ind, 1)

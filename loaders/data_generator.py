@@ -6,6 +6,8 @@ from networkx.algorithms.approximation.clique import max_clique
 import torch
 import torch.utils
 from toolbox import utils
+from concorde.tsp import TSPSolver
+import math
 
 GENERATOR_FUNCTIONS = {}
 
@@ -100,6 +102,54 @@ def adjacency_matrix_to_tensor_representation(W):
     B[indices, indices, 0] = degrees
     return B
 
+##TSP Generation functions
+
+def dist_from_pos(pos):
+    N = len(pos)
+    W_dist = torch.zeros((N,N))
+    for i in range(0,N-1):
+        for j in range(i+1,N):
+            curr_dist = math.sqrt( (pos[i][0]-pos[j][0])**2 + (pos[i][1]-pos[j][1])**2)
+            W_dist[i,j] = curr_dist
+            W_dist[j,i] = curr_dist
+    return W_dist
+
+def generates_TSP(name):
+    """ Register a generator function for a graph distribution """
+    def decorator(func):
+        GENERATOR_FUNCTIONS[name] = func
+        return func
+    return decorator
+
+@generates_TSP("GaussNormal")
+def generate_gauss_normal_netx(N):
+    """ Generate random graph with points"""
+    pos = {i: (random.gauss(0, 1), random.gauss(0, 1)) for i in range(N)} #Define the positions of the points
+    W_dist = dist_from_pos(pos)
+    g = networkx.random_geometric_graph(N,0,pos=pos)
+    g.add_edges_from(networkx.complete_graph(N).edges)
+    W = networkx.adjacency_matrix(g).todense()
+    return g, torch.as_tensor(W_dist, dtype=torch.float)
+
+@generates_TSP("Square01")
+def generate_square_netx(N):
+    pos = {i: (random.random(), random.random()) for i in range(N)} #Define the positions of the points
+    W_dist = dist_from_pos(pos)
+    g = networkx.random_geometric_graph(N,0,pos=pos)
+    g.add_edges_from(networkx.complete_graph(N).edges)
+    W = networkx.adjacency_matrix(g).todense()
+    return g, torch.as_tensor(W_dist, dtype=torch.float)
+
+def distance_matrix_tensor_representation(W):
+    """ Create a tensor B[:,:,1] = W and B[i,i,0] = deg(i)"""
+    W_adjacency = torch.sign(W)
+    degrees = W_adjacency.sum(1)
+    B = torch.zeros((len(W), len(W), 2))
+    B[:, :, 1] = W
+    indices = torch.arange(len(W))
+    B[indices, indices, 0] = degrees
+    return B
+
 class Base_Generator(torch.utils.data.Dataset):
     def __init__(self, name, path_dataset, num_examples):
         self.path_dataset = path_dataset
@@ -137,8 +187,7 @@ class Base_Generator(torch.utils.data.Dataset):
         """ Get dataset length """
         return len(self.data)
 
-
-class Generator(Base_Generator):
+class QAP_Generator(Base_Generator):
     """
     Build a numpy dataset of pairs of (Graph, noisy Graph)
     """
@@ -184,6 +233,59 @@ class Generator(Base_Generator):
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
 
+class TSP_Generator(Base_Generator):
+    """
+    Build a numpy dataset of pairs of (Graph, noisy Graph)
+    """
+    def __init__(self, name, args, coeff=1e8):
+        self.generative_model = args['generative_model']
+        self.distance = args['distance_used']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'TSP_{}_{}_{}_{}'.format(self.generative_model, 
+                                                     self.distance,
+                                                     num_examples,
+                                                     self.n_vertices)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        
+        
+        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
+        self.constant_n_vertices = True
+        self.coeff = coeff
+        self.positions = []
+
+    def compute_example(self):
+        """
+        Compute pairs (Adjacency, Optimal Tour)
+        """
+        try:
+            g, W = GENERATOR_FUNCTIONS[self.generative_model](self.n_vertices)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
+        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
+
+        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
+        solution = problem.solve(verbose=False)
+        assert solution.success, "Couldn't find solution!"
+
+        B = distance_matrix_tensor_representation(W)
+        
+        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
+        prec = solution.tour[-1]
+        for i in range(self.n_vertices):
+            curr = solution.tour[i]
+            SOL[curr,prec] = 1
+            SOL[prec,curr] = 1
+            prec = curr
+        SOL = adjacency_matrix_to_tensor_representation(SOL)
+        self.positions.append((xs,ys))
+        return (B, SOL)
+
 class MCP_Generator(Base_Generator):
     """
     Generator for the Maximum Clique Pb
@@ -213,10 +315,27 @@ class MCP_Generator(Base_Generator):
         except KeyError:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
-        W, K = add_clique(W,self.clique_size)
+        W, K = self.add_clique(W,self.clique_size)
         B = adjacency_matrix_to_tensor_representation(W)
         KB = adjacency_matrix_to_tensor_representation(K)
         return (B, KB)
+        
+    @classmethod
+    def add_clique_base(cls,W,k):
+        K = torch.zeros((len(W),len(W)))
+        K[:k,:k] = torch.ones((k,k)) - torch.eye(k)
+        W[:k,:k] = torch.ones((k,k)) - torch.eye(k)
+        return W, K
+
+    @classmethod
+    def add_clique(cls,W,k):
+        K = torch.zeros((len(W),len(W)))
+        indices = random.sample(range(len(W)),k)
+        l_indices = [(id_i,id_j) for id_i in indices for id_j in indices if id_i!=id_j] #Makes all the pairs of indices where we put the clique (get rid of diagonal terms)
+        t_ind = torch.tensor(l_indices)
+        K[t_ind[:,0],t_ind[:,1]] = 1
+        W[t_ind[:,0],t_ind[:,1]] = 1
+        return W,K
 
 class MCP_True_Generator(Base_Generator):
     """
@@ -257,21 +376,6 @@ class MCP_True_Generator(Base_Generator):
         B = adjacency_matrix_to_tensor_representation(W)
         KB = adjacency_matrix_to_tensor_representation(K)
         return (B, KB)
-
-def add_clique_base(W,k):
-    K = torch.zeros((len(W),len(W)))
-    K[:k,:k] = torch.ones((k,k)) - torch.eye(k)
-    W[:k,:k] = torch.ones((k,k)) - torch.eye(k)
-    return W, K
-
-def add_clique(W,k):
-    K = torch.zeros((len(W),len(W)))
-    indices = random.sample(range(len(W)),k)
-    l_indices = [(id_i,id_j) for id_i in indices for id_j in indices if id_i!=id_j] #Makes all the pairs of indices where we put the clique (get rid of diagonal terms)
-    t_ind = torch.tensor(l_indices)
-    K[t_ind[:,0],t_ind[:,1]] = 1
-    W[t_ind[:,0],t_ind[:,1]] = 1
-    return W,K
     
 if __name__=="__main__":
     data_args = {"edge_density":0.1, "clique_size":3, "num_examples_train":5,"path_dataset":"dataset_mcp","n_vertices":5}

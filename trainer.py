@@ -3,18 +3,18 @@ import time
 import torch
 
 def train_triplet(train_loader,model,criterion,optimizer,
-                logger,device,epoch,clique_size,eval_score=None,print_freq=100):
+                helper,device,epoch,eval_score=False,print_freq=100):
     model.train()
-    logger.reset_meters('train')
-    logger.reset_meters('hyperparams')
+    helper.reset_meters('train')
+    helper.reset_meters('hyperparams')
     learning_rate = optimizer.param_groups[0]['lr']
-    logger.update_value_meter('hyperparams', 'learning_rate', learning_rate)
+    helper.update_value_meter('hyperparams', 'learning_rate', learning_rate)
     end = time.time()
 
     for i, (input1, input2) in enumerate(train_loader):
         batch_size = input1.shape[0]
         # measure data loading time
-        logger.update_meter('train', 'data_time', time.time() - end, n=batch_size)
+        helper.update_meter('train', 'data_time', time.time() - end, n=batch_size)
 
         input1 = input1.to(device)
         K = input2.to(device)
@@ -24,41 +24,41 @@ def train_triplet(train_loader,model,criterion,optimizer,
         proba = torch.softmax(rawscores,-1)
         loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
         #loss = criterion(proba,K[:,:,:,1])
-        logger.update_meter('train', 'loss', loss.data.item(), n=1)
+        helper.update_meter('train', 'loss', loss.data.item(), n=1)
         
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         # measure elapsed time
-        logger.update_meter('train', 'batch_time', time.time() - end, n=batch_size)
+        helper.update_meter('train', 'batch_time', time.time() - end, n=batch_size)
         end = time.time()
 
     
         if i % print_freq == 0:
-            if eval_score is not None:
+            if eval_score:
                 #print(np_out.shape)
-                acc, total_n_vertices = eval_score(proba*input1[:,:,:,1],clique_size,input2)
+                values = helper.eval_function(proba*input1[:,:,:,1],input2)
                 #print(acc_max, n, bs)
-                logger.update_meter('train', 'acc', acc, n=total_n_vertices)
+                helper.update_eval('train', values)
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                   'LR {lr:.2e}\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
-                   epoch, i, len(train_loader), batch_time=logger.get_meter('train', 'batch_time'),
-                   data_time=logger.get_meter('train', 'data_time'), lr=learning_rate,
-                   loss=logger.get_meter('train', 'loss'), acc=logger.get_meter('train', 'acc')))
+                  '{helper_str}'.format(
+                   epoch, i, len(train_loader), batch_time=helper.get_meter('train', 'batch_time'),
+                   data_time=helper.get_meter('train', 'data_time'), lr=learning_rate,
+                   loss=helper.get_meter('train', 'loss'), helper_str=helper.get_eval_str('train')))
     optimizer.zero_grad()   
-    logger.log_meters('train', n=epoch)
-    logger.log_meters('hyperparams', n=epoch)
+    helper.log_meters('train', n=epoch)
+    helper.log_meters('hyperparams', n=epoch)
 
 
 def val_triplet(val_loader,model,criterion,
-                logger,device,epoch,clique_size,eval_score=None,print_freq=10,val_test='val'):
+                helper,device,epoch,eval_score=False,print_freq=10,val_test='val'):
     model.eval()
-    logger.reset_meters(val_test)
+    helper.reset_meters(val_test)
     with torch.no_grad():
         for i, (input1, input2) in enumerate(val_loader):
             input1 = input1.to(device)
@@ -68,29 +68,29 @@ def val_triplet(val_loader,model,criterion,
             proba = torch.softmax(rawscores,-1)
         
             loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
-            logger.update_meter(val_test, 'loss', loss.data.item(), n=1)
+            helper.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
-            if eval_score is not None:
-                acc, total_n_vertices = eval_score(proba*input1[:,:,:,1],clique_size,input2)
-                logger.update_meter(val_test, 'acc', acc, n=total_n_vertices)
+            if eval_score:
+                values = helper.eval_function(proba*input1[:,:,:,1],input2)
+                helper.update_eval(val_test,values)
             if i % print_freq == 0:
-                accu = logger.get_meter(val_test, 'acc')
-                los = logger.get_meter(val_test, 'loss')
+                los = helper.get_meter(val_test, 'loss')
                 if val_test == 'val':
                     print('Validation set, epoch: [{0}][{1}/{2}]\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
-                        epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
-                        acc=accu))
+                        '{helper_str}'.format(
+                        epoch, i, len(val_loader), loss=helper.get_meter(val_test, 'loss'),
+                        helper_str = helper.get_eval_str(val_test)))
                 else:
                     print('Test set, epoch: [{0}][{1}/{2}]\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        'Acc {acc.avg:.3f} ({acc.val:.3f})'.format(
-                        epoch, i, len(val_loader), loss=logger.get_meter(val_test, 'loss'),
-                        acc=accu))
+                        '{helper_str}'.format(
+                        epoch, i, len(val_loader), loss=helper.get_meter(val_test, 'loss'),
+                        helper_str = helper.get_eval_str(val_test)))
 
-    logger.log_meters(val_test, n=epoch)
-    return accu.avg, los.avg
+    helper.log_meters(val_test, n=epoch)
+    relevant_metric = helper.get_relevant_metric(val_test)
+    return relevant_metric.avg, los.avg
 
 
 def train_tsp(train_loader,model,criterion,optimizer,
