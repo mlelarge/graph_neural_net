@@ -126,9 +126,10 @@ def update_config(config, command_name, logger):
 @ex.config_hook
 def init_observers(config, command_name, logger):
     neptune = config['observers']['neptune']
+    problem = config['problem']
     if neptune['enable']:
         from neptunecontrib.monitoring.sacred import NeptuneObserver
-        ex.observers.append(NeptuneObserver(project_name=neptune['project']))
+        ex.observers.append(NeptuneObserver(project_name=neptune['project']+problem.upper()))
     return config
 
 @ex.post_run_hook

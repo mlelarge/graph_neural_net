@@ -1,5 +1,5 @@
 ---
-name: TSP-50-cont
+name: Fusion
 cpu: No
 root_dir: .
 problem: "mcp" #qap, tsp, mcp
@@ -7,8 +7,8 @@ test_enabled: No
 
 data:
     train: # Train/Val data generation parameters
-        num_examples_train: 100
-        num_examples_val: 100
+        num_examples_train: 2000
+        num_examples_val: 1000
         n_vertices: 50
 
         _qap:
@@ -25,8 +25,7 @@ data:
             path_dataset: dataset_tsp #TSP #dataset_tsp # Path where datasets are stored
 
         _mcp:
-            edge_density: 0.39810717055349726 #0.1
-            n_vertices: 100
+            edge_density: 0.3981071705534973 #0.1
             clique_size: 9
             path_dataset: dataset_mcp # Path where datasets are stored
             
@@ -55,25 +54,25 @@ data:
 
 
 train: # Training parameters
-    epoch: 100
+    epoch: 20
     batch_size: 16
-    lr: !!float 1e-3
+    lr: !!float 1e-4
     scheduler_step: 1
-    scheduler_factor: 0.9
-    scheduler_decay: 0.9
-    print_freq: 10
+    scheduler_factor: 0.5
+    scheduler_decay: 0.5
+    print_freq: 100
     loss_reduction: mean
 
 arch: # Architecture and model
     arch: Simple_Edge_Embedding 
     model_name: Simple_Edge_Embedding #Simple_Node_Embedding
-    num_blocks: 4
+    num_blocks: 5
     original_features_num: 2
-    in_features: 64
+    in_features: 128
     out_features: 1
-    depth_of_mlp: 3
+    depth_of_mlp: 5
 
 observers:
     neptune:
-        enable: No
-        project: mautrib/TSP
+        enable: Yes
+        project: mautrib/

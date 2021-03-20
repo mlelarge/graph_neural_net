@@ -6,3 +6,4 @@ sacred
 PyYAML
 neptune-contrib
 psutil
+Cython
