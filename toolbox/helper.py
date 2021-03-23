@@ -15,14 +15,14 @@ def get_helper(problem):
         return QAP_Experiment
     elif problem=='tsp':
         return TSP_Experiment
-    elif problem=='tsp_rl':
+    elif problem=='tsprl':
         return TSP_RL_Experiment
     elif problem=='mcp':
         return MCP_Experiment
     elif problem=='sbm':
         return SBM_Experiment
     else:
-        return NotImplementedError(f"Problem {problem} not implemented.")
+        raise NotImplementedError(f"Problem {problem} not implemented.")
 
 '''
 Object of the Experiment class is an evolved Experiment object, which knows which 

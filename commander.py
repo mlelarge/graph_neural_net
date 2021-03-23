@@ -201,7 +201,6 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
             test_helper = init_helper('tsp')
         gene_test = test_helper.generator('test', test_data_dict)
         gene_test.load_dataset()
-        print(gene_test.data[0][0].shape)
         test_loader = siamese_loader(gene_test, train['batch_size'],
                                     gene_test.constant_n_vertices)
     
