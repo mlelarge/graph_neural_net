@@ -4,7 +4,7 @@ import os
 
 from torch.nn import BCELoss, CrossEntropyLoss, Sigmoid
 from toolbox.logger import Experiment
-from loaders.data_generator import QAP_Generator,TSP_Generator,MCP_Generator,SBM_Generator
+from loaders.data_generator import QAP_Generator,TSP_Generator,TSP_RL_Generator, MCP_Generator,SBM_Generator
 import toolbox.metrics as metrics
 import toolbox.losses as losses
 import toolbox.utils as utils
@@ -15,6 +15,8 @@ def get_helper(problem):
         return QAP_Experiment
     elif problem=='tsp':
         return TSP_Experiment
+    elif problem=='tsp_rl':
+        return TSP_RL_Experiment
     elif problem=='mcp':
         return MCP_Experiment
     elif problem=='sbm':
@@ -57,6 +59,11 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
             self.add_meters('val', metrics.make_meter_f1())
             self.add_meters('test', metrics.make_meter_f1())
             self.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
+        elif metric=="loss":
+            self.add_meters('train', metrics.make_meter_loss())
+            self.add_meters('val', metrics.make_meter_loss())
+            self.add_meters('test', metrics.make_meter_loss())
+            self.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
         else:
             raise NotImplementedError(f"{metric} metric not implemented")
 
@@ -69,6 +76,8 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
             self.update_eval = self._update_meter_acc
         elif metric=="f1":
             self.update_eval = self._update_meter_f1
+        elif metric=="loss":
+            self.update_eval = self._update_meter_loss
         else:
             raise NotImplementedError(f"{metric} metric not implemented")
     
@@ -90,6 +99,13 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
             self.update_meter(name,'recall', recall)
             self.update_meter(name,'f1', f1_score)
     
+    def _update_meter_loss(self, name, values) -> None:
+            '''
+            name : 'train', 'val' or 'test'
+            values : the values given by the eval function, in this case, should be of the form (loss)
+            '''
+            self.update_meter(name,'loss_ref', values)
+    
     def get_eval_str(self, tag):
         string = ''
         if self.metric == 'acc':
@@ -101,6 +117,8 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
             string = ('F1 {f1.avg:.3f} ({f1.val:.3f})\t'
                      'Recall {rec.avg:.3f} ({rec.val:.3f})\t'
                      'Prec {prec.avg:.3f} ({prec.val:.3f})').format(f1=f1,rec=rec,prec=prec)
+        elif self.metric == 'loss':
+            string =  'Loss Ref {loss_ref.avg:.3f} ({loss_ref.val:.3f})'.format(loss_ref = self.get_meter(tag,'loss_ref'))
         else:
             raise NotImplementedError(f"{self.metric} metric not implemented")
         
@@ -111,6 +129,8 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
             return self.get_meter(tag, 'acc')
         elif self.metric=='f1':
             return self.get_meter(tag, 'f1')
+        elif self.metric=='loss':
+            return self.get_meter(tag, 'loss_ref')
         else:
             raise NotImplementedError(f"{self.metric} metric not implemented")
 
@@ -148,6 +168,16 @@ class TSP_Experiment(Experiment_Helper):
         
         self.metric = 'f1' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('tsp', name, options=options, run=run)
+
+class TSP_RL_Experiment(Experiment_Helper):
+    def __init__(self, name, options=dict(), run=None, normalize = Sigmoid()) -> None:
+        self.generator = TSP_RL_Generator
+        self.criterion = losses.tsp_rl_loss(normalize=normalize)
+        self.eval_function = metrics.tsp_rl_loss
+        
+        self.metric = 'loss' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+        super().__init__('tsp', name, options=options, run=run)
+
 
 class MCP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid()) -> None:

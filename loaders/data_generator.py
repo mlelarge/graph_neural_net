@@ -10,6 +10,7 @@ from concorde.tsp import TSPSolver
 import math
 
 GENERATOR_FUNCTIONS = {}
+GENERATOR_FUNCTIONS_TSP = {}
 
 def generates(name):
     """ Register a generator function for a graph distribution """
@@ -82,7 +83,7 @@ def do_swap(g, u, v, s, t):
     g.add_edge(s, v)
 
 @noise("EdgeSwap")
-def noise_edge_swap(g, W, noise, edge_density):
+def noise_edge_swap(g, W, noise, edge_density): #Permet de garder la regularite
     g_noise = g.copy()
     edges_iter = list(itertools.chain(iter(g.edges), ((v, u) for (u, v) in g.edges)))
     for u,v in edges_iter:
@@ -117,7 +118,7 @@ def dist_from_pos(pos):
 def generates_TSP(name):
     """ Register a generator function for a graph distribution """
     def decorator(func):
-        GENERATOR_FUNCTIONS[name] = func
+        GENERATOR_FUNCTIONS_TSP[name] = func
         return func
     return decorator
 
@@ -263,7 +264,7 @@ class TSP_Generator(Base_Generator):
         Compute pairs (Adjacency, Optimal Tour)
         """
         try:
-            g, W = GENERATOR_FUNCTIONS[self.generative_model](self.n_vertices)
+            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
         except KeyError:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
@@ -286,6 +287,47 @@ class TSP_Generator(Base_Generator):
         
         self.positions.append((xs,ys))
         return (B, SOL)
+
+class TSP_RL_Generator(Base_Generator):
+    """
+    Build a numpy dataset of pairs of (Graph, noisy Graph)
+    """
+    def __init__(self, name, args, coeff=1e8):
+        self.generative_model = args['generative_model']
+        self.distance = args['distance_used']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'TSP_RL_{}_{}_{}_{}'.format(self.generative_model, 
+                                                     self.distance,
+                                                     num_examples,
+                                                     self.n_vertices)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        
+        
+        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
+        self.constant_n_vertices = True
+        self.coeff = coeff
+        self.positions = []
+
+    def compute_example(self):
+        """
+        Compute pairs (Adjacency, Optimal Tour)
+        """
+        try:
+            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
+        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
+
+        B = distance_matrix_tensor_representation(W)
+        
+        self.positions.append((xs,ys))
+        return (B, W) # Keep the distance matrix W in the target for the loss to be computed
 
 class MCP_Generator(Base_Generator):
     """
@@ -380,15 +422,13 @@ class MCP_True_Generator(Base_Generator):
 class SBM_Generator(Base_Generator):
     def __init__(self, name, args):
         self.edge_density_a = args['edge_density_a']
-        self.edge_density_b = args['edge_density_b']
-        self.edge_density_link = args['edge_density_link']
+        self.edge_density_c = args['edge_density_c']
         num_examples = args['num_examples_' + name]
         self.n_vertices = args['n_vertices']
         subfolder_name = 'SBM_{}_{}_{}_{}'.format(num_examples,
                                                            self.n_vertices, 
                                                            self.edge_density_a,
-                                                           self.edge_density_b,
-                                                           self.edge_density_link)
+                                                           self.edge_density_c)
         path_dataset = os.path.join(args['path_dataset'],
                                          subfolder_name)
         super().__init__(name, path_dataset, num_examples)
@@ -397,12 +437,13 @@ class SBM_Generator(Base_Generator):
         utils.check_dir(self.path_dataset)
     
     def compute_example(self):
-        n_sub_a = self.n_vertices//2
-        n_sub_b = self.n_vertices - n_sub_a # In case n_vertices is odd
+        n = self.n_vertices
+        n_sub_a = n//2
+        n_sub_b = n - n_sub_a # In case n_vertices is odd
 
-        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<self.edge_density_a).to(torch.float)
-        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<self.edge_density_b).to(torch.float)
-        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.edge_density_link).to(torch.float)
+        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.edge_density_a/n)).to(torch.float)
+        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.edge_density_a/n)).to(torch.float)
+        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.edge_density_c/n).to(torch.float)
         
         adj = torch.zeros((self.n_vertices,self.n_vertices))
 

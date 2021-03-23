@@ -23,61 +23,18 @@ SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 ex = Experiment()
 ex.add_config('default_config.yaml')
 
-def get_generator(pbm):
-    """
-    returns the problem associated generator
-    """
-    if pbm=="qap":
-        generator = QAP_Generator
-    elif pbm=="tsp":
-        generator = TSP_Generator
-    elif pbm=="mcp":
-        generator = MCP_Generator
-    elif pbm=="sbm":
-        generator = SBM_Generator
-    else:
-        raise NotImplementedError(f"{pbm.upper()} problem not implemented")
-    return generator
-
-def get_eval(pbm):
-    """
-    returns the problem associated eval function
-    """
-    if pbm=="qap":
-        func = metrics.accuracy_max
-    elif pbm=="tsp":
-        func = metrics.compute_f1
-    elif pbm=="mcp":
-        func = metrics.accuracy_mcp
-    else:
-        raise NotImplementedError(f"{pbm.upper()} problem not implemented")
-    return func
-
-def get_criterion(pbm, device='cpu',reduction='mean'):
-    """
-    returns the problem associated eval function
-    """
-    if pbm=="qap":
-        crit = toolbox.losses.triplet_loss(device=device,loss_reduction=reduction)
-    elif pbm=="tsp":
-        crit = toolbox.losses.tsp_loss(loss = torch.nn.BCELoss(reduction=reduction))
-    elif pbm=="mcp":
-        crit = torch.nn.BCELoss(reduction=reduction)
-    elif pbm=="sbm":
-        crit = torch.nn.BCELoss(reduction=reduction)
-    else:
-        raise NotImplementedError(f"{pbm.upper()} problem not implemented")
-    return crit
-
 @ex.config_hook
 def create_data_dict(config, command_name, logger):
     """
     Creates the parameter dictionaries for the data generation
     """
-    problem_key = "_" + config['problem']
+    problem = config['problem']
+    if problem=='tsp_rl':
+        problem = 'tsp'
+    problem_key = "_" + problem
     train_config = config['data']['train']
     test_config = config['data']['test']
-    custom_test = config['test_enabled'] and config['data']['test']
+    custom_test = config['test_enabled'] and config['data']['test']['custom']
     assert problem_key in list(train_config.keys())
     train_data_dict = dict()
     test_data_dict = dict()
@@ -119,6 +76,9 @@ def set_experiment_name(config, command_name, logger):
 @ex.config_hook
 def update_config(config, command_name, logger):
     pbm = config['problem']
+    if pbm=='tsp_rl':
+        pbm = 'tsp'
+
     pbm_key = "_"+pbm
     l_params =[value for _,value in (config['data']['train'][pbm_key]).items()]
     config_str = "_".join([str(item) for item in l_params])
@@ -161,7 +121,7 @@ def clean_observer(observers):
 ### END Sacred setup
 
 @ex.capture
-def init_helper(name, _config, _run, problem):
+def init_helper(problem, name, _config, _run):
     # set loggers
     exp_helper_object = get_helper(problem)
     exp_helper = exp_helper_object(name, _config, run=_run)
@@ -222,7 +182,8 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
     setup_env()
 
     init_output_env()
-    exp_helper = init_helper()
+    exp_helper = init_helper(problem)
+    test_helper = exp_helper
     
     generator = exp_helper.generator
     
@@ -236,8 +197,11 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
                                 gene_val.constant_n_vertices)
     
     if test_enabled:
-        gene_test = generator('test', test_data_dict)
+        if problem == 'tsp_rl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
+            test_helper = init_helper('tsp')
+        gene_test = test_helper.generator('test', test_data_dict)
         gene_test.load_dataset()
+        print(gene_test.data[0][0].shape)
         test_loader = siamese_loader(gene_test, train['batch_size'],
                                     gene_test.constant_n_vertices)
     
@@ -272,4 +236,4 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
             }, is_best)
     
     if test_enabled:
-        acc, loss = trainer.val_triplet(test_loader, model, criterion, exp_helper, device, 0, eval_score=True, print_freq=train['print_freq'],val_test='test')
+        acc, loss = trainer.val_triplet(test_loader, model, test_helper.criterion, test_helper, device, 0, eval_score=True, print_freq=train['print_freq'],val_test='test')

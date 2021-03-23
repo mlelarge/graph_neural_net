@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment
+from torch.nn.modules.activation import Sigmoid
 from toolbox.utils import get_device
 
 class Meter(object):
@@ -47,11 +48,20 @@ class ValueMeter(object):
     def value(self):
         return self.val
 
+def make_meter_loss():
+    meters_dict = {
+        'loss': Meter(),
+        'loss_ref': Meter(),
+        'batch_time': Meter(),
+        'data_time': Meter(),
+        'epoch_time': Meter(),
+    }
+    return meters_dict
+
 def make_meter_acc():
     meters_dict = {
         'loss': Meter(),
         'acc': Meter(),
-        #'acc_gr': Meter(),
         'batch_time': Meter(),
         'data_time': Meter(),
         'epoch_time': Meter(),
@@ -62,10 +72,8 @@ def make_meter_f1():
     meters_dict = {
         'loss': Meter(),
         'f1': Meter(),
-        #'acc_gr': Meter(),
         'precision': Meter(),
         'recall': Meter(),
-        #'acc':Meter(),
         'batch_time': Meter(),
         'data_time': Meter(),
         'epoch_time': Meter(),
@@ -219,6 +227,11 @@ def compute_f1_3(raw_scores,target):
     y_onehot = torch.zeros_like(raw_scores).to(device)
     y_onehot.scatter_(2, ind, 1)
     return f1_score(y_onehot,target)
+
+def tsp_rl_loss(raw_scores, distance_matrix):
+    proba = Sigmoid()(raw_scores)
+    loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1)
+    return torch.mean(loss).data.item()
 
 def accuracy_sbm(raw_scores,target):
     """
