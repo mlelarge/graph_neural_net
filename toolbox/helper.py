@@ -3,6 +3,7 @@ import copy
 import os
 
 from torch.nn import BCELoss, CrossEntropyLoss, Sigmoid
+from torch.nn.modules.activation import Softmax
 from toolbox.logger import Experiment
 from loaders.data_generator import QAP_Generator,TSP_Generator,TSP_RL_Generator, MCP_Generator,SBM_Generator
 import toolbox.metrics as metrics
@@ -170,7 +171,7 @@ class TSP_Experiment(Experiment_Helper):
         super().__init__('tsp', name, options=options, run=run)
 
 class TSP_RL_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, normalize = Sigmoid()) -> None:
+    def __init__(self, name, options=dict(), run=None, normalize = Softmax(dim=-1)) -> None:
         self.generator = TSP_RL_Generator
         self.criterion = losses.tsp_rl_loss(normalize=normalize)
         self.eval_function = metrics.tsp_rl_loss

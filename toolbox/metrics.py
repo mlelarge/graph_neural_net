@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment
-from torch.nn.modules.activation import Sigmoid
+from torch.nn.modules.activation import Sigmoid, Softmax
 from toolbox.utils import get_device
 
 class Meter(object):
@@ -229,7 +229,8 @@ def compute_f1_3(raw_scores,target):
     return f1_score(y_onehot,target)
 
 def tsp_rl_loss(raw_scores, distance_matrix):
-    proba = Sigmoid()(raw_scores)
+    proba = Softmax(dim=-1)(raw_scores)
+    proba = proba*proba.transpose(-2,-1)
     loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1)
     return torch.mean(loss).data.item()
 

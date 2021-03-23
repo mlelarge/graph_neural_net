@@ -138,7 +138,6 @@ def generate_square_netx(N):
     W_dist = dist_from_pos(pos)
     g = networkx.random_geometric_graph(N,0,pos=pos)
     g.add_edges_from(networkx.complete_graph(N).edges)
-    W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W_dist, dtype=torch.float)
 
 def distance_matrix_tensor_representation(W):
@@ -323,6 +322,8 @@ class TSP_RL_Generator(Base_Generator):
                              .format(self.generative_model))
         xs = [g.nodes[node]['pos'][0] for node in g.nodes]
         ys = [g.nodes[node]['pos'][1] for node in g.nodes]
+
+        W += 1000*torch.eye(self.n_vertices) #~to adding infinity on the edges from a node to itself
 
         B = distance_matrix_tensor_representation(W)
         

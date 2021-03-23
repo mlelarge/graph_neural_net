@@ -23,7 +23,7 @@ def get_model(args):
     else:
         raise NotImplementedError(f"{arch} architecture not implemented")
 
-    print('Fetching model %s - %s ' % (args['arch'], args['embedding'] + 'Embedding'))
+    print('Fetching model %s - %s ' % (args['arch'], args['embedding'] + ' embedding'))
 
     model =  model_instance(**args_dict)
     return model

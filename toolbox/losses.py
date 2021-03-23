@@ -33,7 +33,7 @@ class triplet_loss(nn.Module):
 # TODO refactor
 
 class tsp_loss(nn.Module):
-    def __init__(self, loss=nn.BCELoss(reduction='none'), normalize=torch.nn.Sigmoid()):
+    def __init__(self, loss=nn.BCELoss(reduction='none'), normalize=nn.Sigmoid()):
         super(tsp_loss, self).__init__()
         self.loss = loss
         self.normalize = normalize
@@ -48,29 +48,23 @@ class tsp_loss(nn.Module):
 
 class tsp_rl_loss(nn.Module):
     
-    def __init__(self, normalize=torch.nn.Sigmoid()):
+    def __init__(self, normalize=nn.Softmax(dim=-1)):
         super(tsp_rl_loss, self).__init__()
         self.normalize = normalize
     
-    def loss(self,proba,distance_matrix):
-        """
-        proba and distance_matrix shapes should be (bs,n,n)
-        For each value in the batch : sum_{ij} p_{ij} \dot w_{ij}
-        """
-        loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1)
-        return loss
-
-    def forward(self, raw_scores, target):
+    def forward(self, raw_scores, distance_matrix):
         """
         raw_scores (bs,n_vertices,n_vertices), target (bs,n,n) and should be the distance matrix W
         """
         proba = self.normalize(raw_scores)
-        loss = self.loss(proba,target)
+        #print(proba)
+        proba = proba*proba.transpose(-2,-1) #Symmetrization
+        loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1)
         return torch.mean(loss)
 
 
 class mcp_loss(nn.Module):
-    def __init__(self, loss=nn.BCELoss(reduction='mean'), normalize=torch.nn.Sigmoid()):
+    def __init__(self, loss=nn.BCELoss(reduction='mean'), normalize=nn.Sigmoid()):
         super(mcp_loss, self).__init__()
         self.loss = loss
         self.normalize = normalize
@@ -85,7 +79,7 @@ class mcp_loss(nn.Module):
 
 
 class sbm_loss(nn.Module):
-    def __init__(self, loss=nn.BCELoss(reduction='none'), normalize=torch.nn.Sigmoid()):
+    def __init__(self, loss=nn.BCELoss(reduction='none'), normalize=nn.Sigmoid()):
         super(sbm_loss, self).__init__()
         self.loss = loss
         self.normalize = normalize
