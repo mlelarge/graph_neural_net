@@ -2,13 +2,13 @@
 name: Fusion
 cpu: No
 root_dir: .
-problem: "qap" #qap, tsp, mcp, sbm
-test_enabled: No
+problem: "tsprl" #qap, tsp, tsprl, mcp, sbm
+test_enabled: Yes
 
 data:
     train: # Train/Val data generation parameters
-        num_examples_train: 20
-        num_examples_val: 10
+        num_examples_train: 20000
+        num_examples_val: 1000
         n_vertices: 50
 
         _qap:
@@ -32,7 +32,6 @@ data:
         _sbm:
             edge_density_a : 0.2
             edge_density_b : 0.3
-            edge_density_link: 0.05
             path_dataset: dataset_sbm
             
     test: #Test data generation parameters
@@ -58,11 +57,10 @@ data:
         _sbm:
             edge_density_a : 0.2
             edge_density_b : 0.3
-            edge_density_link: 0.1
 
 
 train: # Training parameters
-    epoch: 20
+    epoch: 2
     batch_size: 16
     lr: !!float 1e-4
     scheduler_step: 1
@@ -72,8 +70,8 @@ train: # Training parameters
     #loss_reduction: mean
 
 arch: # Architecture and model
-    arch: Siamese_Model
-    model_name: Simple_Node_Embedding #Simple_Node_Embedding
+    arch: simple #siamese or simple
+    embedding: edge #node or edge
     num_blocks: 5
     original_features_num: 2
     in_features: 128
@@ -82,5 +80,5 @@ arch: # Architecture and model
 
 observers:
     neptune:
-        enable: No
+        enable: Yes
         project: mautrib/
