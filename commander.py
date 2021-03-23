@@ -87,14 +87,21 @@ def create_data_dict(config, command_name, logger):
             if not custom_test:
                 test_data_dict[key] = value
             else:
-                test_data_dict[key] = test_config[key]
+                try:
+                    test_data_dict[key] = test_config[key]
+                except: #In case the key doesn't exist in the custom test data, add it from the train anyways
+                    test_data_dict[key] = value
         elif key==problem_key:#Add problem data
             for pb_key,pb_value in train_config[key].items():
                 train_data_dict[pb_key] = pb_value
                 if not custom_test:
                     test_data_dict[pb_key] = pb_value
                 else:
-                    test_data_dict[pb_key] = test_config[key][pb_key]
+                    try:
+                        test_data_dict[pb_key] = test_config[key][pb_key]
+                    except:
+                        test_data_dict[pb_key] = pb_value
+
     
     test_data_dict['num_examples_test'] = test_config['num_examples_test'] #Special case of the numer of examples
 

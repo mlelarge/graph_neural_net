@@ -157,7 +157,6 @@ def accuracy_max_mcp(weights,clique_size):
 def accuracy_mcp(weights,solutions):
     """
     weights and solutions should be (bs,n,n)
-    Careful, not completely verified with different clique sizes in same batch
     """
     clique_sizes,_ = torch.max(solutions.sum(dim=-1),dim=-1) #The '+1' is because the diagonal of the solutions is 0
     clique_sizes += 1
