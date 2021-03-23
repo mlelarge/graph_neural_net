@@ -10,19 +10,18 @@ def train_triplet(train_loader,model,criterion,optimizer,
     learning_rate = optimizer.param_groups[0]['lr']
     helper.update_value_meter('hyperparams', 'learning_rate', learning_rate)
     end = time.time()
+    batch_size = train_loader.batch_size
 
-    for i, (input1, input2) in enumerate(train_loader):
-        batch_size = input1.shape[0]
+    for i, (data, target) in enumerate(train_loader):
         # measure data loading time
         helper.update_meter('train', 'data_time', time.time() - end, n=batch_size)
 
-        input1 = input1.to(device)
-        K = input2.to(device)
-        output = model(input1)#,input2)
+        data = data.to(device)
+        target_deviced = target.to(device)
+        output = model(data)#,input2)
+        raw_scores = output.squeeze(-1)
 
-        rawscores = output.squeeze(-1)
-        proba = torch.softmax(rawscores,-1)
-        loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
+        loss = criterion(raw_scores,target_deviced)
         #loss = criterion(proba,K[:,:,:,1])
         helper.update_meter('train', 'loss', loss.data.item(), n=1)
         
@@ -38,7 +37,7 @@ def train_triplet(train_loader,model,criterion,optimizer,
         if i % print_freq == 0:
             if eval_score:
                 #print(np_out.shape)
-                values = helper.eval_function(proba*input1[:,:,:,1],input2)
+                values = helper.eval_function(raw_scores,target_deviced)
                 #print(acc_max, n, bs)
                 helper.update_eval('train', values)
             print('Epoch: [{0}][{1}/{2}]\t'
@@ -60,18 +59,18 @@ def val_triplet(val_loader,model,criterion,
     model.eval()
     helper.reset_meters(val_test)
     with torch.no_grad():
-        for i, (input1, input2) in enumerate(val_loader):
-            input1 = input1.to(device)
-            K = input2.to(device)
-            output = model(input1)
-            rawscores = output.squeeze(-1)
-            proba = torch.softmax(rawscores,-1)
+        for i, (data, target) in enumerate(val_loader):
+
+            data = data.to(device)
+            target_deviced = target.to(device)
+            output = model(data)
+            raw_scores = output.squeeze(-1)
         
-            loss = torch.mean(criterion(proba,K[:,:,:,1])*input1[:,:,:,1])
+            loss = criterion(raw_scores,target_deviced)
             helper.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
             if eval_score:
-                values = helper.eval_function(proba*input1[:,:,:,1],input2)
+                values = helper.eval_function(raw_scores,target_deviced)
                 helper.update_eval(val_test,values)
             if i % print_freq == 0:
                 los = helper.get_meter(val_test, 'loss')

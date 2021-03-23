@@ -5,6 +5,14 @@
 *.pt
 *.py.swp
 .ipynb_checkpoints/
+dataset*/
+runs/
+*.json
+*.pkl
+
+#pyconcorde residual files
+*.res
+*.sol
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

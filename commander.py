@@ -9,11 +9,12 @@ import torch.backends.cudnn as cudnn
 from toolbox import logger, metrics
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
-from loaders.data_generator import QAP_Generator,TSP_Generator,MCP_Generator
+from loaders.data_generator import QAP_Generator, SBM_Generator,TSP_Generator,MCP_Generator
 from toolbox.optimizer import get_optimizer
 import toolbox.losses
 import toolbox.utils as utils
 import trainer as trainer
+from toolbox.helper import get_helper
 
 from sacred import SETTINGS
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
@@ -32,6 +33,10 @@ def get_generator(pbm):
         generator = TSP_Generator
     elif pbm=="mcp":
         generator = MCP_Generator
+    elif pbm=="sbm":
+        generator = SBM_Generator
+    else:
+        raise NotImplementedError(f"{pbm.upper()} problem not implemented")
     return generator
 
 def get_eval(pbm):
@@ -44,6 +49,8 @@ def get_eval(pbm):
         func = metrics.compute_f1
     elif pbm=="mcp":
         func = metrics.accuracy_mcp
+    else:
+        raise NotImplementedError(f"{pbm.upper()} problem not implemented")
     return func
 
 def get_criterion(pbm, device='cpu',reduction='mean'):
@@ -56,6 +63,10 @@ def get_criterion(pbm, device='cpu',reduction='mean'):
         crit = toolbox.losses.tsp_loss(loss = torch.nn.BCELoss(reduction=reduction))
     elif pbm=="mcp":
         crit = torch.nn.BCELoss(reduction=reduction)
+    elif pbm=="sbm":
+        crit = torch.nn.BCELoss(reduction=reduction)
+    else:
+        raise NotImplementedError(f"{pbm.upper()} problem not implemented")
     return crit
 
 @ex.config_hook
@@ -143,14 +154,15 @@ def clean_observer(observers):
 ### END Sacred setup
 
 @ex.capture
-def init_logger(name, _config, _run, problem):
+def init_helper(name, _config, _run, problem):
     # set loggers
-    exp_logger = logger.Experiment_Helper(problem, name, _config, run=_run)
+    exp_helper_object = get_helper(problem)
+    exp_helper = exp_helper_object(name, _config, run=_run)
     #exp_logger.add_meters('train', metrics.make_meter_matching()) #Initialization is now taken care of into Experiment Helper
     #exp_logger.add_meters('val', metrics.make_meter_matching())
     #exp_logger.add_meters('test', metrics.make_meter_matching())
     #exp_logger.add_meters('hyperparams', {'learning_rate': metrics.ValueMeter()})
-    return exp_logger
+    return exp_helper
  
 @ex.capture
 def setup_env(cpu):
@@ -203,9 +215,9 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
     setup_env()
 
     init_output_env()
-    exp_logger = init_logger()
-
-    generator = get_generator(problem)
+    exp_helper = init_helper()
+    
+    generator = exp_helper.generator
     
     gene_train = generator('train', train_data_dict)
     gene_train.load_dataset()
@@ -224,9 +236,7 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
     
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
-    criterion = get_criterion(problem, device, train['loss_reduction'])
-
-    eval_score = get_eval(problem)
+    criterion = exp_helper.criterion
 
     model.to(device)
 
@@ -235,11 +245,11 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
     #print(log_dir_ckpt)
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
-        trainer.train_triplet(train_loader,model,criterion,optimizer,exp_logger,device,epoch,eval_score=True,print_freq=train['print_freq'])
+        trainer.train_triplet(train_loader,model,criterion,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
         
 
 
-        acc, loss = trainer.val_triplet(val_loader,model,criterion,exp_logger,device,epoch,eval_score=True)
+        acc, loss = trainer.val_triplet(val_loader,model,criterion,exp_helper,device,epoch,eval_score=True)
         scheduler.step(loss)
         # remember best acc and save checkpoint
         is_best = (acc > best_score)
@@ -251,8 +261,8 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
             'state_dict': model.state_dict(),
             'best_score': best_score,
             'best_epoch': best_epoch,
-            'exp_logger': exp_logger.get_logger(),
+            'exp_logger': exp_helper.get_logger(),
             }, is_best)
     
     if test_enabled:
-        pass
+        acc, loss = trainer.val_triplet(test_loader, model, criterion, exp_helper, device, 0, eval_score=True, print_freq=train['print_freq'],val_test='test')

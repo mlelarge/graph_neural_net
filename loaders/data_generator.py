@@ -5,7 +5,7 @@ import networkx
 from networkx.algorithms.approximation.clique import max_clique
 import torch
 import torch.utils
-from toolbox import utils
+import toolbox.utils as utils
 from concorde.tsp import TSPSolver
 import math
 
@@ -231,7 +231,8 @@ class QAP_Generator(Base_Generator):
                              .format(self.noise_model))
         B = adjacency_matrix_to_tensor_representation(W)
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
-        return (B, B_noise)
+        data = torch.cat((B.unsqueeze(0),B_noise.unsqueeze(0)))
+        return (data,torch.empty(0)) #Empty tensor used as dummy data
 
 class TSP_Generator(Base_Generator):
     """
@@ -282,7 +283,7 @@ class TSP_Generator(Base_Generator):
             SOL[curr,prec] = 1
             SOL[prec,curr] = 1
             prec = curr
-        SOL = adjacency_matrix_to_tensor_representation(SOL)
+        
         self.positions.append((xs,ys))
         return (B, SOL)
 
@@ -317,8 +318,7 @@ class MCP_Generator(Base_Generator):
                              .format(self.generative_model))
         W, K = self.add_clique(W,self.clique_size)
         B = adjacency_matrix_to_tensor_representation(W)
-        KB = adjacency_matrix_to_tensor_representation(K)
-        return (B, KB)
+        return (B, K)
         
     @classmethod
     def add_clique_base(cls,W,k):
@@ -376,9 +376,49 @@ class MCP_True_Generator(Base_Generator):
         B = adjacency_matrix_to_tensor_representation(W)
         KB = adjacency_matrix_to_tensor_representation(K)
         return (B, KB)
+
+class SBM_Generator(Base_Generator):
+    def __init__(self, name, args):
+        self.edge_density_a = args['edge_density_a']
+        self.edge_density_b = args['edge_density_b']
+        self.edge_density_link = args['edge_density_link']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'SBM_{}_{}_{}_{}'.format(num_examples,
+                                                           self.n_vertices, 
+                                                           self.edge_density_a,
+                                                           self.edge_density_b,
+                                                           self.edge_density_link)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        self.constant_n_vertices = True
+        utils.check_dir(self.path_dataset)
     
+    def compute_example(self):
+        n_sub_a = self.n_vertices//2
+        n_sub_b = self.n_vertices - n_sub_a # In case n_vertices is odd
+
+        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<self.edge_density_a).to(torch.float)
+        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<self.edge_density_b).to(torch.float)
+        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.edge_density_link).to(torch.float)
+        
+        adj = torch.zeros((self.n_vertices,self.n_vertices))
+
+        adj[:n_sub_a,:n_sub_a] = ga.detach().clone()
+        adj[:n_sub_a,n_sub_a:] = glink.detach().clone()
+        adj[n_sub_a:,:n_sub_a] = glink.T.detach().clone()
+        adj[n_sub_a:,n_sub_a:] = gb.detach().clone()
+
+        K = torch.zeros(self.n_vertices)
+        K[n_sub_a:] = 1
+        B = adjacency_matrix_to_tensor_representation(adj)
+        return (B, K)
+
+
 if __name__=="__main__":
-    data_args = {"edge_density":0.1, "clique_size":3, "num_examples_train":5,"path_dataset":"dataset_mcp","n_vertices":5}
-    mg = MCP_Generator("train",data_args)
+    data_args = {"edge_density_a":0.3,"edge_density_b":0.2, "num_examples_train":5,"path_dataset":"dataset_sbm","n_vertices":10}
+    mg = SBM_Generator("train",data_args)
     mg.load_dataset()
 

@@ -159,7 +159,6 @@ def accuracy_mcp(weights,solutions):
     weights and solutions should be (bs,n,n)
     Careful, not completely verified with different clique sizes in same batch
     """
-    solutions = solutions[:,:,:,1]
     clique_sizes,_ = torch.max(solutions.sum(dim=-1),dim=-1) #The '+1' is because the diagonal of the solutions is 0
     clique_sizes += 1
     bs,n,_ = weights.shape
@@ -191,7 +190,7 @@ def f1_score(preds,labels):
     """
     device = get_device(preds)
 
-    labels = labels[:,:,:,1]
+    labels = labels.to(device)
     bs, n_nodes ,_  = labels.shape
     true_pos = 0
     false_pos = 0
@@ -211,9 +210,23 @@ def f1_score(preds,labels):
         f1 = 2*prec*rec/(prec+rec)
     return prec, rec, f1#, n, bs
 
-def compute_f1(raw_scores,target):
+def compute_f1_3(raw_scores,target):
+    """
+    Computes F1-score with the 3 best edges per row
+    For TSP, the best result will be : prec=2/3, rec=1, f1=0.8 (only 2 edges are valid)
+    """
     device = get_device(raw_scores)
-    _, ind = torch.topk(raw_scores, 3, dim =2)
+    _, ind = torch.topk(raw_scores, 3, dim =2) #Here chooses the 3 best choices
     y_onehot = torch.zeros_like(raw_scores).to(device)
     y_onehot.scatter_(2, ind, 1)
     return f1_score(y_onehot,target)
+
+def accuracy_sbm(raw_scores,target):
+    """
+    Computes a simple category accuracy
+    Needs raw_scores.shape = (bs,n) and target.shape = (bs,n)
+    """
+    bs,n= raw_scores.shape
+    category = (raw_scores>0.5).to(int)
+    true_pos = int(torch.sum(1-torch.abs(target-category)).cpu().item())
+    return true_pos, bs * n 
