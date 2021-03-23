@@ -29,7 +29,7 @@ def create_data_dict(config, command_name, logger):
     Creates the parameter dictionaries for the data generation
     """
     problem = config['problem']
-    if problem=='tsp_rl':
+    if problem=='tsprl':
         problem = 'tsp'
     problem_key = "_" + problem
     train_config = config['data']['train']
@@ -76,7 +76,7 @@ def set_experiment_name(config, command_name, logger):
 @ex.config_hook
 def update_config(config, command_name, logger):
     pbm = config['problem']
-    if pbm=='tsp_rl':
+    if pbm=='tsprl':
         pbm = 'tsp'
 
     pbm_key = "_"+pbm
@@ -197,7 +197,7 @@ def main(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enable
                                 gene_val.constant_n_vertices)
     
     if test_enabled:
-        if problem == 'tsp_rl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
+        if problem == 'tsprl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
             test_helper = init_helper('tsp')
         gene_test = test_helper.generator('test', test_data_dict)
         gene_test.load_dataset()
