@@ -8,10 +8,6 @@ import torch
 import torch.backends.cudnn as cudnn
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
-<<<<<<< HEAD
-=======
-from loaders.data_generator import QAP_Generator, SBM_Generator,TSP_Generator,MCP_Generator
->>>>>>> 4e7a26e83845cd8042dd0741d9816a28d7d3298d
 from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
