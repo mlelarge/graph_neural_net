@@ -253,9 +253,9 @@ def accuracy_sbm_two_categories(raw_scores,target):
     similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
     for batch_embed,target_node in zip(similarity,target_nodes):
         kmeans = KMeans(n_clusters=2).fit(batch_embed.cpu().detach().numpy())
-        labels = torch.tensor(kmeans.labels_)
-        poss1 = torch.sum((labels==target_node).to(int)).to(device)   
-        poss2 = torch.sum(((1-labels)==target_node).to(int)).to(device)
+        labels = torch.tensor(kmeans.labels_).to(device)
+        poss1 = torch.sum((labels==target_node).to(int))  
+        poss2 = torch.sum(((1-labels)==target_node).to(int))
         best = max(poss1,poss2)
         #labels = 2*labels -1 #Normalize categories to 1 and -1
         #similarity = labels@labels.transpose(-2,-1)
