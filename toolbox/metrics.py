@@ -241,6 +241,8 @@ def accuracy_sbm_two_categories(raw_scores,target):
     Computes a simple category accuracy
     Needs raw_scores.shape = (bs,n,n) and target.shape = (bs,n,n)
     """
+    device = get_device(raw_scores)
+
     bs,n,_ = raw_scores.shape
 
     target_nodes = target[:,:,0] #Keep the category of the first node as 1, and the other at 0
@@ -252,8 +254,8 @@ def accuracy_sbm_two_categories(raw_scores,target):
     for batch_embed,target_node in zip(similarity,target_nodes):
         kmeans = KMeans(n_clusters=2).fit(batch_embed.cpu().detach().numpy())
         labels = torch.tensor(kmeans.labels_)
-        poss1 = torch.sum((labels==target_node).to(int))    
-        poss2 = torch.sum(((1-labels)==target_node).to(int))
+        poss1 = torch.sum((labels==target_node).to(int)).to(device)   
+        poss2 = torch.sum(((1-labels)==target_node).to(int)).to(device)
         best = max(poss1,poss2)
         #labels = 2*labels -1 #Normalize categories to 1 and -1
         #similarity = labels@labels.transpose(-2,-1)
