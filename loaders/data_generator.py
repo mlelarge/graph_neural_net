@@ -9,24 +9,24 @@ import toolbox.utils as utils
 from concorde.tsp import TSPSolver
 import math
 
-GENERATOR_FUNCTIONS_QAP = {}
+GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
 
-def generates_QAP(name):
+def generates(name):
     """ Register a generator function for a graph distribution """
     def decorator(func):
-        GENERATOR_FUNCTIONS_QAP[name] = func
+        GENERATOR_FUNCTIONS[name] = func
         return func
     return decorator
 
-@generates_QAP("ErdosRenyi")
+@generates("ErdosRenyi")
 def generate_erdos_renyi_netx(p, N):
     """ Generate random Erdos Renyi graph """
     g = networkx.erdos_renyi_graph(N, p)
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float)
 
-@generates_QAP("BarabasiAlbert")
+@generates("BarabasiAlbert")
 def generate_barabasi_albert_netx(p, N):
     """ Generate random Barabasi Albert graph """
     m = int(p*(N -1)/2)
@@ -34,7 +34,7 @@ def generate_barabasi_albert_netx(p, N):
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float)
 
-@generates_QAP("Regular")
+@generates("Regular")
 def generate_regular_graph_netx(p, N):
     """ Generate random regular graph """
     d = p * N
@@ -220,7 +220,7 @@ class QAP_Generator(Base_Generator):
         """
         n_vertices = int(self.n_vertices_sampler.sample().item())
         try:
-            g, W = GENERATOR_FUNCTIONS_QAP[self.generative_model](self.edge_density, n_vertices)
+            g, W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
         except KeyError:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
@@ -458,6 +458,9 @@ class SBM_Generator(Base_Generator):
         K = torch.zeros((n,n))
         K[:n_sub_a,:n_sub_a] = 1
         K[n_sub_a:,n_sub_a:] = 1
+        #K[:n_sub_a,n_sub_a:] = -1
+        #K[n_sub_a:,:n_sub_a] = -1
+
         B = adjacency_matrix_to_tensor_representation(adj)
         return (B, K)
 

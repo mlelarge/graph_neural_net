@@ -2,11 +2,10 @@ import json
 import copy
 import os
 
-from torch.nn import BCELoss, CrossEntropyLoss, Sigmoid
+from torch.nn import BCELoss, MSELoss, CrossEntropyLoss, Sigmoid
 from torch.nn.modules.activation import Softmax
 from toolbox.logger import Experiment
 from loaders.data_generator import QAP_Generator,TSP_Generator,TSP_RL_Generator, MCP_Generator,SBM_Generator
-from loaders.data_generator_label import SBM_other_Generator
 import toolbox.metrics as metrics
 import toolbox.losses as losses
 import toolbox.utils as utils
@@ -191,8 +190,8 @@ class MCP_Experiment(Experiment_Helper):
         super(MCP_Experiment,self).__init__('mcp', name, options=options, run=run)
 
 class SBM_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid()) -> None:
-        self.generator = SBM_other_Generator
+    def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize=Sigmoid()) -> None:
+        self.generator = SBM_Generator
         self.criterion = losses.sbm_loss(loss=loss)
         self.eval_function = metrics.accuracy_sbm_two_categories
         

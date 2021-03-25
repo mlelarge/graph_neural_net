@@ -83,11 +83,12 @@ class mcp_loss(nn.Module):
 
 
 class sbm_loss(nn.Module):
-    def __init__(self, loss=nn.BCELoss(reduction='none')):
+    def __init__(self, loss=nn.MSELoss(reduction='none'), normalize = nn.Sigmoid()):
         super(sbm_loss, self).__init__()
         self.loss = loss
+        self.normalize = normalize
     
-    def forward(self, embeddings, target):
+    def fake_forward(self, embeddings, target):
         """
         embeddings (bs,n_vertices,dim_embedding)
         cluster_sizes (bs, n_clusters)
@@ -119,13 +120,13 @@ class sbm_loss(nn.Module):
         return loss
     
     
-    def real_forward(self, raw_scores, target):
+    def forward(self, raw_scores, target):
         """
         raw_scores of shape (bs,n_vertices,out_features), target of shape (bs,n_vertices,n_vertices)
         """
-        embeddings = F.normalize(raw_scores,dim=-1) #Compute E
+        embeddings = F.normalize(raw_scores) #Compute E
         similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
-        loss = F.normalize((similarity-target)**2)
+        loss = self.loss(similarity,target)
         return torch.mean(loss)
     
 
