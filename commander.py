@@ -9,7 +9,6 @@ import torch.backends.cudnn as cudnn
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
 from loaders.data_generator import QAP_Generator, SBM_Generator,TSP_Generator,MCP_Generator
-from loaders.data_generator_label import SBM_other_Generator
 from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
