@@ -26,7 +26,7 @@ class Siamese_Model(nn.Module):
         Data should be given with the shape (x1,x2)
         """
         assert x.shape[1]==2, f"Data given is not of the shape (x1,x2) => data.shape={x.shape}"
-        x.permute(1,0,2,3,4)
+        x = x.permute(1,0,2,3,4)
         x1 = x[0]
         x2 = x[1]
         x1 = self.node_embedder(x1)

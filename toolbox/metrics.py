@@ -3,6 +3,8 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from torch.nn.modules.activation import Sigmoid, Softmax
 from toolbox.utils import get_device
+import torch.nn.functional as F
+from sklearn.cluster import KMeans
 
 class Meter(object):
     """Computes and stores the sum, average and current value"""
@@ -80,7 +82,7 @@ def make_meter_f1():
     }
     return meters_dict
 
-def accuracy_linear_assignment(weights,labels=None,aggregate_score = True):
+def accuracy_linear_assignment(weights, target, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
@@ -93,13 +95,13 @@ def accuracy_linear_assignment(weights,labels=None,aggregate_score = True):
         else:
             label = np.arange(len(weight))
         cost = -weight.cpu().detach().numpy()
-        _ , preds = linear_sum_assignment(cost)
+        _, preds = linear_sum_assignment(cost)
         if aggregate_score:
             acc += np.sum(preds == label)
             total_n_vertices += len(weight)
         else:
-            all_acc += [np.sum(preds == label)/len(weight)]
-        
+            all_acc += [np.sum(preds == label) / len(weight)]
+
     if aggregate_score:
         return acc, total_n_vertices
     else:
@@ -234,12 +236,26 @@ def tsp_rl_loss(raw_scores, distance_matrix):
     loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1)
     return torch.mean(loss).data.item()
 
-def accuracy_sbm(raw_scores,target):
+def accuracy_sbm_two_categories(raw_scores,target):
     """
     Computes a simple category accuracy
-    Needs raw_scores.shape = (bs,n) and target.shape = (bs,n)
+    Needs raw_scores.shape = (bs,n,n) and target.shape = (bs,n,n)
     """
-    bs,n= raw_scores.shape
-    category = (raw_scores>0.5).to(int)
-    true_pos = int(torch.sum(1-torch.abs(target-category)).cpu().item())
-    return true_pos, bs * n 
+    bs,n,_ = raw_scores.shape
+
+    target_nodes = target[:,:,0] #Keep the category of the first node as 1, and the other at 0
+    
+    true_pos = 0
+
+    embeddings = F.normalize(raw_scores,dim=-1) #Compute E
+    similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
+    for batch_embed,target_node in zip(similarity,target_nodes):
+        kmeans = KMeans(n_clusters=2).fit(batch_embed.cpu().detach().numpy())
+        labels = torch.tensor(kmeans.labels_)
+        poss1 = torch.sum((labels==target_node).to(int))    
+        poss2 = torch.sum(((1-labels)==target_node).to(int))
+        best = max(poss1,poss2)
+        #labels = 2*labels -1 #Normalize categories to 1 and -1
+        #similarity = labels@labels.transpose(-2,-1)
+        true_pos += int(best)
+    return true_pos, bs * n

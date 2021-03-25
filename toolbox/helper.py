@@ -6,6 +6,7 @@ from torch.nn import BCELoss, CrossEntropyLoss, Sigmoid
 from torch.nn.modules.activation import Softmax
 from toolbox.logger import Experiment
 from loaders.data_generator import QAP_Generator,TSP_Generator,TSP_RL_Generator, MCP_Generator,SBM_Generator
+from loaders.data_generator_label import SBM_other_Generator
 import toolbox.metrics as metrics
 import toolbox.losses as losses
 import toolbox.utils as utils
@@ -156,7 +157,7 @@ class QAP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss_reduction='mean', loss=CrossEntropyLoss(reduction='sum')) -> None:
         self.generator = QAP_Generator
         self.criterion = losses.triplet_loss(loss_reduction=loss_reduction, loss=loss)
-        self.eval_function = metrics.accuracy_max
+        self.eval_function = metrics.accuracy_linear_assignment
         
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('qap', name, options=options, run=run)
@@ -191,9 +192,9 @@ class MCP_Experiment(Experiment_Helper):
 
 class SBM_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid()) -> None:
-        self.generator = SBM_Generator
-        self.criterion = losses.sbm_loss(loss=loss, normalize=normalize)
-        self.eval_function = metrics.accuracy_sbm
+        self.generator = SBM_other_Generator
+        self.criterion = losses.sbm_loss(loss=loss)
+        self.eval_function = metrics.accuracy_sbm_two_categories
         
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('sbm', name, options=options, run=run)

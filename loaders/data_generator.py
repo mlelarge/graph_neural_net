@@ -9,24 +9,24 @@ import toolbox.utils as utils
 from concorde.tsp import TSPSolver
 import math
 
-GENERATOR_FUNCTIONS = {}
+GENERATOR_FUNCTIONS_QAP = {}
 GENERATOR_FUNCTIONS_TSP = {}
 
-def generates(name):
+def generates_QAP(name):
     """ Register a generator function for a graph distribution """
     def decorator(func):
-        GENERATOR_FUNCTIONS[name] = func
+        GENERATOR_FUNCTIONS_QAP[name] = func
         return func
     return decorator
 
-@generates("ErdosRenyi")
+@generates_QAP("ErdosRenyi")
 def generate_erdos_renyi_netx(p, N):
     """ Generate random Erdos Renyi graph """
     g = networkx.erdos_renyi_graph(N, p)
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float)
 
-@generates("BarabasiAlbert")
+@generates_QAP("BarabasiAlbert")
 def generate_barabasi_albert_netx(p, N):
     """ Generate random Barabasi Albert graph """
     m = int(p*(N -1)/2)
@@ -34,7 +34,7 @@ def generate_barabasi_albert_netx(p, N):
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float)
 
-@generates("Regular")
+@generates_QAP("Regular")
 def generate_regular_graph_netx(p, N):
     """ Generate random regular graph """
     d = p * N
@@ -220,7 +220,7 @@ class QAP_Generator(Base_Generator):
         """
         n_vertices = int(self.n_vertices_sampler.sample().item())
         try:
-            g, W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
+            g, W = GENERATOR_FUNCTIONS_QAP[self.generative_model](self.edge_density, n_vertices)
         except KeyError:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
@@ -422,14 +422,16 @@ class MCP_True_Generator(Base_Generator):
 
 class SBM_Generator(Base_Generator):
     def __init__(self, name, args):
-        self.edge_density_a = args['edge_density_a']
-        self.edge_density_c = args['edge_density_c']
-        num_examples = args['num_examples_' + name]
         self.n_vertices = args['n_vertices']
-        subfolder_name = 'SBM_{}_{}_{}_{}'.format(num_examples,
-                                                           self.n_vertices, 
-                                                           self.edge_density_a,
-                                                           self.edge_density_c)
+        self.p_inter = args['p_inter']
+        self.p_outer = args['p_outer']
+        self.alpha = args['alpha']
+        num_examples = args['num_examples_' + name]
+        subfolder_name = 'SBM_{}_{}_{}_{}_{}'.format(num_examples,
+                                                           self.n_vertices,
+                                                           self.alpha, 
+                                                           self.p_inter,
+                                                           self.p_outer)
         path_dataset = os.path.join(args['path_dataset'],
                                          subfolder_name)
         super().__init__(name, path_dataset, num_examples)
@@ -442,9 +444,9 @@ class SBM_Generator(Base_Generator):
         n_sub_a = n//2
         n_sub_b = n - n_sub_a # In case n_vertices is odd
 
-        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.edge_density_a/n)).to(torch.float)
-        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.edge_density_a/n)).to(torch.float)
-        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.edge_density_c/n).to(torch.float)
+        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.p_inter/n)).to(torch.float)
+        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.p_inter/n)).to(torch.float)
+        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.p_outer/n).to(torch.float)
         
         adj = torch.zeros((self.n_vertices,self.n_vertices))
 
@@ -453,8 +455,9 @@ class SBM_Generator(Base_Generator):
         adj[n_sub_a:,:n_sub_a] = glink.T.detach().clone()
         adj[n_sub_a:,n_sub_a:] = gb.detach().clone()
 
-        K = torch.zeros(self.n_vertices)
-        K[n_sub_a:] = 1
+        K = torch.zeros((n,n))
+        K[:n_sub_a,:n_sub_a] = 1
+        K[n_sub_a:,n_sub_a:] = 1
         B = adjacency_matrix_to_tensor_representation(adj)
         return (B, K)
 

@@ -6,15 +6,15 @@ from sacred.config import config_scope
 
 import torch
 import torch.backends.cudnn as cudnn
-from toolbox import logger, metrics
 from models import get_model
 from loaders.siamese_loaders import siamese_loader
 from loaders.data_generator import QAP_Generator, SBM_Generator,TSP_Generator,MCP_Generator
+from loaders.data_generator_label import SBM_other_Generator
 from toolbox.optimizer import get_optimizer
-import toolbox.losses
 import toolbox.utils as utils
 import trainer as trainer
 from toolbox.helper import get_helper
+import toolbox.vision as vision
 
 from sacred import SETTINGS
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
@@ -46,7 +46,7 @@ def create_data_dict(config, command_name, logger):
             else:
                 try:
                     test_data_dict[key] = test_config[key]
-                except: #In case the key doesn't exist in the custom test data, add it from the train anyways
+                except KeyError: #In case the key doesn't exist in the custom test data, add it from the train anyways
                     test_data_dict[key] = value
         elif key==problem_key:#Add problem data
             for pb_key,pb_value in train_config[key].items():
@@ -56,7 +56,7 @@ def create_data_dict(config, command_name, logger):
                 else:
                     try:
                         test_data_dict[pb_key] = test_config[key][pb_key]
-                    except:
+                    except KeyError:
                         test_data_dict[pb_key] = pb_value
 
     
