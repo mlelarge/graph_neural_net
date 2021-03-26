@@ -134,6 +134,17 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
             return self.get_meter(tag, 'loss_ref')
         else:
             raise NotImplementedError(f"{self.metric} metric not implemented")
+    
+    def get_relevant_metric_with_name(self,tag):
+        if self.metric=='acc':
+            return { 'acc' : self.get_meter(tag, 'acc').avg }
+        elif self.metric=='f1':
+            return { 'f1' : self.get_meter(tag, 'f1').avg }
+        elif self.metric=='loss':
+            return { 'loss_ref' : self.get_meter(tag, 'loss_ref').avg }
+        else:
+            raise NotImplementedError(f"{self.metric} metric not implemented")
+
 
     def to_json(self, log_dir, filename):
         utils.check_dir(log_dir)
