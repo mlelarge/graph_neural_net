@@ -21,7 +21,7 @@ def get_helper(problem):
     elif problem=='mcp':
         return MCP_Experiment
     elif problem=='mcptrue':
-        return MCP_True_Generator
+        return MCP_True_Experiment
     elif problem=='sbm':
         return SBM_Experiment
     else:

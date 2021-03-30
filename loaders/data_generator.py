@@ -417,8 +417,7 @@ class MCP_True_Generator(Base_Generator):
         K[t_ind[:,0],t_ind[:,1]] = 1
 
         B = adjacency_matrix_to_tensor_representation(W)
-        KB = adjacency_matrix_to_tensor_representation(K)
-        return (B, KB)
+        return (B, K)
 
 class SBM_Generator(Base_Generator):
     def __init__(self, name, args):
