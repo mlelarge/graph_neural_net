@@ -156,6 +156,7 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
 def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     """ Main func.
     """
+    print("Heading to Training.")
     global best_score, best_epoch
     best_score, best_epoch = -1, -1
     print("Current problem : ", problem)
@@ -213,7 +214,10 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
             'best_epoch': best_epoch,
             'exp_logger': exp_helper.get_logger(),
             }, is_best)
-    
+        cur_lr = utils.get_lr(optimizer)
+        if exp_helper.stop_condition(cur_lr):
+            print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+            break
     if test_enabled:
         eval()
 
@@ -258,6 +262,7 @@ def save_to_json(jsonkey, loss, relevant_metric_dict, filename):
 
 @ex.command
 def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
+    print("Heading to evaluation.")
     use_cuda = not cpu and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
     print('Using device:', device)

@@ -7,7 +7,7 @@ test_enabled: Yes
 
 data:
     train: # Train/Val data generation parameters
-        num_examples_train: 20000
+        num_examples_train: 10
         num_examples_val: 1000
         n_vertices: 50
 
@@ -27,7 +27,7 @@ data:
         _mcp:
             edge_density: 0.831763771102671 #0.3981071705534973 #0.1
             clique_size: 4
-            planted: Yes
+            planted: No
             path_dataset: dataset_mcp # Path where datasets are stored
         
         _sbm:
@@ -69,17 +69,18 @@ train: # Training parameters
     lr: !!float 1e-4
     scheduler_step: 1
     scheduler_decay: 0.5
-    print_freq: 10
+    lr_stop: !!float 1e-7
+    print_freq: 100
     #loss_reduction: mean
 
 arch: # Architecture and model
     arch: simple #siamese or simple
     embedding: edge #node or edge
-    num_blocks: 5
+    num_blocks: 2
     original_features_num: 2
-    in_features: 128
+    in_features: 64
     out_features: 1
-    depth_of_mlp: 5
+    depth_of_mlp: 2
 
 observers:
     neptune:

@@ -36,6 +36,8 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
         super(Experiment_Helper,self).__init__(name, options=options, run=run)
         self.problem = problem
 
+        self.lr_threshold = options['train']['lr_stop']
+
         self.init_update_eval()
         self.init_loggers()
 
@@ -126,6 +128,9 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
             raise NotImplementedError(f"{self.metric} metric not implemented")
         
         return string
+
+    def stop_condition(self, lr):
+        return lr < self.lr_threshold
 
     def get_relevant_metric(self,tag):
         if self.metric=='acc':
