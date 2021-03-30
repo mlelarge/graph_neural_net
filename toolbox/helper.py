@@ -209,7 +209,7 @@ class MCP_True_Experiment(Experiment_Helper):
         self.eval_function = metrics.accuracy_mcp
         
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super(MCP_Experiment,self).__init__('mcp', name, options=options, run=run)
+        super(MCP_True_Experiment,self).__init__('mcp', name, options=options, run=run)
 
 class SBM_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize=Sigmoid()) -> None:
