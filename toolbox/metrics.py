@@ -174,9 +174,11 @@ def accuracy_mcp(weights,solutions):
     true_pos = 0
     total_n_vertices = 0
 
-    deg = torch.sum(weights, dim=-1)
+    probas = F.sigmoid(weights)
+
+    deg = torch.sum(probas, dim=-1)
     inds = [ (torch.topk(deg[k],int(clique_sizes[k].item()),dim=-1))[1] for k in range(bs)]
-    for i,cur_w in enumerate(weights):
+    for i,_ in enumerate(weights):
         sol = torch.sum(solutions[i],dim=1) #Sum over rows !
         ind = inds[i]
         for idx in ind:
@@ -184,11 +186,6 @@ def accuracy_mcp(weights,solutions):
             if sol[idx]:
                 true_pos += 1
         total_n_vertices+=clique_sizes[i].item()
-    """
-    y_onehot = torch.zeros_like(weights)
-    y_onehot.scatter_(2, inds, 1)
-    true_pos = torch.sum(y_onehot==solutions)
-    total_n_vertices = bs*clique_size"""
     return true_pos, total_n_vertices
 
 

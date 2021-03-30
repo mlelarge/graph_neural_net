@@ -112,7 +112,7 @@ def clean_observer(observers):
 ### END Sacred setup
 
 @ex.capture
-def init_helper(problem, name, _config, _run):
+def init_helper(problem, name, _config, _run, type='train'):
     exp_helper_object = get_helper(problem)
     exp_helper = exp_helper_object(name, _config, run=_run)
     return exp_helper
@@ -153,7 +153,7 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
 
 
 @ex.command
-def train(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enabled):
+def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     """ Main func.
     """
     global best_score, best_epoch
@@ -168,8 +168,10 @@ def train(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enabl
     setup_env()
 
     init_output_env()
+    
+    if problem == 'mcp' and not train_data_dict['planted']:
+        problem = 'mcptrue'
     exp_helper = init_helper(problem)
-    test_helper = exp_helper
     
     generator = exp_helper.generator
     
@@ -182,17 +184,8 @@ def train(cpu, train, problem, train_data_dict, test_data_dict, arch, test_enabl
     val_loader = siamese_loader(gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
     
-    if test_enabled:
-        if problem == 'tsprl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
-            test_helper = init_helper('tsp')
-        gene_test = test_helper.generator('test', test_data_dict)
-        gene_test.load_dataset()
-        test_loader = siamese_loader(gene_test, train['batch_size'],
-                                    gene_test.constant_n_vertices)
-    
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
-    criterion = exp_helper.criterion
 
     model.to(device)
 
@@ -275,18 +268,20 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
 
     if problem == 'tsprl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
         problem = 'tsp'
+    elif problem == 'mcp' and not test_data_dict['planted']:
+        problem = 'mcptrue'
     
     helper = init_helper(problem)
-
-    criterion = helper.criterion
 
     gene_test = helper.generator('test', test_data_dict)
     gene_test.load_dataset()
     test_loader = siamese_loader(gene_test, train['batch_size'],
                                  gene_test.constant_n_vertices)
+    
     relevant_metric, loss = trainer.val_triplet(test_loader, model, helper, device,
                                     epoch=0, eval_score=True,
                                     val_test='test')
+    
     key = create_key()
     filename_test = os.path.join(log_dir,  output_filename)
     print('Saving result at: ',filename_test)
