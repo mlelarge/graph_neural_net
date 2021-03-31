@@ -71,6 +71,7 @@ train: # Training parameters
     scheduler_decay: 0.5
     lr_stop: !!float 1e-7
     print_freq: 100
+    anew: Yes
     #loss_reduction: mean
 
 arch: # Architecture and model
