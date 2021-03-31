@@ -124,7 +124,7 @@ class sbm_loss(nn.Module):
         """
         raw_scores of shape (bs,n_vertices,out_features), target of shape (bs,n_vertices,n_vertices)
         """
-        embeddings = F.normalize(raw_scores) #Compute E
+        embeddings = F.normalize(raw_scores,dim=-1) #Compute E
         similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
         loss = self.loss(similarity,target)
         return torch.mean(loss)

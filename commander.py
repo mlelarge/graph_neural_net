@@ -152,6 +152,17 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
 
 
+@ex.capture
+def load_model(model, device, model_path):
+    """ Load model. Note that the model_path argument is captured """
+    if os.path.exists(model_path):
+        print("Reading model from ", model_path)
+        checkpoint = torch.load(model_path, map_location=torch.device(device))
+        model.load_state_dict(checkpoint['state_dict'])
+        return model
+    else:
+        raise RuntimeError('Model does not exist!')
+
 @ex.command
 def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     """ Main func.
@@ -188,6 +199,13 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
 
+    if train['anew']:
+        try:
+            load_model(model,device)
+            print("Model found, using it.")
+        except RuntimeError:
+            print("Model not existing. Starting from scratch.")
+
     model.to(device)
 
     is_best = True
@@ -221,16 +239,6 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     if test_enabled:
         eval()
 
-@ex.capture
-def load_model(model, device, model_path):
-    """ Load model. Note that the model_path argument is captured """
-    if os.path.exists(model_path):
-        print("Reading model from ", model_path)
-        checkpoint = torch.load(model_path, map_location=torch.device(device))
-        model.load_state_dict(checkpoint['state_dict'])
-        return model
-    else:
-        raise RuntimeError('Model does not exist!')
 
 @ex.capture
 def create_key(problem, test_data_dict, _config):
