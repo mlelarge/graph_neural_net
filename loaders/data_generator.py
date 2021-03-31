@@ -443,9 +443,9 @@ class SBM_Generator(Base_Generator):
         n_sub_a = n//2
         n_sub_b = n - n_sub_a # In case n_vertices is odd
 
-        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.p_inter/n)).to(torch.float)
-        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.p_inter/n)).to(torch.float)
-        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.p_outer/n).to(torch.float)
+        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.p_inter)).to(torch.float)
+        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.p_inter)).to(torch.float)
+        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.p_outer).to(torch.float)
         
         adj = torch.zeros((self.n_vertices,self.n_vertices))
 
@@ -459,7 +459,7 @@ class SBM_Generator(Base_Generator):
         K[n_sub_a:,n_sub_a:] = 1
         #K[:n_sub_a,n_sub_a:] = -1
         #K[n_sub_a:,:n_sub_a] = -1
-
+        K = utils.permute_adjacency(K)
         B = adjacency_matrix_to_tensor_representation(adj)
         return (B, K)
 

@@ -29,3 +29,11 @@ def get_device(t):
         return t.get_device()
     return 'cpu'
 
+def permute_adjacency(adj):
+    """
+    Makes a permutation of an adjacency matrix. Equivalent to a renaming of the nodes.
+    Supposes shape (n,n)
+    """
+    n,_ = adj.shape
+    perm = torch.randperm(n)
+    return adj[perm,:][:,perm]
