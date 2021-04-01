@@ -199,7 +199,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
 
-    if train['anew']:
+    if not train['anew']:
         try:
             load_model(model,device)
             print("Model found, using it.")
