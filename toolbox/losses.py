@@ -86,39 +86,7 @@ class sbm_loss(nn.Module):
     def __init__(self, loss=nn.MSELoss(reduction='none'), normalize = nn.Sigmoid()):
         super(sbm_loss, self).__init__()
         self.loss = loss
-        self.normalize = normalize
-    
-    def fake_forward(self, embeddings, target):
-        """
-        embeddings (bs,n_vertices,dim_embedding)
-        cluster_sizes (bs, n_clusters)
-        """
-        device = get_device(embeddings)
-        bs,n,_ = embeddings.shape
-        cluster_sizes = ((n//2)*torch.ones((bs,2))).to(int)
-        loss = torch.zeros([1], dtype=torch.float64, device=device)
-        for i, n_nodes in enumerate(cluster_sizes):
-            mean_cluster = []
-            var_cluster = []
-            prev = 0
-            for n in n_nodes:
-                mean_cluster.append(
-                    F.normalize(torch.mean(embeddings[i][prev : prev + n, :], 0), dim=0)
-                )
-                var_cluster.append(torch.var(embeddings[i][prev : prev + n, :], 0))
-                prev = n
-
-            loss_dist_cluster = torch.zeros([1], dtype=torch.float64, device=device)
-            loss_var_cluster = torch.zeros([1], dtype=torch.float64, device=device)
-            for m1, m2 in itertools.combinations(mean_cluster, 2):
-                loss_dist_cluster += 1.0 + torch.dot(m1, m2)
-
-            mu = 1.0
-            loss_var_cluster = mu * torch.stack(var_cluster, dim=0).sum()
-
-            loss += 0.1 * loss_dist_cluster + loss_var_cluster
-        return loss
-    
+        self.normalize = normalize    
     
     def forward(self, raw_scores, target):
         """
@@ -127,6 +95,6 @@ class sbm_loss(nn.Module):
         embeddings = F.normalize(raw_scores,dim=-1) #Compute E
         similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
         loss = self.loss(similarity,target)
-        return torch.mean(loss)
-    
+        mean_loss = torch.mean(loss)
+        return mean_loss
 

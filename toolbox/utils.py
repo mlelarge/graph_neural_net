@@ -29,11 +29,11 @@ def get_device(t):
         return t.get_device()
     return 'cpu'
 
-def permute_adjacency(adj):
+def permute_adjacency_twin(t1,t2):
     """
     Makes a permutation of an adjacency matrix. Equivalent to a renaming of the nodes.
     Supposes shape (n,n)
     """
-    n,_ = adj.shape
+    n,_ = t1.shape
     perm = torch.randperm(n)
-    return adj[perm,:][:,perm]
+    return t1[perm,:][:,perm],t2[perm,:][:,perm]

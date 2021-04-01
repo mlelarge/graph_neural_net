@@ -459,7 +459,7 @@ class SBM_Generator(Base_Generator):
         K[n_sub_a:,n_sub_a:] = 1
         #K[:n_sub_a,n_sub_a:] = -1
         #K[n_sub_a:,:n_sub_a] = -1
-        K = utils.permute_adjacency(K)
+        K,adj = utils.permute_adjacency_twin(K,adj)
         B = adjacency_matrix_to_tensor_representation(adj)
         return (B, K)
 
