@@ -439,6 +439,11 @@ class SBM_Generator(Base_Generator):
         utils.check_dir(self.path_dataset)
     
     def compute_example(self):
+        """
+        Computes the pair (data,target). Data is the adjacency matrix. For target, there are 2 interpretations :
+         - if used with similarity : K_{ij} is 1 if node i and j are from the same group
+         - if used with edge probas: K_{ij} is 1 if it's an intra-edge (so i and j from the same group)
+        """
         n = self.n_vertices
         n_sub_a = n//2
         n_sub_b = n - n_sub_a # In case n_vertices is odd
@@ -457,11 +462,9 @@ class SBM_Generator(Base_Generator):
         K = torch.zeros((n,n))
         K[:n_sub_a,:n_sub_a] = 1
         K[n_sub_a:,n_sub_a:] = 1
-        #K[:n_sub_a,n_sub_a:] = -1
-        #K[n_sub_a:,:n_sub_a] = -1
         K,adj = utils.permute_adjacency_twin(K,adj)
         B = adjacency_matrix_to_tensor_representation(adj)
-        return (B, K)
+        return (B, K) 
 
 
 if __name__=="__main__":

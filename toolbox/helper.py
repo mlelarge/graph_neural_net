@@ -23,7 +23,7 @@ def get_helper(problem):
     elif problem=='mcptrue':
         return MCP_True_Experiment
     elif problem=='sbm':
-        return SBM_Experiment
+        return SBM_Edge_Experiment
     else:
         raise NotImplementedError(f"Problem {problem} not implemented.")
 
@@ -216,11 +216,22 @@ class MCP_True_Experiment(Experiment_Helper):
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super(MCP_True_Experiment,self).__init__('mcp', name, options=options, run=run)
 
-class SBM_Experiment(Experiment_Helper):
+class SBM_Edge_Experiment(Experiment_Helper):
+    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid()) -> None:
+        
+        self.generator = SBM_Generator
+        self.criterion = losses.sbm_edge_loss(loss=loss)
+        self.eval_function = metrics.accuracy_sbm_two_categories_edge
+        
+        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+        super().__init__('sbm', name, options=options, run=run)
+
+
+class SBM_Node_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize=Sigmoid()) -> None:
         
         self.generator = SBM_Generator
-        self.criterion = losses.sbm_loss(loss=loss)
+        self.criterion = losses.sbm_node_loss(loss=loss)
         self.eval_function = metrics.accuracy_sbm_two_categories
         
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function

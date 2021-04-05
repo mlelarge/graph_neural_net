@@ -82,9 +82,24 @@ class mcp_loss(nn.Module):
         return torch.mean(loss)
 
 
-class sbm_loss(nn.Module):
+class sbm_edge_loss(nn.Module):
+    def __init__(self, loss=nn.BCELoss(reduction='none'), normalize = nn.Sigmoid()):
+        super(sbm_edge_loss, self).__init__()
+        self.loss = loss
+        self.normalize = normalize    
+    
+    def forward(self, raw_scores, target):
+        """
+        raw_scores of shape (bs,n_vertices,out_features), target of shape (bs,n_vertices,n_vertices)
+        """
+        probas = self.normalize(raw_scores)
+        loss = self.loss(probas,target)
+        mean_loss = torch.mean(loss)
+        return mean_loss
+
+class sbm_node_loss(nn.Module):
     def __init__(self, loss=nn.MSELoss(reduction='none'), normalize = nn.Sigmoid()):
-        super(sbm_loss, self).__init__()
+        super(sbm_node_loss, self).__init__()
         self.loss = loss
         self.normalize = normalize    
     

@@ -127,7 +127,6 @@ def all_losses_acc(val_loader,model,criterion,
             all_acc += acc
     return all_losses, np.array(all_acc)
    
-
 def accuracy_max(weights,labels=None):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
@@ -189,7 +188,6 @@ def accuracy_mcp(weights,solutions):
     return true_pos, total_n_vertices
 
 
-
 def f1_score(preds,labels):
     """
     take 2 adjacency matrices and compute precision, recall, f1_score for a tour
@@ -236,7 +234,7 @@ def tsp_rl_loss(raw_scores, distance_matrix):
 def accuracy_sbm_two_categories(raw_scores,target):
     """
     Computes a simple category accuracy
-    Needs raw_scores.shape = (bs,n,n) and target.shape = (bs,n,n)
+    Needs raw_scores.shape = (bs,n,out_features) and target.shape = (bs,n,n)
     """
     device = get_device(raw_scores)
 
@@ -258,3 +256,21 @@ def accuracy_sbm_two_categories(raw_scores,target):
         #similarity = labels@labels.transpose(-2,-1)
         true_pos += int(best)
     return true_pos, bs * n
+
+def accuracy_sbm_two_categories_edge(raw_scores,target):
+    """
+    Computes a simple category accuracy
+    Needs raw_scores.shape = (bs,n,n) and target.shape = (bs,n,n)
+    """
+    device = get_device(raw_scores)
+
+    bs,n,_ = raw_scores.shape
+
+    #probas = torch.sigmoid(raw_scores) #No need for proba, we just need the best choices
+
+    _,ind = torch.topk(raw_scores, n//2, -1)
+    y_onehot = torch.zeros_like(raw_scores).to(device)
+    y_onehot.scatter_(2, ind, 1)
+
+    true_pos = int(torch.sum(torch.abs(target-y_onehot)))
+    return true_pos, bs * n * n
