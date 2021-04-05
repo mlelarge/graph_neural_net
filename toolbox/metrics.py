@@ -272,5 +272,5 @@ def accuracy_sbm_two_categories_edge(raw_scores,target):
     y_onehot = torch.zeros_like(raw_scores).to(device)
     y_onehot.scatter_(2, ind, 1)
 
-    true_pos = int(torch.sum(torch.abs(target-y_onehot)))
+    true_pos = bs * n * n - int(torch.sum(torch.abs(target-y_onehot)))
     return true_pos, bs * n * n
