@@ -82,6 +82,8 @@ def make_meter_f1():
     }
     return meters_dict
 
+#QAP
+
 def accuracy_linear_assignment(weights, target, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
@@ -145,6 +147,8 @@ def accuracy_max(weights,labels=None):
         total_n_vertices += len(weight)
     return acc, total_n_vertices
 
+#MCP
+
 def accuracy_max_mcp(weights,clique_size):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
@@ -173,7 +177,7 @@ def accuracy_mcp(weights,solutions):
     true_pos = 0
     total_n_vertices = 0
 
-    probas = F.sigmoid(weights)
+    probas = torch.sigmoid(weights)
 
     deg = torch.sum(probas, dim=-1)
     inds = [ (torch.topk(deg[k],int(clique_sizes[k].item()),dim=-1))[1] for k in range(bs)]
@@ -187,6 +191,7 @@ def accuracy_mcp(weights,solutions):
         total_n_vertices+=clique_sizes[i].item()
     return true_pos, total_n_vertices
 
+#TSP
 
 def f1_score(preds,labels):
     """
@@ -214,13 +219,13 @@ def f1_score(preds,labels):
         f1 = 2*prec*rec/(prec+rec)
     return prec, rec, f1#, n, bs
 
-def compute_f1_3(raw_scores,target):
+def compute_f1(raw_scores,target,k_best=3):
     """
-    Computes F1-score with the 3 best edges per row
-    For TSP, the best result will be : prec=2/3, rec=1, f1=0.8 (only 2 edges are valid)
+    Computes F1-score with the k_best best edges per row
+    For TSP with the chosen 3 best, the best result will be : prec=2/3, rec=1, f1=0.8 (only 2 edges are valid)
     """
     device = get_device(raw_scores)
-    _, ind = torch.topk(raw_scores, 3, dim =2) #Here chooses the 3 best choices
+    _, ind = torch.topk(raw_scores, k_best, dim = 2) #Here chooses the 3 best choices
     y_onehot = torch.zeros_like(raw_scores).to(device)
     y_onehot.scatter_(2, ind, 1)
     return f1_score(y_onehot,target)
@@ -231,6 +236,7 @@ def tsp_rl_loss(raw_scores, distance_matrix):
     loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1)
     return torch.mean(loss).data.item()
 
+#SBM
 def accuracy_sbm_two_categories(raw_scores,target):
     """
     Computes a simple category accuracy

@@ -8,6 +8,8 @@ import torch.utils
 import toolbox.utils as utils
 from concorde.tsp import TSPSolver
 import math
+from toolbox.searches import mcp_beam_method
+import timeit
 
 GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
@@ -380,6 +382,14 @@ class MCP_Generator(Base_Generator):
                              .format(self.generative_model))
         W, K = self.add_clique(W,self.clique_size)
         B = adjacency_matrix_to_tensor_representation(W)
+
+
+        k_size = len(torch.where(K.sum(dim=-1)!=0)[0])
+        seed = utils.mcp_adj_to_ind(K)
+        K2 = mcp_beam_method(B,K,seeds=seed,add_singles=False) #Finds a probably better solution with beam search in the form of a list of indices
+        k2_size = len(K2)
+        if k2_size>k_size:
+            K = utils.mcp_ind_to_adj(K2,self.n_vertices)
         return (B, K)
         
     @classmethod
@@ -487,7 +497,8 @@ class SBM_Generator(Base_Generator):
 
 
 if __name__=="__main__":
-    data_args = {"edge_density_a":0.3,"edge_density_b":0.2, "num_examples_train":5,"path_dataset":"dataset_sbm","n_vertices":10}
-    mg = SBM_Generator("train",data_args)
-    mg.load_dataset()
+    #data_args = {"edge_density_a":0.3,"edge_density_b":0.2, "num_examples_train":5,"path_dataset":"dataset_sbm","n_vertices":10}
+    data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
+    g = MCP_Generator("train",data_args)
+    timeit.timeit(g.load_dataset,number=1)
 
