@@ -257,6 +257,25 @@ class TSP_Generator(Base_Generator):
         self.constant_n_vertices = True
         self.coeff = coeff
         self.positions = []
+    
+    def load_dataset(self):
+        """
+        Look for required dataset in files and create it if
+        it does not exist
+        """
+        filename = self.name + '.pkl'
+        path = os.path.join(self.path_dataset, filename)
+        if os.path.exists(path):
+            print('Reading dataset at {}'.format(path))
+            data,pos = torch.load(path)
+            self.data = list(data)
+            self.positions = list(pos)
+        else:
+            print('Creating dataset.')
+            self.data = []
+            self.create_dataset()
+            print('Saving datatset at {}'.format(path))
+            torch.save((self.data,self.positions), path)
 
     def compute_example(self):
         """

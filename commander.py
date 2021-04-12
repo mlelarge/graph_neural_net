@@ -140,6 +140,7 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, os.path.join(log_dir, 'model_best.pth.tar'))
+        print(f"Best Model yet : saving at {log_dir+'model_best.pth.tar'}")
 
     fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')
     torch.save(state, fn.format(state['epoch']))
