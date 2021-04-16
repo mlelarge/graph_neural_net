@@ -131,7 +131,6 @@ def generate_gauss_normal_netx(N):
     W_dist = dist_from_pos(pos)
     g = networkx.random_geometric_graph(N,0,pos=pos)
     g.add_edges_from(networkx.complete_graph(N).edges)
-    W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W_dist, dtype=torch.float)
 
 @generates_TSP("Square01")
@@ -238,7 +237,8 @@ class QAP_Generator(Base_Generator):
 
 class TSP_Generator(Base_Generator):
     """
-    Build a numpy dataset of pairs of (Graph, noisy Graph)
+    Traveling Salesman Problem Generator.
+    Uses the pyconcorde wrapper : see https://github.com/jvkersch/pyconcorde (thanks a lot)
     """
     def __init__(self, name, args, coeff=1e8):
         self.generative_model = args['generative_model']
@@ -293,7 +293,7 @@ class TSP_Generator(Base_Generator):
 
         problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
         solution = problem.solve(verbose=False)
-        assert solution.success, "Couldn't find solution!"
+        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
 
         B = distance_matrix_tensor_representation(W)
         
@@ -307,6 +307,51 @@ class TSP_Generator(Base_Generator):
         
         self.positions.append((xs,ys))
         return (B, SOL)
+
+class TSP_custom_Generator(Base_Generator):
+    """
+    This class just has the 'custom_example' method. It is useful for testing a model on custom examples.
+    """
+    def __init__(self, name, args, coeff=1e8):
+        self.distance = args['distance_used']
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'TSP_custom_{}_{}'.format(self.distance,
+                                                     self.n_vertices)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples=1)
+        self.data = []
+        
+        
+        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
+        self.constant_n_vertices = True
+        self.coeff = coeff
+        self.positions = []
+    
+    def custom_example(self,xs,ys):
+        n = len(xs)
+        pos = {i: (xs[i], ys[i]) for i in range(n)} #Define the positions of the points
+        W_dist = dist_from_pos(pos)
+        g = networkx.random_geometric_graph(n,0,pos=pos)
+        g.add_edges_from(networkx.complete_graph(n).edges)
+        W = torch.as_tensor(W_dist, dtype=torch.float)
+
+        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
+        solution = problem.solve(verbose=False)
+        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
+
+        B = distance_matrix_tensor_representation(W)
+        
+        SOL = torch.zeros((n,n),dtype=torch.float)
+        prec = solution.tour[-1]
+        for i in range(n):
+            curr = solution.tour[i]
+            SOL[curr,prec] = 1
+            SOL[prec,curr] = 1
+            prec = curr
+        
+        self.positions.append((xs,ys))
+        self.data.append((B,SOL))
 
 class TSP_RL_Generator(Base_Generator):
     """
@@ -353,7 +398,9 @@ class TSP_RL_Generator(Base_Generator):
 
 class MCP_Generator(Base_Generator):
     """
-    Generator for the Maximum Clique Pb
+    Generator for the Maximum Clique Problem.
+    This generator plants a clique of 'clique_size' size in the graph.
+    It is then used as a seed to find a possible bigger clique with this seed
     """
     def __init__(self, name, args):
         self.edge_density = args['edge_density']

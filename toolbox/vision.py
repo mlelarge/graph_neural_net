@@ -30,6 +30,39 @@ def show_adjacency(adj,path='pics/',name='graph'):
     plt.savefig(fname+".png", format="PNG")
     plt.close()
 
+def show_proba(xs,ys,proba,path='pics/',name='graph',transparency=True,edge_true_range=False):
+    n,_ = proba.shape
+    assert len(xs)==n and len(ys)==n, f"Length of point coordinates ({len(xs),len(ys)}) not matching size of probability matrix ({proba.shape})"
+
+    g = networkx.empty_graph(n)
+    for i in range(0,n-1):
+        for j in range(i+1,n):
+            g.add_edge(i,j,weight = proba[i,j])
+
+    edges = g.edges()
+    colors = [g[u][v]['weight'].item() for u,v in edges]  
+    pos = {i:(xs[i],ys[i]) for i in range(n)}
+    plt.figure()
+    cmap = plt.cm.get_cmap('jet')
+    if transparency: cmap = get_alpha_cmap(cmap)
+    options = {
+        "pos": pos,
+        "edge_color": colors,
+        "width": 2,
+        "edge_cmap": cmap,
+        "with_labels": True,
+        "node_size": 10,
+        'edge_vmin': 0,
+        'edge_vmax': 1
+    }
+    if edge_true_range:
+        options['edge_vmin'] = torch.min(proba).item()
+        options['edge_vmax'] = torch.max(proba).item()
+    networkx.draw(g,**options)
+    plt.show()
+    fname = os.path.join(path,name)
+    plt.savefig(fname+".png", format="PNG",dpi=1000)
+    plt.close()
 
 def compare(xs,ys,adj_out,adj_target,save_out=True,path='pics/',name='graph'):
     N = len(xs)
@@ -86,8 +119,11 @@ def show_tour(xs,ys,adj,path='pics/',name='graph', **kwargs):
     plt.savefig(fname+".png", format="PNG")
     plt.close()
 
-def show_probas_tsp(probas,solution=None,path='pics/',name='graph', iterations=1000):
+def show_proba_spring(probas,solution=None,path='pics/',name='graph', iterations=1000):
     check_dir(path)
+
+    if solution==None:
+        solution = torch.zeros_like(probas)
 
     n,_ = probas.shape
     #probas = torch.sigmoid(probas)

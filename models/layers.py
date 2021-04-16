@@ -10,8 +10,9 @@ class RegularBlock(nn.Module):
     and pass the concatenation of this result with the input through a MLP
     with no activation for the last layer.
     """
-    def __init__(self, in_features, out_features, depth_of_mlp):
+    def __init__(self, in_features, out_features, depth_of_mlp,name=""):
         super().__init__()
+        self.name=name
 
         self.mlp1 = MlpBlock(in_features, out_features, depth_of_mlp)
         self.mlp2 = MlpBlock(in_features, out_features, depth_of_mlp)

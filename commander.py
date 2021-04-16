@@ -3,6 +3,7 @@ import shutil
 import json
 from sacred import Experiment
 from sacred.config import config_scope
+import yaml
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -12,15 +13,25 @@ from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
 from toolbox.helper import get_helper
-import toolbox.vision as vision
 
 from sacred import SETTINGS
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 ### BEGIN Sacred setup
 ex = Experiment()
-ex.add_config('default_config.yaml')
+#ex.add_config('default_config.yaml')
 
+@ex.config
+def create_config():
+    with open("default_config.yaml") as f:
+        config = yaml.load(f,Loader=yaml.FullLoader)
+    del f
+    pbm = config['problem']
+    if pbm=='tsprl':
+        pbm = 'tsp'
+    pbm_key='_'+pbm
+    config = utils.clean_config(config,pbm_key)
+    ex.add_config(config)
 
 @ex.config_hook
 def set_experiment_name(config, command_name, logger):
@@ -90,7 +101,6 @@ def create_data_dict(config, command_name, logger):
         train_data_dict=train_data_dict
     )
     return config
-
 
 @ex.config_hook
 def init_observers(config, command_name, logger):
@@ -199,6 +209,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     
     model = get_model(arch)
     optimizer, scheduler = get_optimizer(train,model)
+    print("Model #parameters : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
 
     if not train['anew']:
         try:

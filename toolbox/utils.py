@@ -1,7 +1,10 @@
 import os
 import json
+from matplotlib.pyplot import isinteractive
+from numpy.lib.arraysetops import isin
 import torch
 import numpy as np
+from scipy.spatial.distance import cdist
 
 # create directory if it does not exist
 def check_dir(dir_path):
@@ -20,6 +23,32 @@ class NpEncoder(json.JSONEncoder):
         else:
             return super(NpEncoder, self).default(obj)
 
+def is_pbm_key(chars):
+    """
+    Recognizes problem keys of the form '_*' (Ex: '_mcp','_tsp')
+    """
+    return isinstance(chars,str) and chars[0]=='_'
+
+def clean_config(config,pbm_key):
+    if not isinstance(config,dict):
+        return config
+    new_config = {}
+    for k,v in config.items():
+        if not(is_pbm_key(k)) or k==pbm_key:
+            new_config[k] = clean_config(v,pbm_key)
+    return new_config
+
+def clean_config_inplace(config,pbm_key):
+    assert isinstance(config,dict), "Trying to clean something that is not a dictionary!"
+    keys_to_delete = []
+    for k,v in config.items():
+        if is_pbm_key(k) and k!=pbm_key:
+            keys_to_delete.append(k)
+        elif isinstance(v,dict):
+            clean_config_inplace(v,pbm_key)
+    for k in keys_to_delete:
+        config.pop(k)
+
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
@@ -28,6 +57,40 @@ def get_device(t):
     if t.is_cuda:
         return t.get_device()
     return 'cpu'
+
+def tsp_get_min_dist(dist_matrix):
+    """
+    Takes a distance matrix dist_matrix of shape (n,n) or (bs,n,n)
+    Returns the mean minimal distance between two distinct nodes for each of the *bs* instances 
+    """
+    if not isinstance(dist_matrix,torch.Tensor):
+        try:
+            dist_matrix = torch.tensor(dist_matrix)
+        except Exception:
+            raise ValueError(f"Type {type(dist_matrix)} could not be broadcasted to torch.Tensor")
+    solo=False
+    if len(dist_matrix.shape)==2:
+        solo=True
+        dist_matrix = dist_matrix.unsqueeze(0)
+    bs,n,_ = dist_matrix.shape
+    max_dist = torch.max(dist_matrix)
+    eye_mask = torch.zeros_like(dist_matrix)
+    eye_mask[:] = torch.eye(n)
+    dist_modif = dist_matrix + max_dist*eye_mask
+    min_dist = torch.min(dist_modif,dim=-1).values
+    min_mean = torch.mean(min_dist,dim=-1)
+    if solo:
+        min_mean = min_mean[0]
+    
+    return min_mean
+
+def points_to_dist(xs,ys):
+    n=len(xs)
+    points = np.zeros((n,2))
+    points[:,0] = xs
+    points[:,1] = ys
+    dist_matrix = cdist(points,points)
+    return dist_matrix
 
 def permute_adjacency_twin(t1,t2):
     """
