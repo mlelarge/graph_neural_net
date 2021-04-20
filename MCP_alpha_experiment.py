@@ -51,6 +51,8 @@ def custom_mcp_eval(p1,cs1,p2,cs2,cpu, test_data_dict, arch, train):
 
     l_errors = []
     for data,target in loader:
+        data = data.to(device)
+        target = target.to(device)
         raw_scores = model(data).squeeze(-1)
         l_clique_inf = mcp_beam_method(data.squeeze(),raw_scores)
         l_clique_sol = mcp_adj_to_ind(target)
