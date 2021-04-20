@@ -60,6 +60,10 @@ def custom_mcp_eval(p2,cs2,cpu, test_data_dict, arch):
 
 if __name__=='__main__':
     
+    filename = 'mcp_alpha_results.txt'
+    with open(filename,'w') as f:
+        f.write('ptrain,ptest,error\n')
+
 
     n_vertices=50
     lp1 = np.arange(0.05,1,0.1)
@@ -79,11 +83,14 @@ if __name__=='__main__':
             'data.train._mcp.clique_size':cs1,
             'data.train._mcp.edge_density':p1
             })
-        ex.run('custom_mcp',config_updates={
+        l_errors = ex.run('custom_mcp',config_updates={
             'data.train._mcp.clique_size':cs1,
             'data.train._mcp.edge_density':p1
             })
-        
+        mean_error = np.mean(l_errors)
+        line = get_line(p1,p2,mean_error)
+        add_line(filename,line)
+
 
 
 
