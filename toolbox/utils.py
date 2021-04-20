@@ -1,5 +1,6 @@
 import os
 import json
+from typing import Tuple
 from matplotlib.pyplot import isinteractive
 from numpy.lib.arraysetops import isin
 import torch
@@ -58,6 +59,65 @@ def get_device(t):
         return t.get_device()
     return 'cpu'
 
+
+#MCP
+
+def permute_adjacency_twin(t1,t2) -> Tuple[torch.Tensor,torch.Tensor]:
+    """
+    Makes a permutation of two adjacency matrices together. Equivalent to a renaming of the nodes.
+    Supposes shape (n,n)
+    """
+    n,_ = t1.shape
+    perm = torch.randperm(n)
+    return t1[perm,:][:,perm],t2[perm,:][:,perm]
+
+def permute_adjacency(t,perm=None) -> torch.Tensor:
+    """
+    Makes a permutation of an adjacency matrix. Equivalent to a renaming of the nodes.
+    Supposes shape (n,n)
+    If perm is not specified, it randomly permutes
+    """
+    n,_ = t.shape
+    if perm is None:
+        perm = torch.randperm(n)
+    else:
+        perm = perm.to(int)
+    return t[perm,:][:,perm]
+
+def mcp_adj_to_ind(adj)->list:
+    """
+    adj should be of size (n,n) or (bs,n,n), supposedly the solution for mcp
+    Transforms the adjacency matrices in a list of indices corresponding to the clique
+    """
+    solo=False
+    if len(adj.shape)==2:
+        solo=True
+        adj = adj.unsqueeze(0)
+    bs,n,_ = adj.shape
+    sol_onehot = torch.sum(adj,dim=-1)#Gets the onehot encoding of the solution clique
+    l_sol_indices = [torch.where(sol_onehot[i])[0] for i in range(bs)] #Converts the onehot encoding to a list of the nodes' numbers
+    l_clique_sol = [{elt.item() for elt in indices} for indices in l_sol_indices]
+    
+    if solo:
+        l_clique_sol=l_clique_sol[0]
+    return l_clique_sol
+
+def mcp_ind_to_adj(ind,n)->torch.Tensor:
+    """
+    ind should be a set of indices (or iterable)
+    Transforms it into the adjacency matrix of shape (n,n)
+    """
+    assert max(ind)<n, f"Index {max(ind)} not in range for {n} indices"
+    adj = torch.zeros((n,n))
+    n_indices = len(ind)
+    x = [elt for elt in ind for _ in range(n_indices)]
+    y = [elt for _ in range(n_indices) for elt in ind]
+    adj[x,y] = 1
+    adj *= 0*torch.eye(n)
+    return adj
+
+#TSP
+
 def tsp_get_min_dist(dist_matrix):
     """
     Takes a distance matrix dist_matrix of shape (n,n) or (bs,n,n)
@@ -84,7 +144,7 @@ def tsp_get_min_dist(dist_matrix):
     
     return min_mean
 
-def points_to_dist(xs,ys):
+def points_to_dist(xs,ys)->np.array:
     n=len(xs)
     points = np.zeros((n,2))
     points[:,0] = xs
@@ -92,43 +152,39 @@ def points_to_dist(xs,ys):
     dist_matrix = cdist(points,points)
     return dist_matrix
 
-def permute_adjacency_twin(t1,t2):
-    """
-    Makes a permutation of an adjacency matrix. Equivalent to a renaming of the nodes.
-    Supposes shape (n,n)
-    """
-    n,_ = t1.shape
-    perm = torch.randperm(n)
-    return t1[perm,:][:,perm],t2[perm,:][:,perm]
+def is_permutation_matrix(x):
+    '''
+    Checks if x is a permutation matrix, thus a tour.
+    '''
+    x = x.squeeze()
+    return (x.ndim == 2 and x.shape[0] == x.shape[1] and
+            (x.sum(dim=0) == 1).all() and 
+            (x.sum(dim=1) == 1).all() and
+            ((x == 1) | (x == 0)).all())
 
-def mcp_adj_to_ind(adj):
-    """
-    adj should be of size (n,n) or (bs,n,n), supposedly the solution for mcp
-    Transforms the adjacency matrices in a list of indices corresponding to the clique
-    """
-    solo=False
-    if len(adj.shape)==2:
-        solo=True
-        adj = adj.unsqueeze(0)
-    bs,n,_ = adj.shape
-    sol_onehot = torch.sum(adj,dim=-1)#Gets the onehot encoding of the solution clique
-    l_sol_indices = [torch.where(sol_onehot[i])[0] for i in range(bs)] #Converts the onehot encoding to a list of the nodes' numbers
-    l_clique_sol = [{elt.item() for elt in indices} for indices in l_sol_indices]
-    
-    if solo:
-        l_clique_sol=l_clique_sol[0]
-    return l_clique_sol
+def tour_to_perm(n,path):
+    '''
+    Transform a tour into a permutation (directed tour)
+    '''
+    m = torch.zeros((n,n))
+    for k in range(n):
+        u = int(path[k])
+        v = int(path[(k+1)%n])
+        m[u,v] = 1
+    return m
 
-def mcp_ind_to_adj(ind,n):
-    """
-    ind should be a set of indices (or iterable)
-    Transforms it into the adjacency matrix of shape (n,n)
-    """
-    assert max(ind)<n, f"Index {max(ind)} not in range for {n} indices"
-    adj = torch.zeros((n,n))
-    n_indices = len(ind)
-    x = [elt for elt in ind for _ in range(n_indices)]
-    y = [elt for _ in range(n_indices) for elt in ind]
-    adj[x,y] = 1
-    adj *= 0*torch.eye(n)
-    return adj
+def tour_to_adj(n,path):
+    '''
+    Transform a tour into an adjacency matrix
+    '''
+    m = torch.zeros((n,n))
+    for k in range(n):
+        u = int(path[k])
+        v = int(path[(k+1)%n])
+        m[u,v] = 1
+        m[v,u] = 1
+    return m
+
+
+
+

@@ -236,6 +236,25 @@ def tsp_rl_loss(raw_scores, distance_matrix):
     loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1)
     return torch.mean(loss).data.item()
 
+def tspd_dumb(raw_scores, target):
+    """
+    raw_scores and target of shape (bs,n,n)
+    Just takes the order of the first column, it's a bit naive.
+    As the data is ordered, it should be [0,1/n,2/n,...,1-1/n,1,1,1-1/n,...,1/n,0]
+    The procedure is ordering the vertices and comparing directly
+    """
+    bs,n,_ = raw_scores.shape
+    _,order = torch.topk(raw_scores,n,dim=2)
+    results = order[:,0,:] #Keep the first row everytime
+    true_pos=0
+    for result in results:
+        true_result = torch.cat( (result[::2],result[1::2].flip(-1)) )
+        comparison = true_result==torch.arange(n)
+        positives = torch.sum(comparison.to(int)).item()
+        true_pos+=positives
+    return true_pos,bs*n
+
+
 #SBM
 def accuracy_sbm_two_categories(raw_scores,target):
     """

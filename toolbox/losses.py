@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.modules.activation import Sigmoid
 from toolbox.utils import get_device
 import itertools
 
@@ -37,6 +38,20 @@ class triplet_loss(nn.Module):
 class tsp_loss(nn.Module):
     def __init__(self, loss=nn.BCELoss(reduction='none'), normalize=nn.Sigmoid()):
         super(tsp_loss, self).__init__()
+        self.loss = loss
+        self.normalize = normalize
+        
+    def forward(self, raw_scores, target):
+        """
+        raw_scores (bs,n_vertices,n_vertices)
+        """
+        proba = self.normalize(raw_scores)
+        loss = self.loss(proba,target)
+        return torch.mean(loss)
+
+class tspd_loss(nn.Module):
+    def __init__(self, loss=nn.MSELoss(reduction='none'), normalize=Sigmoid):
+        super(tspd_loss, self).__init__()
         self.loss = loss
         self.normalize = normalize
         

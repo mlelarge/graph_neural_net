@@ -396,6 +396,81 @@ class TSP_RL_Generator(Base_Generator):
         self.positions.append((xs,ys))
         return (B, W) # Keep the distance matrix W in the target for the loss to be computed
 
+class TSP_Distance_Generator(Base_Generator):
+    """
+    Traveling Salesman Problem Generator.
+    Uses the pyconcorde wrapper : see https://github.com/jvkersch/pyconcorde (thanks a lot)
+    This version uses a vertex distance matrix as the target instead of an adjacency matrix
+    """
+    def __init__(self, name, args, coeff=1e8):
+        self.generative_model = args['generative_model']
+        self.distance = args['distance_used']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'TSP_DIST_{}_{}_{}_{}'.format(self.generative_model, 
+                                                     self.distance,
+                                                     num_examples,
+                                                     self.n_vertices)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        
+        
+        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
+        self.constant_n_vertices = True
+        self.coeff = coeff
+        self.positions = []
+    
+    def load_dataset(self):
+        """
+        Look for required dataset in files and create it if
+        it does not exist
+        """
+        filename = self.name + '.pkl'
+        path = os.path.join(self.path_dataset, filename)
+        if os.path.exists(path):
+            print('Reading dataset at {}'.format(path))
+            data,pos = torch.load(path)
+            self.data = list(data)
+            self.positions = list(pos)
+        else:
+            print('Creating dataset.')
+            self.data = []
+            self.create_dataset()
+            print('Saving datatset at {}'.format(path))
+            torch.save((self.data,self.positions), path)
+
+    def compute_example(self):
+        """
+        Compute pairs (Adjacency, Optimal Tour)
+        """
+        try:
+            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
+        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
+
+        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
+        solution = problem.solve(verbose=False)
+        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
+
+        tour = torch.Tensor(solution.tour)
+        W_perm = utils.permute_adjacency(W,tour)
+
+        B = distance_matrix_tensor_representation(W_perm)
+        
+        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
+        distance = torch.cat((torch.arange(self.n_vertices/2),torch.arange(self.n_vertices//2,0,-1))) #Will return a dtype=float, care
+        distance /= self.n_vertices  #To have values between 0 and 1, for normalization
+        for i in range(SOL.shape[0]): #For each vertex
+            SOL[i,:] = distance.roll(i) #Create the distance matrix
+        
+        self.positions.append((xs,ys))
+        return (B, SOL)
+
 class MCP_Generator(Base_Generator):
     """
     Generator for the Maximum Clique Problem.
@@ -545,7 +620,9 @@ class SBM_Generator(Base_Generator):
 
 if __name__=="__main__":
     #data_args = {"edge_density_a":0.3,"edge_density_b":0.2, "num_examples_train":5,"path_dataset":"dataset_sbm","n_vertices":10}
-    data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
-    g = MCP_Generator("train",data_args)
+    #data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
+    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":13, 'distance_used':'EUC_2D','generative_model':'Square01'}
+    
+    g = TSP_Distance_Generator("train",data_args)
     timeit.timeit(g.load_dataset,number=1)
 

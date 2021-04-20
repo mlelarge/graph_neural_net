@@ -4,13 +4,30 @@ import os
 
 from torch.nn import BCELoss, MSELoss, CrossEntropyLoss
 from torch import sigmoid as Sigmoid
-from torch.nn.modules.activation import Softmax
+from torch.nn import Softmax
 from toolbox.logger import Experiment
-from loaders.data_generator import QAP_Generator,TSP_Generator,TSP_RL_Generator, MCP_Generator, MCP_True_Generator,SBM_Generator
+import loaders.data_generator as dg
 import toolbox.metrics as metrics
 import toolbox.losses as losses
 import toolbox.utils as utils
 
+from abc import abstractmethod
+
+
+#This file is here to create the handler for each experiment.
+#
+#To create a new experiment, you need to:
+# 1) create an 'Experiment' class which inherits from the 'Experiment_Helper'
+# 2) in its '__init__' function, you need to define:
+#       - self.generator : the generator of the dataset
+#       - self.criterion : the criterion/loss function/class (can be seen in toolbox/losses.py for my functions)
+#       - self.eval_function and self.metric : another function of seeing progress of learning. For now are only implemented:
+#               ¤ loss : if the method is a loss of some sort. The function needs to return only a scalar
+#               ¤ acc  : for accuracy. The function needs to return (true_positives, total_sample) => acc = true_positives/total_sample
+#               ¤ f1   : for an F1-Score. The function needs to return a tuple (precision, recall, f1_score)
+#                   (To implement other metrics, go into the 'Experiment_Helper.init_update_eval' function)
+#       - Don't forget to call the superclass initialization AFTER having defined the previous variables
+# 3) Finally add the problem name in the 'get_helper' function
 
 def get_helper(problem):
     if problem=='qap':
@@ -19,6 +36,8 @@ def get_helper(problem):
         return TSP_Experiment
     elif problem=='tsprl':
         return TSP_RL_Experiment
+    elif problem=='tspd':
+        return TSP_Distance_Experiment
     elif problem=='mcp':
         return MCP_Experiment
     elif problem=='mcptrue':
@@ -153,7 +172,6 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
         else:
             raise NotImplementedError(f"{self.metric} metric not implemented")
 
-
     def to_json(self, log_dir, filename):
         utils.check_dir(log_dir)
         json_file = os.path.join(log_dir,filename)
@@ -171,9 +189,11 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
         with open(json_file, 'w') as f:
             json.dump(var_dict, f, cls=utils.NpEncoder)
 
+
+
 class QAP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss_reduction='mean', loss=CrossEntropyLoss(reduction='sum')) -> None:
-        self.generator = QAP_Generator
+        self.generator = dg.QAP_Generator
         self.criterion = losses.triplet_loss(loss_reduction=loss_reduction, loss=loss)
         self.eval_function = metrics.accuracy_linear_assignment
         
@@ -182,7 +202,7 @@ class QAP_Experiment(Experiment_Helper):
 
 class TSP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
-        self.generator = TSP_Generator
+        self.generator = dg.TSP_Generator
         self.criterion = losses.tsp_loss(loss=loss, normalize=normalize)
         self.eval_function = lambda raw_scores,target: metrics.compute_f1(raw_scores, target, k_best=2)
         
@@ -191,17 +211,25 @@ class TSP_Experiment(Experiment_Helper):
 
 class TSP_RL_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, normalize = Softmax(dim=-1)) -> None:
-        self.generator = TSP_RL_Generator
+        self.generator = dg.TSP_RL_Generator
         self.criterion = losses.tsp_rl_loss(normalize=normalize)
         self.eval_function = metrics.tsp_rl_loss
         
         self.metric = 'loss' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('tsp', name, options=options, run=run)
 
+class TSP_Distance_Experiment(Experiment_Helper):
+    def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize = Sigmoid) -> None:
+        self.generator = dg.TSP_Distance_Generator
+        self.criterion = losses.tspd_loss(loss=loss, normalize=normalize)
+        self.eval_function = metrics.tspd_dumb
+        
+        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+        super().__init__('tsp', name, options=options, run=run)
 
 class MCP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
-        self.generator = MCP_Generator
+        self.generator = dg.MCP_Generator
         self.criterion = losses.mcp_loss(loss=loss, normalize=normalize)
         self.eval_function = metrics.accuracy_mcp
         
@@ -210,7 +238,7 @@ class MCP_Experiment(Experiment_Helper):
 
 class MCP_True_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
-        self.generator = MCP_True_Generator
+        self.generator = dg.MCP_True_Generator
         self.criterion = losses.mcp_loss(loss=loss, normalize=normalize)
         self.eval_function = metrics.accuracy_mcp
         
@@ -220,18 +248,17 @@ class MCP_True_Experiment(Experiment_Helper):
 class SBM_Edge_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
         
-        self.generator = SBM_Generator
+        self.generator = dg.SBM_Generator
         self.criterion = losses.sbm_edge_loss(loss=loss, normalize=normalize)
         self.eval_function = metrics.accuracy_sbm_two_categories_edge
         
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('sbm', name, options=options, run=run)
 
-
 class SBM_Node_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize=Sigmoid) -> None:
         
-        self.generator = SBM_Generator
+        self.generator = dg.SBM_Generator
         self.criterion = losses.sbm_node_loss(loss=loss,normalize = normalize)
         self.eval_function = metrics.accuracy_sbm_two_categories
         
