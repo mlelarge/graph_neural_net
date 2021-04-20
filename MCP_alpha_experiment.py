@@ -79,13 +79,13 @@ if __name__=='__main__':
         cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
         #os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
         #os.system(f"python3 commander.py eval with data.test._mcp.clique_size={cs2} data.test._mcp.edge_density={p2}")
-        ex.run("train",config_updates={
-            'data.train._mcp.clique_size':cs1,
-            'data.train._mcp.edge_density':p1
+        ex.run('custom_mcp_train',config_updates={
+            'cs1':cs1,
+            'p1':p1
             })
-        l_errors = ex.run('custom_mcp',config_updates={
-            'data.train._mcp.clique_size':cs1,
-            'data.train._mcp.edge_density':p1
+        l_errors = ex.run('custom_mcp_eval',config_updates={
+            'cs2':cs2,
+            'p2':p2
             })
         mean_error = np.mean(l_errors)
         line = get_line(p1,p2,mean_error)
