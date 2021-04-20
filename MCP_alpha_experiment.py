@@ -1,4 +1,4 @@
-from re import search
+import os
 import torch
 import numpy as np
 import tqdm
@@ -25,33 +25,34 @@ def compute_cs(n_vertices,a):
 def custom_mcp_train(p1,cs1,train_data_dict):
     train_data_dict['edge_density'] = p1
     train_data_dict['clique_size']  = cs1
-    ex.command('train',config_updates={
-        'train_data_dict': train_data_dict
-        }
-    )
+    ex.add_config({'train_data_dict':train_data_dict})
+    ex.command('train')
 
 @ex.command
-def custom_mcp_eval(p2,cs2,cpu, test_data_dict, arch):
-    use_cuda = not cpu and torch.cuda.is_available()
-    device = 'cuda' if use_cuda else 'cpu'
-
-    model = get_model(arch)
-    model.to(device)
-    model = load_model(model, device)
-    model.eval()
-
+def custom_mcp_eval(p1,cs1,p2,cs2,cpu, test_data_dict, arch, train):
 
     test_data_dict['edge_density'] = p2
     test_data_dict['clique_size']  = cs2
     gen = MCP_Generator('test',test_data_dict)
+
+    use_cuda = not cpu and torch.cuda.is_available()
+    device = 'cuda' if use_cuda else 'cpu'
+
+    model_path= f"./runs/Fusion/MCP-{p1}_{cs1}_True_dataset_mcp/model_best.pth.tar"
+
+    model = get_model(arch)
+    model.to(device)
+    model = load_model(model, device,model_path=model_path)
+    model.eval()
+
     gen.load_dataset()
-    loader = siamese_loader(gen, 1, gen.constant_n_vertices,shuffle=False)
+    loader = siamese_loader(gen, train['batch_size'], gen.constant_n_vertices,shuffle=False)
 
 
     l_errors = []
     for data,target in loader:
-        raw_scores = model(data)
-        l_clique_inf = mcp_beam_method(data,raw_scores)
+        raw_scores = model(data).squeeze(-1)
+        l_clique_inf = mcp_beam_method(data.squeeze(),raw_scores)
         l_clique_sol = mcp_adj_to_ind(target)
         for inf,sol in zip(l_clique_inf,l_clique_sol):
             l_errors.append(len(sol)-len(inf))
@@ -77,16 +78,11 @@ if __name__=='__main__':
         a2 = compute_a(n_vertices=n_vertices,edge_density=p2)
         cs1 = int(np.ceil(compute_cs(n_vertices,a1)))
         cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
-        #os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
+        os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
         #os.system(f"python3 commander.py eval with data.test._mcp.clique_size={cs2} data.test._mcp.edge_density={p2}")
-        ex.run('custom_mcp_train',config_updates={
-            'cs1':cs1,
-            'p1':p1
-            })
-        l_errors = ex.run('custom_mcp_eval',config_updates={
-            'cs2':cs2,
-            'p2':p2
-            })
+        ex.add_config({'p1':p1,'p2':p2,'cs1':cs1,'cs2':cs2})
+        #ex.run('custom_mcp_train')
+        l_errors = ex.run('custom_mcp_eval').result
         mean_error = np.mean(l_errors)
         line = get_line(p1,p2,mean_error)
         add_line(filename,line)

@@ -108,6 +108,9 @@ def mcp_beam_method(data, raw_scores, seeds=None, add_singles=True, beam_size=12
         data = data.unsqueeze(0)
         if seeding: seeds = [seeds] #In that case we'd only have a set
     
+    if len(data.shape)==3:
+        data = data.unsqueeze(0)
+    
 
     bs,n,_ = raw_scores.shape
 
