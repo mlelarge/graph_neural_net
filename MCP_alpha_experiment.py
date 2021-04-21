@@ -12,8 +12,8 @@ def add_line(filename,line) -> None:
     with open(filename,'a') as f:
         f.write(line + "\n")
 
-def get_line(ptrain,ptest,error):
-    return f"{ptrain},{ptest},{error}"
+def get_line(ptrain,ptest,error,accuracy):
+    return f"{ptrain},{ptest},{error},{accuracy}"
 
 def compute_a(n_vertices, edge_density):
     return -np.log(edge_density)/np.log(n_vertices)
@@ -50,6 +50,7 @@ def custom_mcp_eval(p1,cs1,p2,cs2,cpu, test_data_dict, arch, train):
 
 
     l_errors = []
+    l_acc = []
     for data,target in loader:
         data = data.to(device)
         target = target.to(device)
@@ -58,14 +59,15 @@ def custom_mcp_eval(p1,cs1,p2,cs2,cpu, test_data_dict, arch, train):
         l_clique_sol = mcp_adj_to_ind(target)
         for inf,sol in zip(l_clique_inf,l_clique_sol):
             l_errors.append(len(sol)-len(inf))
-    return l_errors
+            l_acc.append(len((inf.intersection(sol)))/len(sol))
+    return l_errors,l_acc
 
 
 if __name__=='__main__':
     
     filename = 'mcp_alpha_results.txt'
     with open(filename,'w') as f:
-        f.write('ptrain,ptest,error\n')
+        f.write('ptrain,ptest,error,accuracy\n')
 
 
     n_vertices=50
@@ -84,9 +86,10 @@ if __name__=='__main__':
         #os.system(f"python3 commander.py eval with data.test._mcp.clique_size={cs2} data.test._mcp.edge_density={p2}")
         ex.add_config({'p1':p1,'p2':p2,'cs1':cs1,'cs2':cs2})
         #ex.run('custom_mcp_train')
-        l_errors = ex.run('custom_mcp_eval').result
+        l_errors,l_acc = ex.run('custom_mcp_eval').result
         mean_error = np.mean(l_errors)
-        line = get_line(p1,p2,mean_error)
+        mean_acc = np.mean(l_acc)
+        line = get_line(p1,p2,mean_error,mean_acc)
         add_line(filename,line)
 
 
