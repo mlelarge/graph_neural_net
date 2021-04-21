@@ -93,9 +93,9 @@ def mcp_adj_to_ind(adj)->list:
     if len(adj.shape)==2:
         solo=True
         adj = adj.unsqueeze(0)
-    bs,n,_ = adj.shape
+    bs,_,_ = adj.shape
     sol_onehot = torch.sum(adj,dim=-1)#Gets the onehot encoding of the solution clique
-    l_sol_indices = [torch.where(sol_onehot[i])[0] for i in range(bs)] #Converts the onehot encoding to a list of the nodes' numbers
+    l_sol_indices = [torch.where(sol_onehot[i]!=0)[0] for i in range(bs)] #Converts the onehot encoding to a list of the nodes' numbers
     l_clique_sol = [{elt.item() for elt in indices} for indices in l_sol_indices]
     
     if solo:
