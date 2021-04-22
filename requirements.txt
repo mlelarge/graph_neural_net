@@ -8,3 +8,4 @@ neptune-contrib
 psutil
 Cython
 sklearn
+tqdm

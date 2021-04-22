@@ -113,7 +113,7 @@ def mcp_ind_to_adj(ind,n)->torch.Tensor:
     x = [elt for elt in ind for _ in range(n_indices)]
     y = [elt for _ in range(n_indices) for elt in ind]
     adj[x,y] = 1
-    adj *= 0*torch.eye(n)
+    adj *= (1-torch.eye(n))
     return adj
 
 #TSP
