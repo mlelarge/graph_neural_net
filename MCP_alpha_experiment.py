@@ -85,32 +85,37 @@ if __name__=='__main__':
     l_total = [(p1,p2) for p1 in lp1 for p2 in lp2]
     counter = 0
     max_cs1=0
-    for p1,p2 in tqdm.tqdm(l_total):
-        if counter%length==0:
-            max_cs2 = 0
+    pb1 = tqdm.tqdm(lp1)
+    for p1 in pb1:
+        pb1.set_description(f"Outer Loop : p1={p1}")
         p1 = round(p1,2) #To prevent the 0.150000000002 as much as possible
-        p2 = round(p2,2)
         a1 = compute_a(n_vertices=n_vertices,edge_density=p1)
-        a2 = compute_a(n_vertices=n_vertices,edge_density=p2)
         cs1 = int(np.ceil(compute_cs(n_vertices,a1)))
         cs1 = max(max_cs1,cs1)
         max_cs1=cs1
-        cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
-        cs2 = max(max_cs2,cs2) #Keep growing cliques until we reset p2
-        max_cs2=cs2
-        if counter>=n_lines:
+        if counter<n_lines:
             os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
-            #os.system(f"python3 commander.py eval with data.test._mcp.clique_size={cs2} data.test._mcp.edge_density={p2}")
-            ex.add_config({'p1':p1,'p2':p2,'cs1':cs1,'cs2':cs2})
-            #ex.run('custom_mcp_train')
-            l_errors,l_acc = ex.run('custom_mcp_eval').result
-            mean_error = np.mean(l_errors)
-            mean_acc = np.mean(l_acc)
-            line = get_line(p1,p2,mean_error,mean_acc)
-            add_line(filename,line)
-        else:
-            print(f"Skipping ({p1},{p2})")
-        counter+=1
+        max_cs2=0
+        pb2 = tqdm.tqdm(l_total)
+        for p2 in pb2:
+            pb2.set_description('Inner Loop : p1={p1}, p2={p2}')
+            p2 = round(p2,2)
+            a2 = compute_a(n_vertices=n_vertices,edge_density=p2)
+            cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
+            cs2 = max(max_cs2,cs2) #Keep growing cliques until we reset p2
+            max_cs2=cs2
+            if counter>=n_lines:
+                #os.system(f"python3 commander.py eval with data.test._mcp.clique_size={cs2} data.test._mcp.edge_density={p2}")
+                ex.add_config({'p1':p1,'p2':p2,'cs1':cs1,'cs2':cs2})
+                #ex.run('custom_mcp_train')
+                l_errors,l_acc = ex.run('custom_mcp_eval').result
+                mean_error = np.mean(l_errors)
+                mean_acc = np.mean(l_acc)
+                line = get_line(p1,p2,mean_error,mean_acc)
+                add_line(filename,line)
+            else:
+                print(f"Skipping ({p1},{p2})")
+            counter+=1
 
 
 
