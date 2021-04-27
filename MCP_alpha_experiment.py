@@ -51,7 +51,7 @@ def custom_mcp_eval(p1,cs1,p2,cs2,cpu, test_data_dict, arch, train):
 
     l_errors = []
     l_acc = []
-    for data,target in loader:
+    for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving mcps'):
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
@@ -65,33 +65,45 @@ def custom_mcp_eval(p1,cs1,p2,cs2,cpu, test_data_dict, arch, train):
 
 if __name__=='__main__':
     
-    filename = 'mcp_alpha_results.txt'
-    with open(filename,'w') as f:
-        f.write('ptrain,ptest,error,accuracy\n')
 
+    filename = 'mcp_alpha_results.txt'
+    n_lines=0
+    if not os.path.isfile(filename):
+        with open(filename,'w') as f:
+            f.write('ptrain,ptest,error,accuracy\n')
+    else:
+        with open(filename,'r') as f:
+            data = f.readlines()
+            n_lines = len(data)-1
+            print(f'File has {n_lines} computations')
 
     n_vertices=50
     lp1 = np.arange(0.05,1,0.1)
     lp2 = np.arange(0.05,1,0.1)
 
     l_total = [(p1,p2) for p1 in lp1 for p2 in lp2]
+    counter = 0
     for p1,p2 in tqdm.tqdm(l_total):
+        
         p1 = round(p1,2) #To prevent the 0.150000000002 as much as possible
         p2 = round(p2,2)
-        a1 = compute_a(n_vertices=n_vertices,edge_density=p1)
-        a2 = compute_a(n_vertices=n_vertices,edge_density=p2)
-        cs1 = int(np.ceil(compute_cs(n_vertices,a1)))
-        cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
-        os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
-        #os.system(f"python3 commander.py eval with data.test._mcp.clique_size={cs2} data.test._mcp.edge_density={p2}")
-        ex.add_config({'p1':p1,'p2':p2,'cs1':cs1,'cs2':cs2})
-        #ex.run('custom_mcp_train')
-        l_errors,l_acc = ex.run('custom_mcp_eval').result
-        mean_error = np.mean(l_errors)
-        mean_acc = np.mean(l_acc)
-        line = get_line(p1,p2,mean_error,mean_acc)
-        add_line(filename,line)
-
+        if counter>=n_lines:
+            a1 = compute_a(n_vertices=n_vertices,edge_density=p1)
+            a2 = compute_a(n_vertices=n_vertices,edge_density=p2)
+            cs1 = int(np.ceil(compute_cs(n_vertices,a1)))
+            cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
+            os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
+            #os.system(f"python3 commander.py eval with data.test._mcp.clique_size={cs2} data.test._mcp.edge_density={p2}")
+            ex.add_config({'p1':p1,'p2':p2,'cs1':cs1,'cs2':cs2})
+            #ex.run('custom_mcp_train')
+            l_errors,l_acc = ex.run('custom_mcp_eval').result
+            mean_error = np.mean(l_errors)
+            mean_acc = np.mean(l_acc)
+            line = get_line(p1,p2,mean_error,mean_acc)
+            add_line(filename,line)
+        else:
+            print(f"Skipping ({p1},{p2})")
+        counter+=1
 
 
 
