@@ -1,6 +1,7 @@
 import os
 import random
 import itertools
+from unicodedata import normalize
 import networkx
 from networkx.algorithms.approximation.clique import max_clique
 import torch
@@ -10,6 +11,8 @@ from concorde.tsp import TSPSolver
 import math
 from toolbox.searches import mcp_beam_method
 import timeit
+from sklearn.decomposition import PCA
+from numpy import pi,angle,cos,sin
 
 GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
@@ -151,6 +154,17 @@ def distance_matrix_tensor_representation(W):
     B[indices, indices, 0] = degrees
     return B
 
+def normalize_tsp(xs,ys):
+    """ 'Normalizes' points positions by moving they in a way where the principal component of the point cloud is directed vertically"""
+    X = [(x,y) for x,y in zip(xs,ys)]
+    pca = PCA(n_components=1)
+    pca.fit(X)
+    pc = pca.components_[0]
+    rot_angle = pi/2 - angle(pc[0]+1j*pc[1])
+    x_rot = [ x*cos(rot_angle) - y*sin(rot_angle) for x,y in X ]
+    y_rot = [ x*sin(rot_angle) + y*cos(rot_angle) for x,y in X ]
+    return x_rot,y_rot
+
 class Base_Generator(torch.utils.data.Dataset):
     def __init__(self, name, path_dataset, num_examples):
         self.path_dataset = path_dataset
@@ -172,7 +186,7 @@ class Base_Generator(torch.utils.data.Dataset):
             print('Creating dataset.')
             self.data = []
             self.create_dataset()
-            print('Saving datatset at {}'.format(path))
+            print('Saving dataset at {}'.format(path))
             torch.save(self.data, path)
     
     def create_dataset(self):
@@ -276,7 +290,7 @@ class TSP_Generator(Base_Generator):
             print('Creating dataset.')
             self.data = []
             self.create_dataset()
-            print('Saving datatset at {}'.format(path))
+            print('Saving dataset at {}'.format(path))
             torch.save((self.data,self.positions), path)
 
     def compute_example(self):
@@ -291,6 +305,79 @@ class TSP_Generator(Base_Generator):
         xs = [g.nodes[node]['pos'][0] for node in g.nodes]
         ys = [g.nodes[node]['pos'][1] for node in g.nodes]
 
+        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
+        solution = problem.solve(verbose=False)
+        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
+
+        B = distance_matrix_tensor_representation(W)
+        
+        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
+        prec = solution.tour[-1]
+        for i in range(self.n_vertices):
+            curr = solution.tour[i]
+            SOL[curr,prec] = 1
+            SOL[prec,curr] = 1
+            prec = curr
+        
+        self.positions.append((xs,ys))
+        return (B, SOL)
+
+class TSP_normalized_Generator(Base_Generator):
+    """
+    Traveling Salesman Problem Generator.
+    Uses the pyconcorde wrapper : see https://github.com/jvkersch/pyconcorde (thanks a lot)
+    """
+    def __init__(self, name, args, coeff=1e8):
+        self.generative_model = args['generative_model']
+        self.distance = args['distance_used']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'TSP_normed_{}_{}_{}_{}'.format(self.generative_model, 
+                                                     self.distance,
+                                                     num_examples,
+                                                     self.n_vertices)
+        path_dataset = os.path.join(args['path_dataset'],
+                                         subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        
+        
+        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
+        self.constant_n_vertices = True
+        self.coeff = coeff
+        self.positions = []
+    
+    def load_dataset(self):
+        """
+        Look for required dataset in files and create it if
+        it does not exist
+        """
+        filename = self.name + '.pkl'
+        path = os.path.join(self.path_dataset, filename)
+        if os.path.exists(path):
+            print('Reading dataset at {}'.format(path))
+            data,pos = torch.load(path)
+            self.data = list(data)
+            self.positions = list(pos)
+        else:
+            print('Creating dataset.')
+            self.data = []
+            self.create_dataset()
+            print('Saving dataset at {}'.format(path))
+            torch.save((self.data,self.positions), path)
+
+    def compute_example(self):
+        """
+        Compute pairs (Adjacency, Optimal Tour)
+        """
+        try:
+            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
+        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
+        xs,ys = normalize_tsp(xs,ys)
         problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
         solution = problem.solve(verbose=False)
         assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
@@ -438,7 +525,7 @@ class TSP_Distance_Generator(Base_Generator):
             print('Creating dataset.')
             self.data = []
             self.create_dataset()
-            print('Saving datatset at {}'.format(path))
+            print('Saving dataset at {}'.format(path))
             torch.save((self.data,self.positions), path)
 
     def compute_example(self):

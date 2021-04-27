@@ -87,18 +87,18 @@ if __name__=='__main__':
     max_cs1=0
     pb1 = tqdm.tqdm(lp1)
     for p1 in pb1:
-        pb1.set_description(f"Outer Loop : p1={p1}")
+        pb1.set_description(f"Outer Loop : p1={p1}\n")
         p1 = round(p1,2) #To prevent the 0.150000000002 as much as possible
         a1 = compute_a(n_vertices=n_vertices,edge_density=p1)
         cs1 = int(np.ceil(compute_cs(n_vertices,a1)))
         cs1 = max(max_cs1,cs1)
         max_cs1=cs1
-        if counter<n_lines:
+        if counter+len(lp2)>=n_lines:
             os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
         max_cs2=0
         pb2 = tqdm.tqdm(lp2)
         for p2 in pb2:
-            pb2.set_description('Inner Loop : p1={p1}, p2={p2}')
+            pb2.set_description('Inner Loop : p1={p1}, p2={p2}\n')
             p2 = round(p2,2)
             a2 = compute_a(n_vertices=n_vertices,edge_density=p2)
             cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
