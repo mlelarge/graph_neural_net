@@ -96,7 +96,7 @@ if __name__=='__main__':
         if counter<n_lines:
             os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
         max_cs2=0
-        pb2 = tqdm.tqdm(l_total)
+        pb2 = tqdm.tqdm(lp2)
         for p2 in pb2:
             pb2.set_description('Inner Loop : p1={p1}, p2={p2}')
             p2 = round(p2,2)
