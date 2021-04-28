@@ -50,7 +50,7 @@ def custom_mcp_eval(loader,model,device):
 
 if __name__=='__main__':
     gen_args = {
-        'num_examples_train': 1000,
+        'num_examples_train': 20001,
         'num_examples_val': 1000,
         'num_examples_test': 100,
         'n_vertices': 50,
@@ -114,7 +114,8 @@ if __name__=='__main__':
     max_cs1=0
     pb1 = tqdm.tqdm(lp1)
     for p1 in pb1:
-        pb1.set_description(f"Outer Loop : p1={p1}\n")
+        pb1.set_description(f"Outer Loop : p1={p1}")
+        print('')
         p1 = round(p1,2) #To prevent the 0.150000000002 as much as possible
         a1 = compute_a(n_vertices=n_vertices,edge_density=p1)
         cs1 = int(np.ceil(compute_cs(n_vertices,a1)))
@@ -156,7 +157,8 @@ if __name__=='__main__':
         max_cs2=0
         pb2 = tqdm.tqdm(lp2)
         for p2 in pb2:
-            pb2.set_description(f'Inner Loop : p1={p1}, p2={p2}\n')
+            pb2.set_description(f'Inner Loop : p1={p1}, p2={p2}')
+            print('')
             p2 = round(p2,2)
             a2 = compute_a(n_vertices=n_vertices,edge_density=p2)
             cs2 = int(np.ceil(compute_cs(n_vertices,a2)))
@@ -165,9 +167,9 @@ if __name__=='__main__':
             if counter>=n_lines:
                 gen_args['clique_size'] = cs2
                 gen_args['edge_density']= p2
-                gen_args=MCP_Generator('val',gen_args)
-                gen_args.load_dataset()
-                val_loader = siamese_loader(gen_args,batch_size,True,shuffle=True)
+                val_gen=MCP_Generator('val',gen_args)
+                val_gen.load_dataset()
+                val_loader = siamese_loader(val_gen,batch_size,True,shuffle=True)
 
                 l_errors,l_acc = custom_mcp_eval(val_loader,model,device)
 

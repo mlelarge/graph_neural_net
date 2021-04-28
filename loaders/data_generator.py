@@ -1,7 +1,6 @@
 import os
 import random
 import itertools
-from unicodedata import normalize
 import networkx
 from networkx.algorithms.approximation.clique import max_clique
 import torch
@@ -13,6 +12,7 @@ from toolbox.searches import mcp_beam_method
 import timeit
 from sklearn.decomposition import PCA
 from numpy import pi,angle,cos,sin
+import tqdm
 
 GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
@@ -190,7 +190,7 @@ class Base_Generator(torch.utils.data.Dataset):
             torch.save(self.data, path)
     
     def create_dataset(self):
-        for _ in range(self.num_examples):
+        for _ in tqdm.tqdm(range(self.num_examples)):
             example = self.compute_example()
             self.data.append(example)
 
