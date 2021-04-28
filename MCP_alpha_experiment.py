@@ -7,7 +7,7 @@ from commander import get_model,load_model
 from loaders.data_generator import MCP_Generator
 from loaders.siamese_loaders import siamese_loader
 from toolbox.searches import mcp_beam_method
-from toolbox.utils import mcp_adj_to_ind
+import toolbox.utils as utils
 from toolbox.optimizer import get_optimizer
 from toolbox.helper import get_helper
 from trainer import train_triplet, val_triplet
@@ -25,6 +25,11 @@ def compute_a(n_vertices, edge_density):
 def compute_cs(n_vertices,a):
     return 2/a+2*np.log(a)/(a*np.log(n_vertices))+2*np.log(np.exp(1)/2)/(a*np.log(n_vertices))+1
 
+def init_helper(problem, name, config):
+    exp_helper_object = get_helper(problem)
+    exp_helper = exp_helper_object(name, config)
+    return exp_helper
+
 def custom_mcp_eval(loader,model,device):
 
     model.eval()
@@ -36,7 +41,7 @@ def custom_mcp_eval(loader,model,device):
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
         l_clique_inf = mcp_beam_method(data.squeeze(),raw_scores)
-        l_clique_sol = mcp_adj_to_ind(target)
+        l_clique_sol = utils.mcp_adj_to_ind(target)
         for inf,sol in zip(l_clique_inf,l_clique_sol):
             l_errors.append(len(sol)-len(inf))
             l_acc.append(len((inf.intersection(sol)))/len(sol))
@@ -68,9 +73,21 @@ if __name__=='__main__':
         'out_features': 1,
         'depth_of_mlp': 3
     }
+    helper_args = {
+        'train':{# Training parameters
+            'epoch': 10,
+            'batch_size': 8,
+            'lr': 1e-4,
+            'scheduler_step': 1,
+            'scheduler_decay': 0.5,
+            'lr_stop': 1e-7,
+            'print_freq': 100,
+            'anew': True
+        } 
+    }
 
-    epoch=1
-    batch_size = 8
+    tot_epoch=helper_args['train']['epoch']
+    batch_size = helper_args['train']['batch_size']
     n_vertices=gen_args['n_vertices']
     pbm='mcp'
 
@@ -109,17 +126,31 @@ if __name__=='__main__':
         if counter+len(lp2)>n_lines:
             gen_args['clique_size'] = cs1
             gen_args['edge_density']= p1
-            gen_args=MCP_Generator('train',gen_args)
-            gen_args.load_dataset()
-            train_loader = siamese_loader(gen_args,batch_size,True,shuffle=True)
+            train_gen=MCP_Generator('train',gen_args)
+            train_gen.load_dataset()
+            train_loader = siamese_loader(train_gen,batch_size,True,shuffle=True)
+
+            val_gen=MCP_Generator('val',gen_args)
+            val_gen.load_dataset()
+            val_loader = siamese_loader(val_gen, batch_size,True,shuffle=True)
             
-            helper = get_helper(pbm)
+            helper = init_helper(pbm,'train',helper_args)
 
             model = get_model(model_args)
 
-            optimizer = get_optimizer(opt_args,model)
+            optimizer, scheduler = get_optimizer(opt_args,model)
 
-            train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+            for epoch in range(tot_epoch):
+                train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+                
+                relevant_metric, loss = val_triplet(val_loader,model,helper,device,epoch,eval_score=True)
+
+                scheduler.step(loss)
+
+                cur_lr = utils.get_lr(optimizer)
+                if helper.stop_condition(cur_lr):
+                    print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+                    break
             #os.system(f"python3 commander.py train with data.train._mcp.clique_size={cs1} data.train._mcp.edge_density={p1}")
         
         max_cs2=0
