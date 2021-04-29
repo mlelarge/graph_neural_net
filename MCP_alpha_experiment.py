@@ -138,6 +138,7 @@ if __name__=='__main__':
             helper = init_helper(pbm,'train',helper_args)
 
             model = get_model(model_args)
+            model.to(device)
 
             optimizer, scheduler = get_optimizer(opt_args,model)
 
