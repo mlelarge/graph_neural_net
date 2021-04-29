@@ -76,7 +76,7 @@ train: # Training parameters
 
 arch: # Architecture and model
     arch: simple #siamese or simple
-    embedding: node #node or edge
+    embedding: edge #node or edge
     num_blocks: 5
     original_features_num: 2
     in_features: 128

@@ -387,7 +387,7 @@ class TSP_normpos_Generator(Base_Generator):
         solution = problem.solve(verbose=False)
         assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
 
-        B = torch.zeros((self.n_vertices,2))
+        B = torch.zeros((self.n_vertices,self.n_vertices,2))
         
         SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
         prec = solution.tour[-1]
@@ -397,8 +397,8 @@ class TSP_normpos_Generator(Base_Generator):
             SOL[prec,curr] = 1
             prec = curr
 
-            B[i,0] = xs[i]
-            B[i,1] = ys[i]
+            B[i,i,0] = xs[i]
+            B[i,i,1] = ys[i]
         
         self.positions.append((xs,ys))
         return (B, SOL)
