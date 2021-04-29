@@ -6,13 +6,17 @@ from networkx.algorithms.approximation.clique import max_clique
 import torch
 import torch.utils
 import toolbox.utils as utils
-from concorde.tsp import TSPSolver
 import math
 from toolbox.searches import mcp_beam_method
 import timeit
 from sklearn.decomposition import PCA
 from numpy import pi,angle,cos,sin
 import tqdm
+
+try:
+    from concorde.tsp import TSPSolver
+except ModuleNotFoundError:
+    print("Trying to continue without pyconcorde as it is not installed. TSP data generation will fail.")
 
 GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
@@ -322,17 +326,18 @@ class TSP_Generator(Base_Generator):
         self.positions.append((xs,ys))
         return (B, SOL)
 
-class TSP_normalized_Generator(Base_Generator):
+class TSP_normpos_Generator(Base_Generator):
     """
     Traveling Salesman Problem Generator.
     Uses the pyconcorde wrapper : see https://github.com/jvkersch/pyconcorde (thanks a lot)
+    This one uses just the positions as data instead of distances
     """
     def __init__(self, name, args, coeff=1e8):
         self.generative_model = args['generative_model']
         self.distance = args['distance_used']
         num_examples = args['num_examples_' + name]
         self.n_vertices = args['n_vertices']
-        subfolder_name = 'TSP_normed_{}_{}_{}_{}'.format(self.generative_model, 
+        subfolder_name = 'TSP_normedxy_{}_{}_{}_{}'.format(self.generative_model, 
                                                      self.distance,
                                                      num_examples,
                                                      self.n_vertices)
@@ -382,7 +387,7 @@ class TSP_normalized_Generator(Base_Generator):
         solution = problem.solve(verbose=False)
         assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
 
-        B = distance_matrix_tensor_representation(W)
+        B = torch.zeros((self.n_vertices,2))
         
         SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
         prec = solution.tour[-1]
@@ -391,6 +396,9 @@ class TSP_normalized_Generator(Base_Generator):
             SOL[curr,prec] = 1
             SOL[prec,curr] = 1
             prec = curr
+
+            B[i,0] = xs[i]
+            B[i,1] = ys[i]
         
         self.positions.append((xs,ys))
         return (B, SOL)

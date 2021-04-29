@@ -38,6 +38,8 @@ def get_helper(problem):
         return TSP_RL_Experiment
     elif problem=='tspd':
         return TSP_Distance_Experiment
+    elif problem=='tsppos':
+        return TSP_Position_Experiment
     elif problem=='mcp':
         return MCP_Experiment
     elif problem=='mcptrue':
@@ -226,6 +228,16 @@ class TSP_Distance_Experiment(Experiment_Helper):
         
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('tsp', name, options=options, run=run)
+
+class TSP_Position_Experiment(Experiment_Helper):
+    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
+        self.generator = dg.TSP_normpos_Generator
+        self.criterion = losses.tsp_loss(loss=loss, normalize=normalize)
+        self.eval_function = lambda raw_scores,target: metrics.compute_f1(raw_scores, target, k_best=2)
+        
+        self.metric = 'f1' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+        super().__init__('tsp', name, options=options, run=run)
+
 
 class MCP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
