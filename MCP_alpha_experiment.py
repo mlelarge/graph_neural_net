@@ -50,7 +50,7 @@ def custom_mcp_eval(loader,model,device):
 
 if __name__=='__main__':
     gen_args = {
-        'num_examples_train': 20001,
+        'num_examples_train': 20000,
         'num_examples_val': 1000,
         'num_examples_test': 100,
         'n_vertices': 50,
@@ -168,11 +168,11 @@ if __name__=='__main__':
             if counter>=n_lines:
                 gen_args['clique_size'] = cs2
                 gen_args['edge_density']= p2
-                val_gen=MCP_Generator('val',gen_args)
-                val_gen.load_dataset()
-                val_loader = siamese_loader(val_gen,batch_size,True,shuffle=True)
+                test_gen=MCP_Generator('test',gen_args)
+                test_gen.load_dataset()
+                test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
 
-                l_errors,l_acc = custom_mcp_eval(val_loader,model,device)
+                l_errors,l_acc = custom_mcp_eval(test_loader,model,device)
 
                 mean_error = np.mean(l_errors)
                 mean_acc = np.mean(l_acc)
