@@ -27,8 +27,7 @@ def create_config():
         config = yaml.load(f,Loader=yaml.FullLoader)
     del f
     pbm = config['problem']
-    if pbm=='tsprl' or pbm=='tspd':
-        pbm = 'tsp'
+    pbm = utils.reduce_name(pbm)
     pbm_key='_'+pbm
     config = utils.clean_config(config,pbm_key)
     ex.add_config(config)
@@ -41,8 +40,7 @@ def set_experiment_name(config, command_name, logger):
 @ex.config_hook
 def update_paths(config, command_name, logger):
     pbm = config['problem']
-    if pbm=='tsprl' or pbm=='tspd':
-        pbm = 'tsp'
+    pbm = utils.reduce_name(pbm)
 
     pbm_key = "_"+pbm
     l_params =[value for _,value in (config['data']['train'][pbm_key]).items()]
@@ -63,8 +61,7 @@ def create_data_dict(config, command_name, logger):
     Creates the parameter dictionaries for the data generation
     """
     problem = config['problem']
-    if problem=='tsprl' or problem=='tspd':
-        problem = 'tsp'
+    problem = utils.reduce_name(problem)
     problem_key = "_" + problem
     train_config = config['data']['train']
     test_config = config['data']['test']
@@ -254,8 +251,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
 
 @ex.capture
 def create_key(problem, test_data_dict, _config):
-    if problem=='tsprl' or problem=='tspd':
-        problem='tsp'
+    problem = utils.reduce_name(problem)
     relevant_keys = _config['data']['test'][f'_{problem}'].keys()
     relevant_params = '_'.join( [ str(test_data_dict[key]) for key in relevant_keys ] )
 

@@ -118,6 +118,11 @@ def mcp_ind_to_adj(ind,n)->torch.Tensor:
 
 #TSP
 
+def reduce_name(pbmkey):
+    if pbmkey[:3]=='tsp':
+        pbmkey='tsp'
+    return pbmkey
+
 def tsp_get_min_dist(dist_matrix):
     """
     Takes a distance matrix dist_matrix of shape (n,n) or (bs,n,n)
