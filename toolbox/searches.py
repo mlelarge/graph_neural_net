@@ -132,7 +132,7 @@ def mcp_beam_method(data, raw_scores, seeds=None, add_singles=True, beam_size=12
         for cur_step in range(len(node_order)):
             cur_node = node_order[cur_step]
             for clique in cliques: #Iterate over the currently saved cliques to make them grow
-                t_clique = torch.tensor(clique)
+                t_clique = clique.clone().detach()
                 neighs = cur_adj[cur_node][t_clique]
                 if torch.all(neighs==1): #If all clique nodes are adjacent to cur_node
                     new_clique = torch.cat((clique,torch.tensor([cur_node],dtype=torch.long)))

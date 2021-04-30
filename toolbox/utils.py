@@ -62,6 +62,12 @@ def get_device(t):
 
 #MCP
 
+def get_cs(t):
+    """ 
+    Returns the clique size of target tensor t
+    """
+    return torch.sum(torch.sign(torch.sum(t,dim=-1))).to(int).item()
+
 def permute_adjacency_twin(t1,t2) -> Tuple[torch.Tensor,torch.Tensor]:
     """
     Makes a permutation of two adjacency matrices together. Equivalent to a renaming of the nodes.
