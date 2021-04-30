@@ -47,7 +47,7 @@ def custom_mcp_eval(loader,model,device):
             l_errors.append(len(inf))
             l_acc.append(len((inf.intersection(sol)))/len(sol))
         
-        fpr, tpr, thresholds = skmetrics.roc_curve(target.reshape(bs*n*n).detach().numpy(), proba.reshape(bs*n*n).detach().numpy())
+        fpr, tpr, thresholds = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), proba.cpu().detach().reshape(bs*n*n).numpy())
         l_auc.append(skmetrics.auc(fpr,tpr))
 
     return l_errors,l_acc,l_auc
