@@ -69,7 +69,7 @@ def custom_mcp_bl_eval(loader):
             l_acc.append(len((inf.intersection(sol)))/len(sol))
         
 
-    return l_bl_cs,l_acc,l_auc
+    return l_bl_cs,l_acc
 
 if __name__=='__main__':
     gen_args = {
@@ -224,8 +224,8 @@ if __name__=='__main__':
             test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
     
             l_bl_cs,l_bl_acc = custom_mcp_bl_eval(test_loader)
-            mean_cs_bl = np.mean(l_cs_found)
-            mean_acc = np.mean(l_acc)
+            mean_cs_bl = np.mean(l_bl_cs)
+            mean_acc = np.mean(l_bl_acc)
             line = get_line_bl(cs1,mean_cs_bl,mean_acc)
             add_line(baseline_filename,line)
 
