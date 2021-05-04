@@ -184,8 +184,9 @@ def generates_HHC(name):
 def generate_gauss_hhc(n,lam,mu):
     """ Using gaussian distribution for the HHC. The information limit is $\mu^2 \ge 4log(n)$ for lambda=0"""
     W_weights = nprandom.normal(loc=mu,scale=1,size=(n,n)) #Outside of the cycle
+    diag = nprandom.normal(loc=lam,scale=1,size=n) #HHC cycle distribution 
     for i in range(n):
-        W_weights[i,i] = nprandom.normal(loc=lam,scale=1,size=1).item() #HHC cycle distribution 
+        W_weights[i,i] = diag[i]
     return W_weights
 
 @generates_HHC('Poisson')
@@ -650,9 +651,11 @@ class HHC_Generator(Base_Generator):
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
         W = torch.tensor(W,dtype=torch.float)
-        B = weight_matrix_to_tensor_representation(W)
 
         SOL = torch.eye(self.n_vertices)
+        W,SOL = utils.permute_adjacency_twin(W,SOL)
+        
+        B = weight_matrix_to_tensor_representation(W)
         return (B,SOL)
 
 class MCP_Generator(Base_Generator):
@@ -805,8 +808,8 @@ class SBM_Generator(Base_Generator):
 if __name__=="__main__":
     #data_args = {"edge_density_a":0.3,"edge_density_b":0.2, "num_examples_train":5,"path_dataset":"dataset_sbm","n_vertices":10}
     #data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
-    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":13, 'distance_used':'EUC_2D','generative_model':'Square01'}
-    
-    g = TSP_Distance_Generator("train",data_args)
+    #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":13, 'distance_used':'EUC_2D','generative_model':'Square01'}
+    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'Gauss','cycle_param':0,'fill_param':0}
+    g = HHC_Generator("train",data_args)
     timeit.timeit(g.load_dataset,number=1)
 
