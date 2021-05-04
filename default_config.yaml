@@ -2,7 +2,7 @@
 name: Fusion
 cpu: No
 root_dir: .
-problem: "tsp" #qap, tsp, tsprl, mcp, sbm
+problem: 'hhc' #qap, tsp, hhc, tsprl, mcp, sbm
 test_enabled: Yes
 
 data:
@@ -18,18 +18,20 @@ data:
             vertex_proba: 1. # Parameter of the binomial distribution of vertices
             noise: 0.05
             path_dataset: dataset_qap # Path where datasets are stored
-
         _tsp:
             generative_model: Square01
             distance_used: EUC_2D
             path_dataset: dataset_tsp #TSP #dataset_tsp # Path where datasets are stored
-
+        _hhc:
+            generative_model: Gauss
+            cycle_param: 0
+            fill_param: 5 #Should be largely enough for up to 200 vertices with cycle_param=0
+            path_dataset: dataset_hhc
         _mcp:
             edge_density: 0.831763771102671 #0.3981071705534973 #0.1
             clique_size: 4
             planted: No
             path_dataset: dataset_mcp # Path where datasets are stored
-        
         _sbm:
             p_inter : 0.9
             p_outer : 0.1
@@ -47,16 +49,17 @@ data:
             edge_density: 0.2
             vertex_proba: 1. # Parameter of the binomial distribution of vertices
             noise: 0.05
-
         _tsp:
             generative_model: Square01
             distance_used: EUC_2D
-
+        _hhc:
+            generative_model: Gauss
+            cycle_param: 0
+            fill_param: 5
         _mcp:
             edge_density: 0.831763771102671 #0.39810717055349726 #0.1
             clique_size: 4
             planted: No
-        
         _sbm:
             p_inter : 0.9
             p_outer : 0.1
@@ -65,7 +68,7 @@ data:
 
 train: # Training parameters
     epoch: 50
-    batch_size: 1
+    batch_size: 16
     lr: !!float 1e-4
     scheduler_step: 1
     scheduler_decay: 0.5
@@ -79,7 +82,7 @@ arch: # Architecture and model
     embedding: edge #node or edge
     num_blocks: 5
     original_features_num: 2
-    in_features: 128
+    in_features: 64
     out_features: 1
     depth_of_mlp: 3
 

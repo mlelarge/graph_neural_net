@@ -9,3 +9,5 @@ psutil
 Cython
 sklearn
 tqdm
+seaborn
+pandas

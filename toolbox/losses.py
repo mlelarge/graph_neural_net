@@ -81,6 +81,19 @@ class tsp_rl_loss(nn.Module):
         loss = torch.sum(torch.sum(proba*distance_matrix, dim=-1), dim=-1) #In need of normalization of the loss
         return torch.mean(loss)
 
+class hhc_loss(nn.Module):
+    def __init__(self, loss=nn.BCELoss(reduction='none'), normalize=nn.Sigmoid()):
+        super(hhc_loss, self).__init__()
+        self.loss = loss
+        self.normalize = normalize
+    
+    def forward(self, raw_scores, target):
+        """
+        outputs is the output of siamese network (bs,n_vertices,n_vertices)
+        """
+        preds = self.normalize(raw_scores)
+        loss = self.loss(preds,target)
+        return torch.mean(loss)
 
 class mcp_loss(nn.Module):
     def __init__(self, loss=nn.BCELoss(reduction='mean'), normalize=nn.Sigmoid()):

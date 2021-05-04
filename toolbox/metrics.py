@@ -254,6 +254,22 @@ def tspd_dumb(raw_scores, target):
         true_pos+=positives
     return true_pos,bs*n
 
+#HHC
+def accuracy_hhc(raw_scores, target):
+    """ Computes simple accuracy by choosing the most probable edge
+    For HHC:    - raw_scores and target of shape (bs,n,n)
+                - target should be identity
+     """
+    bs,n,_ = raw_scores.shape
+    device = get_device(raw_scores)
+    _, ind = torch.topk(raw_scores, 1, dim = 2) #Here chooses the best choice
+    y_onehot = torch.zeros_like(raw_scores).to(device)
+    y_onehot.scatter_(2, ind, 1)
+    accu = target*y_onehot #Places 1 where the values are the same
+    true_pos = torch.count_nonzero(accu)
+    n_total = bs * n #Perfect would be that we have the right permutation for every bs 
+    return true_pos,n_total
+    
 
 #SBM
 def accuracy_sbm_two_categories(raw_scores,target):

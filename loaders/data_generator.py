@@ -11,6 +11,7 @@ from toolbox.searches import mcp_beam_method
 import timeit
 from sklearn.decomposition import PCA
 from numpy import pi,angle,cos,sin
+import numpy.random as nprandom
 import tqdm
 
 try:
@@ -20,6 +21,7 @@ except ModuleNotFoundError:
 
 GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
+GENERATOR_FUNCTIONS_HHC = {}
 
 def generates(name):
     """ Register a generator function for a graph distribution """
@@ -168,6 +170,36 @@ def normalize_tsp(xs,ys):
     x_rot = [ x*cos(rot_angle) - y*sin(rot_angle) for x,y in X ]
     y_rot = [ x*sin(rot_angle) + y*cos(rot_angle) for x,y in X ]
     return x_rot,y_rot
+
+#HHC Generation functions
+
+def generates_HHC(name):
+    """Registers a generator function for HHC problem """
+    def decorator(func):
+        GENERATOR_FUNCTIONS_HHC[name] = func
+        return func
+    return decorator
+
+@generates_HHC('Gauss')
+def generate_gauss_hhc(n,lam,mu):
+    """ Using gaussian distribution for the HHC. The information limit is $\mu^2 \ge 4log(n)$ for lambda=0"""
+    W_weights = nprandom.normal(loc=mu,scale=1,size=(n,n)) #Outside of the cycle
+    for i in range(n):
+        W_weights[i,i] = nprandom.normal(loc=lam,scale=1,size=1).item() #HHC cycle distribution 
+    return W_weights
+
+@generates_HHC('Poisson')
+def generate_poisson_hhc(n,lam,mu):
+    raise NotImplementedError
+
+def weight_matrix_to_tensor_representation(W):
+    """ Create a tensor B[:,:,1] = W and B[i,i,0] = deg(i)"""
+    degrees = W.sum(1)
+    B = torch.zeros((len(W), len(W), 2), dtype=torch.float)
+    B[:, :, 1] = W
+    indices = torch.arange(len(W))
+    B[indices, indices, 0] = degrees
+    return B
 
 class Base_Generator(torch.utils.data.Dataset):
     def __init__(self, name, path_dataset, num_examples):
@@ -565,6 +597,63 @@ class TSP_Distance_Generator(Base_Generator):
         
         self.positions.append((xs,ys))
         return (B, SOL)
+
+class HHC_Generator(Base_Generator):
+    """
+    Hidden Hamilton Cycle Generator
+    See article : https://arxiv.org/abs/1804.05436
+    """
+    def __init__(self, name, args, coeff=1e8):
+        self.generative_model = args['generative_model']
+        self.cycle_param = args['cycle_param']
+        self.fill_param  = args['fill_param']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'HHC_{}_{}_{}_{}_{}'.format(self.generative_model, 
+                                                     self.cycle_param,
+                                                     self.fill_param,
+                                                     num_examples,
+                                                     self.n_vertices)
+        path_dataset = os.path.join(args['path_dataset'],subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        
+        
+        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
+        self.constant_n_vertices = True
+        self.coeff = coeff
+        self.positions = []
+    
+    def load_dataset(self):
+        """
+        Look for required dataset in files and create it if
+        it does not exist
+        """
+        filename = self.name + '.pkl'
+        path = os.path.join(self.path_dataset, filename)
+        if os.path.exists(path):
+            print('Reading dataset at {}'.format(path))
+            data,pos = torch.load(path)
+            self.data = list(data)
+            self.positions = list(pos)
+        else:
+            print('Creating dataset.')
+            self.data = []
+            self.create_dataset()
+            print('Saving dataset at {}'.format(path))
+            torch.save((self.data,self.positions), path)
+
+    def compute_example(self):
+        try:
+            W = GENERATOR_FUNCTIONS_HHC[self.generative_model](self.n_vertices,self.cycle_param,self.fill_param)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        W = torch.tensor(W,dtype=torch.float)
+        B = weight_matrix_to_tensor_representation(W)
+
+        SOL = torch.eye(self.n_vertices)
+        return (B,SOL)
 
 class MCP_Generator(Base_Generator):
     """
