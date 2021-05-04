@@ -11,13 +11,15 @@ from toolbox.searches import mcp_beam_method
 import timeit
 from sklearn.decomposition import PCA
 from numpy import pi,angle,cos,sin
-import numpy.random as nprandom
+from numpy.random import default_rng
 import tqdm
 
 try:
     from concorde.tsp import TSPSolver
 except ModuleNotFoundError:
     print("Trying to continue without pyconcorde as it is not installed. TSP data generation will fail.")
+
+rng = default_rng(41)
 
 GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
@@ -183,10 +185,10 @@ def generates_HHC(name):
 @generates_HHC('Gauss')
 def generate_gauss_hhc(n,lam,mu):
     """ Using gaussian distribution for the HHC. The information limit is $\mu^2 \ge 4log(n)$ for lambda=0"""
-    W_weights = nprandom.normal(loc=mu,scale=1,size=(n,n)) #Outside of the cycle
-    diag = nprandom.normal(loc=lam,scale=1,size=n) #HHC cycle distribution 
+    W_weights = rng.normal(loc=mu,scale=1,size=(n,n)) #Outside of the cycle
+    diag = rng.normal(loc=lam,scale=1,size=n) #HHC cycle distribution 
     for i in range(n):
-        W_weights[i,i] = diag[i]
+        W_weights[i,(i+1)%n] = diag[i]
     return W_weights
 
 @generates_HHC('Poisson')
@@ -623,7 +625,6 @@ class HHC_Generator(Base_Generator):
         utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
         self.constant_n_vertices = True
         self.coeff = coeff
-        self.positions = []
     
     def load_dataset(self):
         """
@@ -634,15 +635,14 @@ class HHC_Generator(Base_Generator):
         path = os.path.join(self.path_dataset, filename)
         if os.path.exists(path):
             print('Reading dataset at {}'.format(path))
-            data,pos = torch.load(path)
+            data = torch.load(path)
             self.data = list(data)
-            self.positions = list(pos)
         else:
             print('Creating dataset.')
             self.data = []
             self.create_dataset()
             print('Saving dataset at {}'.format(path))
-            torch.save((self.data,self.positions), path)
+            torch.save(self.data, path)
 
     def compute_example(self):
         try:
@@ -650,10 +650,10 @@ class HHC_Generator(Base_Generator):
         except KeyError:
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
+        
         W = torch.tensor(W,dtype=torch.float)
-
-        SOL = torch.eye(self.n_vertices)
-        W,SOL = utils.permute_adjacency_twin(W,SOL)
+        SOL = torch.eye(self.n_vertices).roll(1,dims=-1)
+        #W,SOL = utils.permute_adjacency_twin(W,SOL)
         
         B = weight_matrix_to_tensor_representation(W)
         return (B,SOL)

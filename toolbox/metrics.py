@@ -258,7 +258,7 @@ def tspd_dumb(raw_scores, target):
 def accuracy_hhc(raw_scores, target):
     """ Computes simple accuracy by choosing the most probable edge
     For HHC:    - raw_scores and target of shape (bs,n,n)
-                - target should be identity
+                - target should be ones over the diagonal
      """
     bs,n,_ = raw_scores.shape
     device = get_device(raw_scores)
