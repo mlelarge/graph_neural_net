@@ -266,7 +266,7 @@ def accuracy_hhc(raw_scores, target):
     y_onehot = torch.zeros_like(raw_scores).to(device)
     y_onehot.scatter_(2, ind, 1)
     accu = target*y_onehot #Places 1 where the values are the same
-    true_pos = torch.count_nonzero(accu)
+    true_pos = torch.count_nonzero(accu).item()
     n_total = bs * n #Perfect would be that we have the right permutation for every bs 
     return true_pos,n_total
     
