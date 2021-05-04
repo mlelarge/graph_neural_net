@@ -189,6 +189,8 @@ def generate_gauss_hhc(n,lam,mu):
     diag = rng.normal(loc=lam,scale=1,size=n) #HHC cycle distribution 
     for i in range(n):
         W_weights[i,(i+1)%n] = diag[i]
+    W_weights/=W_weights.std()
+    W_weights-=W_weights.mean()
     return W_weights
 
 @generates_HHC('Poisson')
@@ -606,7 +608,7 @@ class HHC_Generator(Base_Generator):
     Hidden Hamilton Cycle Generator
     See article : https://arxiv.org/abs/1804.05436
     """
-    def __init__(self, name, args, coeff=1e8):
+    def __init__(self, name, args):
         self.generative_model = args['generative_model']
         self.cycle_param = args['cycle_param']
         self.fill_param  = args['fill_param']
@@ -624,7 +626,6 @@ class HHC_Generator(Base_Generator):
         
         utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
         self.constant_n_vertices = True
-        self.coeff = coeff
     
     def load_dataset(self):
         """
