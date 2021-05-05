@@ -9,7 +9,7 @@ from commander import get_model,init_helper
 from toolbox.optimizer import get_optimizer
 from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
-from toolbox.metrics import accuracy_hhc
+from toolbox.metrics import accuracy_hhc,perf_hhc
 
 def add_line(filename,line) -> None:
     with open(filename,'a') as f:
@@ -20,13 +20,16 @@ def custom_hhc_eval(loader,model,device):
     model.eval()
 
     l_acc = []
+    l_perf= []
     for data,target in tqdm.tqdm(loader,desc='Inner Loop : testing HHCs'):
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
         true_pos,n_total = accuracy_hhc(raw_scores,target)
+        hhc_rec,total_hhcs = perf_hhc(raw_scores,target)
         l_acc.append((true_pos/n_total))
-    return np.mean(l_acc)
+        l_perf.append((hhc_rec/total_hhcs))
+    return np.mean(l_acc),np.mean(l_perf)
 
 
 if __name__=='__main__':
@@ -85,7 +88,7 @@ if __name__=='__main__':
     n_lines=0
     if not os.path.isfile(filename):
         with open(filename,'w') as f:
-            f.write('fill_param_train,acc\n')
+            f.write('fill_param_train,acc,perf_hhc\n')
     else:
         with open(filename,'r') as f:
             data = f.readlines()
@@ -132,9 +135,9 @@ if __name__=='__main__':
                     print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
                     break
             
-            acc = custom_hhc_eval(test_loader,model,device)
+            acc,perf_hhc = custom_hhc_eval(test_loader,model,device)
 
-            add_line(filename,f'{fill_param},{acc}')
+            add_line(filename,f'{fill_param},{acc},{perf_hhc}')
 
         counter+=1
 

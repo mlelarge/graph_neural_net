@@ -269,6 +269,22 @@ def accuracy_hhc(raw_scores, target):
     true_pos = torch.count_nonzero(accu).item()
     n_total = bs * n #Perfect would be that we have the right permutation for every bs 
     return true_pos,n_total
+
+def perf_hhc(raw_scores, target):
+    """ Computes the probability of getting the full HHC right
+     """
+    bs,n,_ = raw_scores.shape
+    device = get_device(raw_scores)
+    _, ind = torch.topk(raw_scores, 1, dim = 2) #Here chooses the best choice
+    y_onehot = torch.zeros_like(raw_scores).to(device)
+    y_onehot.scatter_(2, ind, 1)
+    accu = target*y_onehot #Places 1 where the values are the same
+    true_pos = 0 #Will count the number of times we recovered the HHC
+    for acc in accu:
+        if torch.count_nonzero(acc).item()==n:
+            true_pos+=1
+    return true_pos,bs
+
     
 
 #SBM
