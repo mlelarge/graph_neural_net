@@ -32,18 +32,18 @@ def get_line(cs1,cs2,cs_found,accuracy,auc)->str:
 def get_line_bl(cs1,cs_found,accuracy)->str:
     return f'{cs1},{cs_found},{accuracy}'
 
-def check_model_exists(model_path,cs)->bool:
-    model_filename = os.path.join(model_path,f'model-cs_{cs}.tar')
+def check_model_exists(model_path,n_vertices,cs)->bool:
+    model_filename = os.path.join(model_path,f'model-n_{n_vertices}-cs_{cs}.tar')
     return os.path.isfile(model_filename)
 
-def save_model(model_path,model,cs)->None:
+def save_model(model_path,model,n_vertices,cs)->None:
     utils.check_dir(model_path)
-    model_filename = os.path.join(model_path,f'model-cs_{cs}.tar')
+    model_filename = os.path.join(model_path,f'model-n_{n_vertices}-cs_{cs}.tar')
     torch.save(model.state_dict(), model_filename)
 
-def load_model_dict(model_path,cs):
+def load_model_dict(model_path,n_vertices,cs):
     utils.check_dir(model_path)
-    model_filename = os.path.join(model_path,f'model-cs_{cs}.tar')
+    model_filename = os.path.join(model_path,f'model-n_{n_vertices}-cs_{cs}.tar')
     state_dict = torch.load(model_filename)
     return state_dict
 
@@ -141,7 +141,7 @@ if __name__=='__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Using device:', device)
 
-    filename='mcp_ps_results.txt'
+    filename=f'mcp_ps_results-{n_vertices}.txt'
     filepath = os.path.join(path,filename)
     n_lines=0
     if not os.path.isfile(filepath):
@@ -154,7 +154,7 @@ if __name__=='__main__':
             print(f'File has {n_lines} computations')
 
     bl_n_lines = 0
-    baseline_filename='mcp_ps_baseline.txt'
+    baseline_filename=f'mcp_ps_baseline-{n_vertices}.txt'
     bl_path = os.path.join(path,baseline_filename)
     if not os.path.isfile(bl_path):
         with open(bl_path,'w') as f:
@@ -176,9 +176,10 @@ if __name__=='__main__':
             pbcs.set_description(f'Using training clique_size {cs1}')
 
             
-            if check_model_exists(model_path,cs1): #If model already exists
+            if check_model_exists(model_path,n_vertices,cs1): #If model already exists
+                print(f'Using already trained model for cs1={cs1}')
                 model = get_model(model_args)
-                state_dict = load_model_dict(model_path,cs1)
+                state_dict = load_model_dict(model_path,n_vertices,cs1)
                 model.load_state_dict(state_dict)
                 model.to(device)
             else: #If model doesn't exist, we need to train
@@ -224,7 +225,7 @@ if __name__=='__main__':
                         print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
                         break
                 
-                save_model(model_path,model,cs1)
+                save_model(model_path,model,n_vertices,cs1)
             
             pb2 = tqdm.tqdm(l_cs)
             for cs2 in pb2:
