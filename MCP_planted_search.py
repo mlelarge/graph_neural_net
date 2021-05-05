@@ -1,11 +1,12 @@
 from loaders.data_generator import MCP_Generator
-from toolbox.searches import mcp_beam_method, mcp_proba_cheat
+from toolbox.searches import mcp_beam_method
 from numpy import log
 import toolbox.utils as utils
 import tqdm
 import os
 import torch
 import numpy as np
+import pandas as pd
 
 from commander import get_model,init_helper
 from toolbox.optimizer import get_optimizer
@@ -18,18 +19,33 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_style("white")
 
-def approx_clique_size(n,p):
+def approx_clique_size(n,p)->float:
     return 2*log(n)/log(1/p)
 
 def add_line(filename,line) -> None:
     with open(filename,'a') as f:
         f.write(line + '\n')
 
-def get_line(cs1,cs2,cs_found,accuracy,auc):
+def get_line(cs1,cs2,cs_found,accuracy,auc)->str:
     return f'{cs1},{cs2},{cs_found},{accuracy},{auc}'
 
-def get_line_bl(cs1,cs_found,accuracy):
+def get_line_bl(cs1,cs_found,accuracy)->str:
     return f'{cs1},{cs_found},{accuracy}'
+
+def check_model_exists(model_path,cs)->bool:
+    model_filename = os.path.join(model_path,f'model-cs_{cs}.tar')
+    return os.path.isfile(model_filename)
+
+def save_model(model_path,model,cs)->None:
+    utils.check_dir(model_path)
+    model_filename = os.path.join(model_path,f'model-cs_{cs}.tar')
+    torch.save(model.state_dict(), model_filename)
+
+def load_model_dict(model_path,cs):
+    utils.check_dir(model_path)
+    model_filename = os.path.join(model_path,f'model-cs_{cs}.tar')
+    state_dict = torch.load(model_filename)
+    return state_dict
 
 def custom_mcp_eval(loader,model,device):
 
@@ -109,6 +125,10 @@ if __name__=='__main__':
         } 
     }
 
+    path = 'mcp_ps/'
+    model_path = os.path.join(path,'models/')
+    utils.check_dir(model_path)
+
     tot_epoch=helper_args['train']['epoch']
     batch_size = helper_args['train']['batch_size']
     n_vertices=gen_args['n_vertices']
@@ -121,24 +141,26 @@ if __name__=='__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Using device:', device)
 
-    filename='mcp_pc_results.txt'
+    filename='mcp_ps_results.txt'
+    filepath = os.path.join(path,filename)
     n_lines=0
-    if not os.path.isfile(filename):
-        with open(filename,'w') as f:
-            f.write('cs_train,cs_test,inf_cs,bl_cs,acc,auc\n')
+    if not os.path.isfile(filepath):
+        with open(filepath,'w') as f:
+            f.write('cs_train,cs_test,cs_inf,cs_bl,acc,auc\n')
     else:
-        with open(filename,'r') as f:
+        with open(filepath,'r') as f:
             data = f.readlines()
             n_lines = len(data)-1
             print(f'File has {n_lines} computations')
 
     bl_n_lines = 0
     baseline_filename='mcp_ps_baseline.txt'
-    if not os.path.isfile(baseline_filename):
-        with open(baseline_filename,'w') as f:
-            f.write('cs,cs_inferred,acc\n')
+    bl_path = os.path.join(path,baseline_filename)
+    if not os.path.isfile(bl_path):
+        with open(bl_path,'w') as f:
+            f.write('cs_test,cs_inf,acc\n')
     else:
-        with open(baseline_filename,'r') as f:
+        with open(bl_path,'r') as f:
             data = f.readlines()
             bl_n_lines = len(data)-1
             print(f'Baseline file has {bl_n_lines} computations')
@@ -153,47 +175,56 @@ if __name__=='__main__':
         else:
             pbcs.set_description(f'Using training clique_size {cs1}')
 
-            gen_args['clique_size'] = cs1
-            train_gen=MCP_Generator('train',gen_args)
-            train_gen.load_dataset()
             
-            l_real_cs = [utils.get_cs(t) for _,t in train_gen.data]
-            
-            kwargs = {'alpha':.6,'fc':'dodgerblue','ec':'navy'}
-            plt.figure()
-            plt.hist(l_real_cs,bins=range(cs_start,cs_stop+1),density=True,align='left',**kwargs)
-            plt.title(f"Density of real clique size for planting size {cs1}")
-            plt.xlabel("Clique Size")
-            plt.tight_layout()
-            plt.xticks(l_cs)
-            plt.xlim(l_cs[0]-1,l_cs[-1]+1)
-            plt.show()
-            plt.savefig(f'figures/mcp_ps/displot-cs_{cs1}')
-
-            train_loader = siamese_loader(train_gen,batch_size,True,shuffle=True)
-
-            val_gen=MCP_Generator('val',gen_args)
-            val_gen.load_dataset()
-            val_loader = siamese_loader(val_gen, batch_size,True,shuffle=True)
-            
-            helper = init_helper(pbm,'train',helper_args)
-
-            model = get_model(model_args)
-            model.to(device)
-
-            optimizer, scheduler = get_optimizer(opt_args,model)
-
-            for epoch in range(tot_epoch):
-                train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+            if check_model_exists(model_path,cs1): #If model already exists
+                model = get_model(model_args)
+                state_dict = load_model_dict(model_path,cs1)
+                model.load_state_dict(state_dict)
+                model.to(device)
+            else: #If model doesn't exist, we need to train
+                gen_args['clique_size'] = cs1
+                train_gen=MCP_Generator('train',gen_args)
+                train_gen.load_dataset()
                 
-                _, loss = val_triplet(val_loader,model,helper,device,epoch,eval_score=True)
+                l_real_cs = [utils.get_cs(t) for _,t in train_gen.data]
+                
+                kwargs = {'alpha':.6,'fc':'dodgerblue','ec':'navy'}
+                plt.figure()
+                plt.hist(l_real_cs,bins=range(cs_start,cs_stop+1),density=True,align='left',**kwargs)
+                plt.title(f"Density of real clique size for planting size {cs1}")
+                plt.xlabel("Clique Size")
+                plt.tight_layout()
+                plt.xticks(l_cs)
+                plt.xlim(l_cs[0]-1,l_cs[-1]+1)
+                plt.show()
+                plt.savefig(f'figures/mcp_ps/displot-cs_{cs1}')
 
-                scheduler.step(loss)
+                train_loader = siamese_loader(train_gen,batch_size,True,shuffle=True)
 
-                cur_lr = utils.get_lr(optimizer)
-                if helper.stop_condition(cur_lr):
-                    print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
-                    break
+                val_gen=MCP_Generator('val',gen_args)
+                val_gen.load_dataset()
+                val_loader = siamese_loader(val_gen, batch_size,True,shuffle=True)
+                
+                helper = init_helper(pbm,'train',helper_args)
+
+                model = get_model(model_args)
+                model.to(device)
+
+                optimizer, scheduler = get_optimizer(opt_args,model)
+
+                for epoch in range(tot_epoch):
+                    train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+                    
+                    _, loss = val_triplet(val_loader,model,helper,device,epoch,eval_score=True)
+
+                    scheduler.step(loss)
+
+                    cur_lr = utils.get_lr(optimizer)
+                    if helper.stop_condition(cur_lr):
+                        print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+                        break
+                
+                save_model(model_path,model,cs1)
             
             pb2 = tqdm.tqdm(l_cs)
             for cs2 in pb2:
@@ -230,6 +261,43 @@ if __name__=='__main__':
             add_line(baseline_filename,line)
 
         counter+=1
-        
-        
+    
+    model_data = pd.read_csv(filepath,delimiter=',')
+    bl_data = pd.read_csv(bl_path,delimiter=',')
+
+    model_data['bl_perf']=0
+    for row_n,row in bl_data.iterrows():
+        cs_test = row['cs_test']
+        cs_inf = row['cs_inf']
+        model_data.loc[model_data['cs_test']==cs_test, 'bl_perf'] = cs_inf
+    
+    imax = model_data['cs_train'].max()
+    imin = model_data['cs_test'].min()
+    heatmap_size = imax-imin+1
+    model_data['i'] = imax-model_data['cs_train']
+    model_data['j'] = model_data['cs_test']-imin
+
+    heatmap = np.zeros((heatmap_size,heatmap_size))
+    for _,row in model_data.iterrows():
+        i,j = int(row['i']),int(row['j'])
+        heatmap[i,j] = row['auc']#row['cs_inf']-row['bl_perf']
+
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(heatmap)
+    fig.colorbar(im,ax=ax)
+    ax.set_xticks(range(heatmap_size))
+    ax.set_xticklabels(range(imin,imax+1))
+    ax.set_yticks(range(heatmap_size))
+    ax.set_yticklabels(range(imin,imax+1)[::-1])
+    ax.set_xlabel("Testing clique size")
+    ax.set_ylabel('Training clique size')
+    for i in range(heatmap_size):
+        for j in range(heatmap_size):
+            text = ax.text(j, i, round(heatmap[i, j],2),
+                        ha="center", va="center", color="b")
+    fig.tight_layout()
+    plt.show()
+    plt.savefig('mcp_planted.png',format='PNG')
+    
 

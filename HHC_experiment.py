@@ -79,7 +79,7 @@ if __name__=='__main__':
     end_param = 5
     steps = 20
 
-    fill_param_list = np.linspace(0,5,steps)
+    fill_param_list = np.sqrt(np.linspace(0,5**2,steps))
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Using device:', device)
@@ -135,9 +135,9 @@ if __name__=='__main__':
                     print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
                     break
             
-            acc,perf_hhc = custom_hhc_eval(test_loader,model,device)
+            acc,hhc_proba = custom_hhc_eval(test_loader,model,device)
 
-            add_line(filename,f'{fill_param},{acc},{perf_hhc}')
+            add_line(filename,f'{fill_param},{acc},{hhc_proba}')
 
         counter+=1
 
