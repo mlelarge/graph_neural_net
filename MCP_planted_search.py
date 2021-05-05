@@ -245,7 +245,7 @@ if __name__=='__main__':
                 mean_acc = np.mean(l_acc)
                 mean_auc = np.mean(l_auc)
                 line = get_line(cs1,cs2,mean_cs_found,mean_acc,mean_auc)
-                add_line(filename,line)
+                add_line(filepath,line)
         if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
             print(f'\nSkipping baseline for {cs1}')
         else:
@@ -258,7 +258,7 @@ if __name__=='__main__':
             mean_cs_bl = np.mean(l_bl_cs)
             mean_acc = np.mean(l_bl_acc)
             line = get_line_bl(cs1,mean_cs_bl,mean_acc)
-            add_line(baseline_filename,line)
+            add_line(bl_path,line)
 
         counter+=1
     
