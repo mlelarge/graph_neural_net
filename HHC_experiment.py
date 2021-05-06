@@ -126,6 +126,7 @@ if __name__=='__main__':
     pb = tqdm.tqdm(fill_param_list)
     for fill_param in pb:
         pb.set_description(desc=f'Using fill_param={fill_param}')
+        gen_args['fill_param'] = fill_param
 
         if counter<n_lines:
             print(f'Skipping fill_param={fill_param}')
@@ -137,7 +138,6 @@ if __name__=='__main__':
                 model.load_state_dict(state_dict)
                 model.to(device)
             else:
-                gen_args['fill_param'] = fill_param
                 train_gen = HHC_Generator('train',gen_args)
                 train_gen.load_dataset()
                 train_loader = siamese_loader(train_gen,batch_size,True,True)
