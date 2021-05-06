@@ -26,11 +26,11 @@ def add_line(filename,line) -> None:
     with open(filename,'a') as f:
         f.write(line + '\n')
 
-def get_line(cs1,cs2,cs_found,accuracy,auc)->str:
-    return f'{cs1},{cs2},{cs_found},{accuracy},{auc}'
+def get_line(cs1,cs2,cs_found,cs_error,accuracy,auc)->str:
+    return f'{cs1},{cs2},{cs_found},{cs_error},{accuracy},{auc}'
 
-def get_line_bl(cs1,cs_found,accuracy)->str:
-    return f'{cs1},{cs_found},{accuracy}'
+def get_line_bl(cs1,cs_found,cs_error,accuracy)->str:
+    return f'{cs1},{cs_found},{cs_error},{accuracy}'
 
 def check_model_exists(model_path,n_vertices,cs)->bool:
     model_filename = os.path.join(model_path,f'model-n_{n_vertices}-cs_{cs}.tar')
@@ -52,6 +52,7 @@ def custom_mcp_eval(loader,model,device):
     model.eval()
 
     l_inf_cs = []
+    l_error = []
     l_acc = []
     l_auc = []
     for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving mcps'):
@@ -64,12 +65,13 @@ def custom_mcp_eval(loader,model,device):
         l_clique_sol = utils.mcp_adj_to_ind(target)
         for inf,sol in zip(l_clique_inf,l_clique_sol):
             l_inf_cs.append(len(inf))
+            l_error.append(len(inf)-len(sol))
             l_acc.append(len((inf.intersection(sol)))/len(sol))
         
         fpr, tpr, _ = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), proba.cpu().detach().reshape(bs*n*n).numpy())
         l_auc.append(skmetrics.auc(fpr,tpr))
 
-    return l_inf_cs,l_acc,l_auc
+    return l_inf_cs,l_error,l_acc,l_auc
 
 def custom_mcp_bl_eval(loader):
 
@@ -146,7 +148,8 @@ if __name__=='__main__':
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('cs_train,cs_test,cs_inf,acc,auc\n')
+            f.write('cs_train,cs_test,cs_inf,cs_error,acc,auc\n')
+        print(f'Creating file')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()
@@ -159,6 +162,7 @@ if __name__=='__main__':
     if not os.path.isfile(bl_path):
         with open(bl_path,'w') as f:
             f.write('cs_test,cs_inf,acc\n')
+        print(f'Creating baseline file')
     else:
         with open(bl_path,'r') as f:
             data = f.readlines()
@@ -232,24 +236,24 @@ if __name__=='__main__':
             for cs2 in pb2:
                 if counter<n_lines:
                     print(f'\nSkipping cs1={cs1}, cs2={cs2}')
-                    counter+=1
-                    continue
-                print(f'Testing for cs1={cs1}, cs1={cs2}')
-                
-                pb2.set_description(f'cs1={cs1}, cs2={cs2}')
-                
-                gen_args['clique_size'] = cs2
-                test_gen=MCP_Generator('test',gen_args)
-                test_gen.load_dataset()
-                test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
+                else:
+                    print(f'Testing for cs1={cs1}, cs1={cs2}')
+                    
+                    pb2.set_description(f'cs1={cs1}, cs2={cs2}')
+                    
+                    gen_args['clique_size'] = cs2
+                    test_gen=MCP_Generator('test',gen_args)
+                    test_gen.load_dataset()
+                    test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
 
-                l_cs_found,l_acc,l_auc = custom_mcp_eval(test_loader,model,device)
+                    l_cs_found,l_error,l_acc,l_auc = custom_mcp_eval(test_loader,model,device)
 
-                mean_cs_found = np.mean(l_cs_found)
-                mean_acc = np.mean(l_acc)
-                mean_auc = np.mean(l_auc)
-                line = get_line(cs1,cs2,mean_cs_found,mean_acc,mean_auc)
-                add_line(filepath,line)
+                    mean_cs_found = np.mean(l_cs_found)
+                    mean_error = np.mean(l_error)
+                    mean_acc = np.mean(l_acc)
+                    mean_auc = np.mean(l_auc)
+                    line = get_line(cs1,cs2,mean_cs_found,mean_error,mean_acc,mean_auc)
+                    add_line(filepath,line)
                 counter+=1
         if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
             print(f'\nSkipping baseline for {cs1}')
