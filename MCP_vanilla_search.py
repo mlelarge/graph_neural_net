@@ -1,4 +1,4 @@
-from loaders.data_generator import MCP_Generator
+from loaders.data_generator import MCP_Generator,MCP_True_Generator
 from toolbox.searches import mcp_beam_method
 from numpy import log
 import toolbox.utils as utils
@@ -47,29 +47,21 @@ def load_model_dict(model_path,n_vertices,cs,device):
     state_dict = torch.load(model_filename,map_location=device)
     return state_dict
 
-def custom_mcp_eval(loader,model,device):
+def custom_mcp_vanilla_eval(loader,model,device):
 
     model.eval()
 
     l_inf_cs = []
-    l_acc = []
-    l_auc = []
-    for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving mcps'):
+    for data,target in tqdm.tqdm(loader,desc='Inner loop : solving mcps'):
         bs,n,_ = target.shape
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
-        proba = torch.sigmoid(raw_scores)
         l_clique_inf = mcp_beam_method(data.squeeze(),raw_scores,beam_size=500)
-        l_clique_sol = utils.mcp_adj_to_ind(target)
-        for inf,sol in zip(l_clique_inf,l_clique_sol):
+        for inf in l_clique_inf:
             l_inf_cs.append(len(inf))
-            l_acc.append(len((inf.intersection(sol)))/len(sol))
-        
-        fpr, tpr, _ = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), proba.cpu().detach().reshape(bs*n*n).numpy())
-        l_auc.append(skmetrics.auc(fpr,tpr))
 
-    return l_inf_cs,l_acc,l_auc
+    return l_inf_cs
 
 def custom_mcp_bl_eval(loader):
 
@@ -79,10 +71,8 @@ def custom_mcp_bl_eval(loader):
         bs,n,_ = target.shape
         data_adj = data[:,:,:,1]
         l_clique_inf = mcp_beam_method(data.squeeze(),data_adj,beam_size=500)
-        l_clique_sol = utils.mcp_adj_to_ind(target)
-        for inf,sol in zip(l_clique_inf,l_clique_sol):
+        for inf in l_clique_inf:
             l_bl_cs.append(len(inf))
-            l_acc.append(len((inf.intersection(sol)))/len(sol))
         
 
     return l_bl_cs,l_acc
@@ -91,9 +81,8 @@ if __name__=='__main__':
     gen_args = {
         'num_examples_train': 20000,
         'num_examples_val': 1000,
-        'num_examples_test': 20,
+        'num_examples_test': 100,
         'n_vertices': 50,
-        'planted': True,
         'path_dataset': 'dataset_mcp',
         'clique_size': None,
         'edge_density': 0.5
@@ -141,12 +130,12 @@ if __name__=='__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Using device:', device)
 
-    filename=f'mcp_ps_results-{n_vertices}.txt'
+    filename=f'mcp_v_results-{n_vertices}.txt'
     filepath = os.path.join(path,filename)
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('cs_train,cs_test,cs_inf,acc,auc\n')
+            f.write('cs_train,cs_inf\n')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()
@@ -154,11 +143,11 @@ if __name__=='__main__':
             print(f'File has {n_lines} computations')
 
     bl_n_lines = 0
-    baseline_filename=f'mcp_ps_baseline-{n_vertices}.txt'
+    baseline_filename=f'mcp_v_baseline-{n_vertices}.txt'
     bl_path = os.path.join(path,baseline_filename)
     if not os.path.isfile(bl_path):
         with open(bl_path,'w') as f:
-            f.write('cs_test,cs_inf,acc\n')
+            f.write('cs_test,cs_inf\n')
     else:
         with open(bl_path,'r') as f:
             data = f.readlines()
@@ -227,38 +216,31 @@ if __name__=='__main__':
                 
                 save_model(model_path,model,n_vertices,cs1)
             
-            pb2 = tqdm.tqdm(l_cs)
-            for cs2 in pb2:
-                if counter<n_lines:
-                    print(f'\nSkipping cs1={cs1}, cs2={cs2}')
-                    continue
-                
-                pb2.set_description(f'cs1={cs1}, cs2={cs2}')
-                
-                gen_args['clique_size'] = cs2
-                test_gen=MCP_Generator('test',gen_args)
-                test_gen.load_dataset()
-                test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
+        if n_lines>counter:
+            print(f'\nSkipping model test for {cs1}')
+        else:
+            gen_args['clique_size'] = cs1
+            test_gen=MCP_True_Generator('test',gen_args)
+            test_gen.load_dataset()
+            test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
+    
+            l_bl_cs = custom_mcp_vanilla_eval(test_loader)
+            mean_cs_bl = np.mean(l_bl_cs)
+            line = get_line(cs1,mean_cs_bl)
+            add_line(bl_path,line)
 
-                l_cs_found,l_acc,l_auc = custom_mcp_eval(test_loader,model,device)
-
-                mean_cs_found = np.mean(l_cs_found)
-                mean_acc = np.mean(l_acc)
-                mean_auc = np.mean(l_auc)
-                line = get_line(cs1,cs2,mean_cs_found,mean_acc,mean_auc)
-                add_line(filepath,line)
         if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
             print(f'\nSkipping baseline for {cs1}')
         else:
             gen_args['clique_size'] = cs1
-            test_gen=MCP_Generator('test',gen_args)
+            test_gen=MCP_True_Generator('test',gen_args)
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
     
             l_bl_cs,l_bl_acc = custom_mcp_bl_eval(test_loader)
             mean_cs_bl = np.mean(l_bl_cs)
             mean_acc = np.mean(l_bl_acc)
-            line = get_line_bl(cs1,mean_cs_bl,mean_acc)
+            line = get_line_bl(cs1,mean_cs_bl)
             add_line(bl_path,line)
 
         counter+=1
