@@ -44,7 +44,7 @@ def custom_hhc_eval(loader,model,device):
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
-        proba = torch.sigmoid()
+        proba = torch.sigmoid(raw_scores)
         true_pos,n_total = accuracy_hhc(raw_scores,target)
         hhc_rec,total_hhcs = perf_hhc(raw_scores,target)
         l_acc.append((true_pos/n_total))
@@ -115,7 +115,7 @@ if __name__=='__main__':
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('fill_param_train,acc,perf_hhc\n')
+            f.write('fill_param_train,acc,perf_hhc,auc\n')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()

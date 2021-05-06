@@ -193,6 +193,17 @@ def generate_gauss_hhc(n,lam,mu):
     W_weights-=W_weights.mean()
     return W_weights
 
+@generates_HHC('UniformMean')
+def generate_uniform(n,lam,mu):
+    """ Using uniform distribution for the HHC, with a moved mean """
+    W_weights = rng.uniform(size=(n,n))+mu
+    diag = rng.uniform(size=n)+lam
+    for i in range(n):
+        W_weights[i,(i+1)%n] = diag[i]
+    W_weights/=W_weights.std()
+    W_weights-=W_weights.mean()
+    return W_weights
+
 @generates_HHC('Poisson')
 def generate_poisson_hhc(n,lam,mu):
     raise NotImplementedError
