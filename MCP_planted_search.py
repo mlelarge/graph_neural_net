@@ -176,6 +176,7 @@ if __name__=='__main__':
     for cs1 in pbcs:
         if counter+len(l_cs)<=n_lines:
             print(f'\nSkipping model for cs1={cs1}')
+            counter+=len(l_cs)
         else:
             pbcs.set_description(f'Using training clique_size {cs1}')
 
