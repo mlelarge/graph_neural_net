@@ -232,6 +232,7 @@ if __name__=='__main__':
             for cs2 in pb2:
                 if counter<n_lines:
                     print(f'\nSkipping cs1={cs1}, cs2={cs2}')
+                    counter+=1
                     continue
                 print(f'Testing for cs1={cs1}, cs1={cs2}')
                 
@@ -249,6 +250,7 @@ if __name__=='__main__':
                 mean_auc = np.mean(l_auc)
                 line = get_line(cs1,cs2,mean_cs_found,mean_acc,mean_auc)
                 add_line(filepath,line)
+                counter+=1
         if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
             print(f'\nSkipping baseline for {cs1}')
         else:
@@ -263,7 +265,7 @@ if __name__=='__main__':
             line = get_line_bl(cs1,mean_cs_bl,mean_acc)
             add_line(bl_path,line)
 
-        counter+=1
+        bl_counter+=1
     
     model_data = pd.read_csv(filepath,delimiter=',')
     bl_data = pd.read_csv(bl_path,delimiter=',')
