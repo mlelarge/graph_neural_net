@@ -26,11 +26,11 @@ def add_line(filename,line) -> None:
     with open(filename,'a') as f:
         f.write(line + '\n')
 
-def get_line(cs1,cs2,cs_found,accuracy,auc)->str:
-    return f'{cs1},{cs2},{cs_found},{accuracy},{auc}'
+def get_line(cs1,cs_found)->str:
+    return f'{cs1},{cs_found}'
 
-def get_line_bl(cs1,cs_found,accuracy)->str:
-    return f'{cs1},{cs_found},{accuracy}'
+def get_line_bl(cs1,cs_found)->str:
+    return f'{cs1},{cs_found}'
 
 def check_model_exists(model_path,n_vertices,cs)->bool:
     model_filename = os.path.join(model_path,f'model-n_{n_vertices}-cs_{cs}.tar')
@@ -172,6 +172,7 @@ if __name__=='__main__':
                 model.load_state_dict(state_dict)
                 model.to(device)
             else: #If model doesn't exist, we need to train
+                print(f'Starting the training for cs1={cs1}')
                 gen_args['clique_size'] = cs1
                 train_gen=MCP_Generator('train',gen_args)
                 train_gen.load_dataset()
@@ -219,29 +220,30 @@ if __name__=='__main__':
         if n_lines>counter:
             print(f'\nSkipping model test for {cs1}')
         else:
-            gen_args['clique_size'] = cs1
+            print(f'\nTesting model trained on cs={cs1}')
             test_gen=MCP_True_Generator('test',gen_args)
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
     
-            l_bl_cs = custom_mcp_vanilla_eval(test_loader)
+            l_bl_cs = custom_mcp_vanilla_eval(test_loader,model,device)
             mean_cs_bl = np.mean(l_bl_cs)
             line = get_line(cs1,mean_cs_bl)
             add_line(bl_path,line)
 
-        if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
-            print(f'\nSkipping baseline for {cs1}')
-        else:
-            gen_args['clique_size'] = cs1
-            test_gen=MCP_True_Generator('test',gen_args)
-            test_gen.load_dataset()
-            test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
-    
-            l_bl_cs,l_bl_acc = custom_mcp_bl_eval(test_loader)
-            mean_cs_bl = np.mean(l_bl_cs)
-            mean_acc = np.mean(l_bl_acc)
-            line = get_line_bl(cs1,mean_cs_bl)
-            add_line(bl_path,line)
+    if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
+        print(f'\nSkipping baseline')
+    else:
+        print(f'\nTesting baseline')
+        gen_args['num_examples_test']=1000
+        test_gen=MCP_True_Generator('test',gen_args)
+        test_gen.load_dataset()
+        test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
+
+        l_bl_cs,l_bl_acc = custom_mcp_bl_eval(test_loader)
+        mean_cs_bl = np.mean(l_bl_cs)
+        mean_acc = np.mean(l_bl_acc)
+        line = get_line_bl(cs1,mean_cs_bl)
+        add_line(bl_path,line)
 
         counter+=1
     

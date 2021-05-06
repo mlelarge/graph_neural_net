@@ -183,6 +183,7 @@ if __name__=='__main__':
                 model.load_state_dict(state_dict)
                 model.to(device)
             else: #If model doesn't exist, we need to train
+                print(f'Starting the training for cs1={cs1}')
                 gen_args['clique_size'] = cs1
                 train_gen=MCP_Generator('train',gen_args)
                 train_gen.load_dataset()
@@ -232,6 +233,7 @@ if __name__=='__main__':
                 if counter<n_lines:
                     print(f'\nSkipping cs1={cs1}, cs2={cs2}')
                     continue
+                print(f'Testing for cs1={cs1}, cs1={cs2}')
                 
                 pb2.set_description(f'cs1={cs1}, cs2={cs2}')
                 
