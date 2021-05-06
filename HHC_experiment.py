@@ -11,6 +11,8 @@ from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
 from toolbox.metrics import accuracy_hhc,perf_hhc
 
+import sklearn.metrics as skmetrics
+
 def add_line(filename,line) -> None:
     with open(filename,'a') as f:
         f.write(line + '\n')
@@ -36,15 +38,20 @@ def custom_hhc_eval(loader,model,device):
 
     l_acc = []
     l_perf= []
+    l_auc = []
     for data,target in tqdm.tqdm(loader,desc='Inner Loop : testing HHCs'):
+        bs,n,_ = target.shape
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
+        proba = torch.sigmoid()
         true_pos,n_total = accuracy_hhc(raw_scores,target)
         hhc_rec,total_hhcs = perf_hhc(raw_scores,target)
         l_acc.append((true_pos/n_total))
         l_perf.append((hhc_rec/total_hhcs))
-    return np.mean(l_acc),np.mean(l_perf)
+        fpr, tpr, _ = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), proba.cpu().detach().reshape(bs*n*n).numpy())
+        l_auc.append(skmetrics.auc(fpr,tpr))
+    return np.mean(l_acc),np.mean(l_perf),np.mean(l_auc)
 
 
 if __name__=='__main__':
@@ -164,9 +171,9 @@ if __name__=='__main__':
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,True)
             
-            acc,hhc_proba = custom_hhc_eval(test_loader,model,device)
+            acc,hhc_proba,auc = custom_hhc_eval(test_loader,model,device)
 
-            add_line(filepath,f'{fill_param},{acc},{hhc_proba}')
+            add_line(filepath,f'{fill_param},{acc},{hhc_proba},{auc}')
 
         counter+=1
 
