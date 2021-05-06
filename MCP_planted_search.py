@@ -76,6 +76,7 @@ def custom_mcp_eval(loader,model,device):
 def custom_mcp_bl_eval(loader):
 
     l_bl_cs = []
+    l_error = []
     l_acc = []
     for data,target in tqdm.tqdm(loader,desc='Inner baseline loop : solving mcps'):
         bs,n,_ = target.shape
@@ -84,10 +85,11 @@ def custom_mcp_bl_eval(loader):
         l_clique_sol = utils.mcp_adj_to_ind(target)
         for inf,sol in zip(l_clique_inf,l_clique_sol):
             l_bl_cs.append(len(inf))
+            l_error.append(len(inf)-len(sol))
             l_acc.append(len((inf.intersection(sol)))/len(sol))
         
 
-    return l_bl_cs,l_acc
+    return l_bl_cs,l_error,l_acc
 
 if __name__=='__main__':
     gen_args = {
@@ -264,10 +266,11 @@ if __name__=='__main__':
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
     
-            l_bl_cs,l_bl_acc = custom_mcp_bl_eval(test_loader)
+            l_bl_cs,l_bl_err,l_bl_acc = custom_mcp_bl_eval(test_loader)
             mean_cs_bl = np.mean(l_bl_cs)
+            mean_err = np.mean(l_bl_err)
             mean_acc = np.mean(l_bl_acc)
-            line = get_line_bl(cs1,mean_cs_bl,mean_acc)
+            line = get_line_bl(cs1,mean_cs_bl,mean_err,mean_acc)
             add_line(bl_path,line)
 
         bl_counter+=1
