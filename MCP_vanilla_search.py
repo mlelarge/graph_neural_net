@@ -228,7 +228,7 @@ if __name__=='__main__':
             l_bl_cs = custom_mcp_vanilla_eval(test_loader,model,device)
             mean_cs_bl = np.mean(l_bl_cs)
             line = get_line(cs1,mean_cs_bl)
-            add_line(bl_path,line)
+            add_line(filepath,line)
 
     if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
         print(f'\nSkipping baseline')
