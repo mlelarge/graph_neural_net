@@ -620,7 +620,7 @@ class HHCTSP_Generator(Base_Generator):
     Hidden Hamilton Cycle Generator, finds the solution for 
     See article : https://arxiv.org/abs/1804.05436
     """
-    def __init__(self, name, args, coeff=1e7):
+    def __init__(self, name, args, coeff=1e6):
         self.generative_model = args['generative_model']
         self.cycle_param = args['cycle_param']
         self.fill_param  = args['fill_param']
@@ -684,7 +684,7 @@ class HHCTSP_Generator(Base_Generator):
             SOL[curr,prec] = 1
             SOL[prec,curr] = 1
             prec = curr
-
+        
         return (B,SOL)
 
 class HHC_Generator(Base_Generator):
@@ -738,6 +738,7 @@ class HHC_Generator(Base_Generator):
         
         W = torch.tensor(W,dtype=torch.float)
         SOL = torch.eye(self.n_vertices).roll(1,dims=-1)
+        SOL = (SOL+SOL.T)
         #W,SOL = utils.permute_adjacency_twin(W,SOL)
         
         B = weight_matrix_to_tensor_representation(W)
@@ -895,7 +896,7 @@ if __name__=="__main__":
     #data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
     #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":13, 'distance_used':'EUC_2D','generative_model':'Square01'}
     #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'Gauss','cycle_param':0,'fill_param':0}
-    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'UniformMean','cycle_param':0,'fill_param':0}
-    g = HHC_Generator("train",data_args)
+    data_args = {"num_examples_train":100,"path_dataset":"dataset_test","n_vertices":50,'generative_model':'UniformMean','cycle_param':0,'fill_param':0}
+    g = HHCTSP_Generator("train",data_args)
     timeit.timeit(g.load_dataset,number=1)
 

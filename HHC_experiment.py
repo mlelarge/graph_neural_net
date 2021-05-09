@@ -34,10 +34,10 @@ def save_model(model_path,model,n_vertices,mu)->None:
     model_filename = os.path.join(model_path,f'model-n_{n_vertices}-mu_{mu}.tar')
     torch.save(model.state_dict(), model_filename)
 
-def load_model_dict(model_path,n_vertices,mu):
+def load_model_dict(model_path,n_vertices,mu,device):
     utils.check_dir(model_path)
     model_filename = os.path.join(model_path,f'model-n_{n_vertices}-mu_{mu}.tar')
-    state_dict = torch.load(model_filename)
+    state_dict = torch.load(model_filename,map_location=device)
     return state_dict
 
 def custom_hhc_eval(loader,model,device):
@@ -61,7 +61,7 @@ def custom_hhc_eval(loader,model,device):
         hhc_target = (hhc_target+hhc_target.T)
         hhc_target = hhc_target.unsqueeze(0)
         hhc_target = hhc_target.repeat( (bs,1,1) )
-        hhc_target.to(device)
+        hhc_target = hhc_target.to(device)
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
@@ -74,7 +74,13 @@ def custom_hhc_eval(loader,model,device):
         l_auc.append(skmetrics.auc(fpr,tpr))
 
         W_dists = data[:,:,:,1]
-        inf_tours = tsp_beam_decode(raw_scores,W_dists=W_dists)
+        W_mins = W_dists.min(axis=-1).values.min(axis=-1).values
+        W_mins = W_mins.unsqueeze(-1).unsqueeze(-1)
+        W_dists -= W_mins
+        if W_dists.std()!=0:
+            W_dists /= W_dists.std()
+        inf_tours = tsp_beam_decode(raw_scores.detach().cpu(),W_dists=W_dists.detach().cpu())
+        inf_tours = inf_tours.to(device)
         inf_len  = torch.sum(W_dists*inf_tours ,axis=-1).sum(axis=-1)
         tsp_len  = torch.sum(W_dists*target    ,axis=-1).sum(axis=-1)
         tsps_len = torch.sum(W_dists*hhc_target,axis=-1).sum(axis=-1)
@@ -91,7 +97,7 @@ def custom_hhc_eval(loader,model,device):
         l_tsps_tsp_ratio.append(torch.sum(tsps_len/tsp_len).item())
     acc = np.mean(l_acc)
     perf = np.mean(l_perf)
-    auc = np.mean(auc)
+    auc = np.mean(l_auc)
     tsp_len = np.mean(l_tsp_len)
     inf_len = np.mean(l_inf_len)
     tsps_len = np.mean(l_tspstar_len)
@@ -183,7 +189,7 @@ if __name__=='__main__':
             if check_model_exists(model_path,n_vertices,fill_param): #If model already exists
                 print(f'Using already trained model for mu={fill_param}')
                 model = get_model(model_args)
-                state_dict = load_model_dict(model_path,n_vertices,fill_param)
+                state_dict = load_model_dict(model_path,n_vertices,fill_param,device)
                 model.load_state_dict(state_dict)
                 model.to(device)
             else:

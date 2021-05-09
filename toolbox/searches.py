@@ -253,7 +253,7 @@ def tsp_beam_decode(raw_scores,l_xs=[],l_ys=[],W_dists=None,b=1280,start_mode="r
             if keep_beams!=0:
                 l_beam.append(beams[:keep_beams])
 
-            if W_dists is not None:
+            if W_dists is None:
                 xs,ys = l_xs[k],l_ys[k]
                 nodes_coord = [ (xs[i],ys[i]) for i in range(len(xs))]
                 W_dist = torch.tensor(squareform(pdist(nodes_coord, metric='euclidean')))
