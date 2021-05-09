@@ -196,7 +196,7 @@ def get_surest(n,G):
     node_idx = torch.argmax(G.flatten())//n
     return node_idx
 
-def tsp_beam_decode(raw_scores,l_xs,l_ys,b=1280,start_mode="r",chosen=0,keep_beams=0):
+def tsp_beam_decode(raw_scores,l_xs=[],l_ys=[],W_dists=None,b=1280,start_mode="r",chosen=0,keep_beams=0):
 
     start_mode = start_mode.lower()
     if start_mode=='r':
@@ -224,7 +224,6 @@ def tsp_beam_decode(raw_scores,l_xs,l_ys,b=1280,start_mode="r",chosen=0,keep_bea
         G[diag_mask] = 0 #Make sure the probability of staying on a node is 0
 
         for k in range(bs):
-            xs,ys = l_xs[k],l_ys[k]
             beams = torch.zeros(b,n, dtype=torch.int64)
             beams_score = torch.zeros((b,1))
             cur_g = G[k]
@@ -254,9 +253,12 @@ def tsp_beam_decode(raw_scores,l_xs,l_ys,b=1280,start_mode="r",chosen=0,keep_bea
             if keep_beams!=0:
                 l_beam.append(beams[:keep_beams])
 
-            nodes_coord = [ (xs[i],ys[i]) for i in range(len(xs))]
-            W_dist = torch.tensor(squareform(pdist(nodes_coord, metric='euclidean')))
-
+            if W_dists is not None:
+                xs,ys = l_xs[k],l_ys[k]
+                nodes_coord = [ (xs[i],ys[i]) for i in range(len(xs))]
+                W_dist = torch.tensor(squareform(pdist(nodes_coord, metric='euclidean')))
+            else:
+                W_dist = W_dists[k]
             mini = torch.sum(W_dist)
             best_beam_idx = -1
             for beam_num in range(beams.shape[0]):

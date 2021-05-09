@@ -1,4 +1,4 @@
-from loaders.data_generator import HHC_Generator
+from loaders.data_generator import HHCTSP_Generator
 import toolbox.utils as utils
 import tqdm
 import torch
@@ -10,6 +10,14 @@ from toolbox.optimizer import get_optimizer
 from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
 from toolbox.metrics import accuracy_hhc,perf_hhc
+from toolbox.searches import tsp_beam_decode
+
+pyconcorde_available=True
+try:
+    from concorde.tsp import TSPSolver
+except ModuleNotFoundError:
+    pyconcorde_available=False
+    print("Trying to continue without pyconcorde as it is not installed. TSP data generation will fail.")
 
 import sklearn.metrics as skmetrics
 
@@ -39,19 +47,60 @@ def custom_hhc_eval(loader,model,device):
     l_acc = []
     l_perf= []
     l_auc = []
+
+    l_tsp_len = []
+    l_inf_len = []
+    l_tspstar_len = []
+    l_tsps_tsp_ratio = []
+    l_tsps_tsp_edge_ratio = []
+    l_inf_tsp_ratio = []
+    l_inf_tsp_edge_ratio = []
     for data,target in tqdm.tqdm(loader,desc='Inner Loop : testing HHCs'):
         bs,n,_ = target.shape
+        hhc_target = torch.eye(n).roll(1,dims=-1)
+        hhc_target = (hhc_target+hhc_target.T)
+        hhc_target = hhc_target.unsqueeze(0)
+        hhc_target = hhc_target.repeat( (bs,1,1) )
+        hhc_target.to(device)
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
         proba = torch.sigmoid(raw_scores)
-        true_pos,n_total = accuracy_hhc(raw_scores,target)
-        hhc_rec,total_hhcs = perf_hhc(raw_scores,target)
+        true_pos,n_total = accuracy_hhc(raw_scores,hhc_target)
+        hhc_rec,total_hhcs = perf_hhc(raw_scores,hhc_target)
         l_acc.append((true_pos/n_total))
         l_perf.append((hhc_rec/total_hhcs))
         fpr, tpr, _ = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), proba.cpu().detach().reshape(bs*n*n).numpy())
         l_auc.append(skmetrics.auc(fpr,tpr))
-    return np.mean(l_acc),np.mean(l_perf),np.mean(l_auc)
+
+        W_dists = data[:,:,:,1]
+        inf_tours = tsp_beam_decode(raw_scores,W_dists=W_dists)
+        inf_len  = torch.sum(W_dists*inf_tours ,axis=-1).sum(axis=-1)
+        tsp_len  = torch.sum(W_dists*target    ,axis=-1).sum(axis=-1)
+        tsps_len = torch.sum(W_dists*hhc_target,axis=-1).sum(axis=-1)
+        
+        number_of_edges = 2*n
+        l_tsps_tsp_edge_ratio.append(torch.sum(hhc_target*target).item()/(bs*number_of_edges))
+        l_inf_tsp_edge_ratio.append(torch.sum(inf_tours *target).item()/(bs*number_of_edges))
+
+        l_tsp_len.append(torch.sum(tsp_len).item())
+        l_inf_len.append(torch.sum(inf_len).item())
+        l_tspstar_len.append(torch.sum(tsps_len).item())
+
+        l_inf_tsp_ratio.append(torch.sum(inf_len/tsp_len).item())
+        l_tsps_tsp_ratio.append(torch.sum(tsps_len/tsp_len).item())
+    acc = np.mean(l_acc)
+    perf = np.mean(l_perf)
+    auc = np.mean(auc)
+    tsp_len = np.mean(l_tsp_len)
+    inf_len = np.mean(l_inf_len)
+    tsps_len = np.mean(l_tspstar_len)
+    tsps_tsp_ratio = np.mean(l_tsps_tsp_ratio)
+    tsps_tsp_edge_ratio  = np.mean(l_tsps_tsp_edge_ratio)
+    inf_tsp_ratio = np.mean(l_inf_tsp_ratio)
+    inf_tsp_edge_ratio = np.mean(l_inf_tsp_edge_ratio)
+
+    return acc,perf,auc,tsp_len,inf_len,tsps_len,tsps_tsp_ratio,tsps_tsp_edge_ratio,inf_tsp_ratio,inf_tsp_edge_ratio
 
 
 if __name__=='__main__':
@@ -115,7 +164,7 @@ if __name__=='__main__':
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('fill_param_train,acc,perf_hhc,auc\n')
+            f.write('fill_param_train,acc,perf_hhc,auc,tsp_length,tsps_length,inf_length,tsps_tsp_len_ratio,tsps_tsp_edge_ratio,inf_tsp_len_ratio,inf_tsp_edge_ratio\n')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()
@@ -138,11 +187,11 @@ if __name__=='__main__':
                 model.load_state_dict(state_dict)
                 model.to(device)
             else:
-                train_gen = HHC_Generator('train',gen_args)
+                train_gen = HHCTSP_Generator('train',gen_args)
                 train_gen.load_dataset()
                 train_loader = siamese_loader(train_gen,batch_size,True,True)
 
-                val_gen = HHC_Generator('val',gen_args)
+                val_gen = HHCTSP_Generator('val',gen_args)
                 val_gen.load_dataset()
                 val_loader = siamese_loader(val_gen,batch_size,True,True)
 
@@ -167,13 +216,13 @@ if __name__=='__main__':
                 
                 save_model(model_path, model, n_vertices, fill_param)
 
-            test_gen = HHC_Generator('test',gen_args)
+            test_gen = HHCTSP_Generator('test',gen_args)
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,True)
             
-            acc,hhc_proba,auc = custom_hhc_eval(test_loader,model,device)
+            acc,hhc_proba,auc, tsp_len,inf_len,tspstar_len,tsp_tsps_ratio,tsps_tsp_edge_ratio,inf_tsp_ratio,inf_tsp_edge_ratio = custom_hhc_eval(test_loader,model,device)
 
-            add_line(filepath,f'{fill_param},{acc},{hhc_proba},{auc}')
+            add_line(filepath,f'{fill_param},{acc},{hhc_proba},{auc},{tsp_len},{inf_len},{tspstar_len},{tsp_tsps_ratio},{tsps_tsp_edge_ratio},{inf_tsp_ratio},{inf_tsp_edge_ratio}')
 
         counter+=1
 

@@ -3,6 +3,7 @@ import random
 import itertools
 import networkx
 from networkx.algorithms.approximation.clique import max_clique
+from numpy import diag_indices
 import torch
 import torch.utils
 import toolbox.utils as utils
@@ -614,6 +615,78 @@ class TSP_Distance_Generator(Base_Generator):
         self.positions.append((xs,ys))
         return (B, SOL)
 
+class HHCTSP_Generator(Base_Generator):
+    """
+    Hidden Hamilton Cycle Generator, finds the solution for 
+    See article : https://arxiv.org/abs/1804.05436
+    """
+    def __init__(self, name, args, coeff=1e7):
+        self.generative_model = args['generative_model']
+        self.cycle_param = args['cycle_param']
+        self.fill_param  = args['fill_param']
+        num_examples = args['num_examples_' + name]
+        self.n_vertices = args['n_vertices']
+        subfolder_name = 'HHCTSP_{}_{}_{}_{}_{}'.format(self.generative_model, 
+                                                     self.cycle_param,
+                                                     self.fill_param,
+                                                     num_examples,
+                                                     self.n_vertices)
+        path_dataset = os.path.join(args['path_dataset'],subfolder_name)
+        super().__init__(name, path_dataset, num_examples)
+        self.data = []
+        
+        
+        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
+        self.constant_n_vertices = True
+        self.coeff = coeff
+    
+    def load_dataset(self):
+        """
+        Look for required dataset in files and create it if
+        it does not exist
+        """
+        filename = self.name + '.pkl'
+        path = os.path.join(self.path_dataset, filename)
+        if os.path.exists(path):
+            print('Reading dataset at {}'.format(path))
+            data = torch.load(path)
+            self.data = list(data)
+        else:
+            print('Creating dataset.')
+            self.data = []
+            self.create_dataset()
+            print('Saving dataset at {}'.format(path))
+            torch.save(self.data, path)
+
+    def compute_example(self):
+        try:
+            W = GENERATOR_FUNCTIONS_HHC[self.generative_model](self.n_vertices,self.cycle_param,self.fill_param)
+        except KeyError:
+            raise ValueError('Generative model {} not supported'
+                             .format(self.generative_model))
+        
+        W = torch.tensor(W,dtype=torch.float)
+
+        W_concorde = (W.detach()*self.coeff).to(int).numpy()
+        W_concorde += W_concorde.max()
+        W_concorde[diag_indices(self.n_vertices)] =1e8
+        
+        problem = TSPSolver.from_data_explicit(W_concorde)
+        solution = problem.solve(verbose=False)
+        assert solution.success, f"Couldn't find solution! \n W={W_concorde} \n {solution}"
+        
+        B = weight_matrix_to_tensor_representation(W)
+
+        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
+        prec = solution.tour[-1]
+        for i in range(self.n_vertices):
+            curr = solution.tour[i]
+            SOL[curr,prec] = 1
+            SOL[prec,curr] = 1
+            prec = curr
+
+        return (B,SOL)
+
 class HHC_Generator(Base_Generator):
     """
     Hidden Hamilton Cycle Generator
@@ -821,7 +894,8 @@ if __name__=="__main__":
     #data_args = {"edge_density_a":0.3,"edge_density_b":0.2, "num_examples_train":5,"path_dataset":"dataset_sbm","n_vertices":10}
     #data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
     #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":13, 'distance_used':'EUC_2D','generative_model':'Square01'}
-    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'Gauss','cycle_param':0,'fill_param':0}
+    #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'Gauss','cycle_param':0,'fill_param':0}
+    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'UniformMean','cycle_param':0,'fill_param':0}
     g = HHC_Generator("train",data_args)
     timeit.timeit(g.load_dataset,number=1)
 
