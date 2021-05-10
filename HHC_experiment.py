@@ -118,7 +118,8 @@ if __name__=='__main__':
         'path_dataset': 'dataset_hhc',
         'generative_model': 'Gauss',
         'cycle_param': 0,
-        'fill_param': None
+        'fill_param': None,
+        'timeout': 60
     }
     opt_args = {
         'lr': 5e-5,

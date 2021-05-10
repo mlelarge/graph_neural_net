@@ -10,6 +10,8 @@ import toolbox.utils as utils
 import math
 from toolbox.searches import mcp_beam_method
 import timeit
+import time
+import signal
 from sklearn.decomposition import PCA
 from numpy import pi,angle,cos,sin
 from numpy.random import default_rng
@@ -25,6 +27,9 @@ rng = default_rng(41)
 GENERATOR_FUNCTIONS = {}
 GENERATOR_FUNCTIONS_TSP = {}
 GENERATOR_FUNCTIONS_HHC = {}
+
+class TimeOutException(Exception):
+    pass
 
 def generates(name):
     """ Register a generator function for a graph distribution """
@@ -620,7 +625,7 @@ class HHCTSP_Generator(Base_Generator):
     Hidden Hamilton Cycle Generator, finds the solution for 
     See article : https://arxiv.org/abs/1804.05436
     """
-    def __init__(self, name, args, coeff=1e6):
+    def __init__(self, name, args, coeff=1e6,timeout=100):
         self.generative_model = args['generative_model']
         self.cycle_param = args['cycle_param']
         self.fill_param  = args['fill_param']
@@ -639,6 +644,7 @@ class HHCTSP_Generator(Base_Generator):
         utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
         self.constant_n_vertices = True
         self.coeff = coeff
+        self.timeout = timeout
     
     def load_dataset(self):
         """
@@ -657,7 +663,23 @@ class HHCTSP_Generator(Base_Generator):
             self.create_dataset()
             print('Saving dataset at {}'.format(path))
             torch.save(self.data, path)
+    
+    def create_dataset(self):
+        def handler(signum, frame):raise TimeOutException()
+        signal.signal(signal.SIGALRM,handler)
+        real_counter = 0
+        with tqdm.tqdm(total=self.num_examples) as pb:
+            while real_counter<self.num_examples:
+                t0 = time.ctime()
+                try:
+                    example = self.compute_example()
+                    self.data.append(example)
+                    real_counter+=1
+                    pb.update(1)
+                except TimeOutException:
+                    print(f"Took too much time to compute solution : {t0} => {time.ctime()}")
 
+    
     def compute_example(self):
         try:
             W = GENERATOR_FUNCTIONS_HHC[self.generative_model](self.n_vertices,self.cycle_param,self.fill_param)
@@ -896,7 +918,7 @@ if __name__=="__main__":
     #data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
     #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":13, 'distance_used':'EUC_2D','generative_model':'Square01'}
     #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'Gauss','cycle_param':0,'fill_param':0}
-    data_args = {"num_examples_train":100,"path_dataset":"dataset_test","n_vertices":50,'generative_model':'UniformMean','cycle_param':0,'fill_param':0}
+    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":50,'generative_model':'UniformMean','cycle_param':0,'fill_param':0}
     g = HHCTSP_Generator("train",data_args)
     timeit.timeit(g.load_dataset,number=1)
 
