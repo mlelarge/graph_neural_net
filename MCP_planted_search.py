@@ -1,4 +1,4 @@
-from loaders.data_generator import MCP_Generator
+from loaders.data_generator import MCP_Generator,MCP_True_Generator
 from toolbox.searches import mcp_beam_method
 from numpy import log
 import toolbox.utils as utils
@@ -73,6 +73,21 @@ def custom_mcp_eval(loader,model,device):
 
     return l_inf_cs,l_error,l_acc,l_auc
 
+def custom_mcp_np_eval(loader,model,device):
+
+    model.eval()
+
+    l_inf_cs = []
+    for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving mcps'):
+        bs,n,_ = target.shape
+        data = data.to(device)
+        target = target.to(device)
+        raw_scores = model(data).squeeze(-1)
+        l_clique_inf = mcp_beam_method(data.squeeze(),raw_scores,beam_size=500)
+        for inf in l_clique_inf:
+            l_inf_cs.append(len(inf))
+    return l_inf_cs
+
 def custom_mcp_bl_eval(loader):
 
     l_bl_cs = []
@@ -90,6 +105,16 @@ def custom_mcp_bl_eval(loader):
         
 
     return l_bl_cs,l_error,l_acc
+
+def custom_mcp_bl_np_eval(loader):
+
+    l_bl_cs = []
+    for data,target in tqdm.tqdm(loader,desc='Inner baseline loop : solving mcps'):
+        data_adj = data[:,:,:,1]
+        l_clique_inf = mcp_beam_method(data.squeeze(),data_adj,beam_size=500)
+        for inf in l_clique_inf:
+            l_bl_cs.append(len(inf))
+    return l_bl_cs
 
 if __name__=='__main__':
     gen_args = {
@@ -140,7 +165,7 @@ if __name__=='__main__':
     
     cs_start=7
     cs_stop=21
-    l_cs = range(cs_start,cs_stop)
+    l_cs = [elt for elt in range(cs_start,cs_stop)] + [0]
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Using device:', device)
@@ -170,12 +195,27 @@ if __name__=='__main__':
             data = f.readlines()
             bl_n_lines = len(data)-1
             print(f'Baseline file has {bl_n_lines} computations')
+    
+    np_lines = 0
+    np_filename=f'mcp_ps_np-{n_vertices}.txt'
+    np_path = os.path.join(path,np_filename)
+    if not os.path.isfile(np_path):
+        with open(np_path,'w') as f:
+            f.write('cs_train,cs_inf\n')
+        print(f'Creating not planted file')
+    else:
+        with open(np_path,'r') as f:
+            data = f.readlines()
+            np_lines = len(data)-1
+            print(f'Baseline file has {np_lines} computations')
 
 
     counter = 0
     bl_counter=0
+    np_counter=0
     pbcs = tqdm.tqdm(l_cs)
     for cs1 in pbcs:
+        gen_args['planted'] = True
         if counter+len(l_cs)<=n_lines:
             print(f'\nSkipping model for cs1={cs1}')
             counter+=len(l_cs)
@@ -258,7 +298,7 @@ if __name__=='__main__':
                     line = get_line(cs1,cs2,mean_cs_found,mean_error,mean_acc,mean_auc)
                     add_line(filepath,line)
                 counter+=1
-        if bl_n_lines>counter: #If we've already computed the baseline values, next iteration
+        if bl_n_lines>bl_counter: #If we've already computed the baseline values, next iteration
             print(f'\nSkipping baseline for {cs1}')
         else:
             gen_args['clique_size'] = cs1
@@ -272,8 +312,23 @@ if __name__=='__main__':
             mean_acc = np.mean(l_bl_acc)
             line = get_line_bl(cs1,mean_cs_bl,mean_err,mean_acc)
             add_line(bl_path,line)
-
         bl_counter+=1
+            
+        if np_lines>np_counter: #If we've already computed the baseline values, next iteration
+            print(f'\nSkipping not planted for {cs1}')
+        else:
+            gen_args['clique_size'] = cs1
+            gen_args['planted']=False
+            test_gen=MCP_True_Generator('test',gen_args)
+            test_gen.load_dataset()
+            test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
+    
+            l_np_cs = custom_mcp_bl_eval(test_loader)
+            mean_cs_np = np.mean(l_np_cs)
+            add_line(np_path,f'{cs1},{mean_cs_np}')
+            gen_args['planted']=True
+        np_counter+=1
+
     
     model_data = pd.read_csv(filepath,delimiter=',')
     bl_data = pd.read_csv(bl_path,delimiter=',')

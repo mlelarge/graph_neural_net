@@ -117,7 +117,7 @@ if __name__=='__main__':
     gen_args = {
         'num_examples_train': 20000,
         'num_examples_val': 1000,
-        'num_examples_test': 1000,
+        'num_examples_test': 100,
         'n_vertices': 50,
         'path_dataset': 'dataset_hhc',
         'generative_model': 'Gauss',
@@ -239,7 +239,7 @@ if __name__=='__main__':
                 
                 acc,hhc_proba,auc_tsps,auc_tsp, tsp_len,tsps_len,inf_len,tsp_tsps_ratio,tsps_tsp_edge_ratio,inf_tsp_ratio,inf_tsp_edge_ratio = custom_hhc_eval(test_loader,model,device)
 
-                add_line(filepath,f'{mu},{acc},{hhc_proba},{auc_tsps},{auc_tsp},{tsp_len},{tsps_len},{inf_len},{tsp_tsps_ratio},{tsps_tsp_edge_ratio},{inf_tsp_ratio},{inf_tsp_edge_ratio}')
+                add_line(filepath,f'{fill_param},{acc},{hhc_proba},{auc_tsps},{auc_tsp},{tsp_len},{tsps_len},{inf_len},{tsp_tsps_ratio},{tsps_tsp_edge_ratio},{inf_tsp_ratio},{inf_tsp_edge_ratio}')
             
             counter+=1
 
