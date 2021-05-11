@@ -214,7 +214,7 @@ def tsp_beam_decode(raw_scores,l_xs=[],l_ys=[],W_dists=None,b=1280,start_mode="r
 
 
     with torch.no_grad(): #Make sure no gradient is computed
-        G = torch.sigmoid(raw_scores[0]).unsqueeze(0)
+        G = torch.sigmoid(raw_scores)
 
         bs,n,_ = G.shape
         
@@ -247,6 +247,8 @@ def tsp_beam_decode(raw_scores,l_xs=[],l_ys=[],W_dists=None,b=1280,start_mode="r
                     new_beams[j,:beam_time] = beams[x,:beam_time]
                     beams_score[j] = nxt_values[x,y]
                 beams = new_beams
+                assert beams_score[0].item()>0, "Zero in the most probable beam. That's not good."
+                beams_score /= beams_score[0].item() #This prevents probabilities from going all the way to 0 by renormalizing the first score to 1
             #Now add last edge to the score
             beams_score = beams_score * torch.unsqueeze(cur_g[beams[:,-1],start_node],-1)
             

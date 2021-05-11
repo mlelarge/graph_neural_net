@@ -46,7 +46,8 @@ def custom_hhc_eval(loader,model,device):
 
     l_acc = []
     l_perf= []
-    l_auc = []
+    l_auc_tsps = []
+    l_auc_tsp = []
 
     l_tsp_len = []
     l_inf_len = []
@@ -70,8 +71,10 @@ def custom_hhc_eval(loader,model,device):
         hhc_rec,total_hhcs = perf_hhc(raw_scores,hhc_target)
         l_acc.append((true_pos/n_total))
         l_perf.append((hhc_rec/total_hhcs))
+        fpr, tpr, _ = skmetrics.roc_curve(hhc_target.cpu().detach().reshape(bs*n*n).numpy(), proba.cpu().detach().reshape(bs*n*n).numpy())
+        l_auc_tsps.append(skmetrics.auc(fpr,tpr))
         fpr, tpr, _ = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), proba.cpu().detach().reshape(bs*n*n).numpy())
-        l_auc.append(skmetrics.auc(fpr,tpr))
+        l_auc_tsp.append(skmetrics.auc(fpr,tpr))
 
         W_dists = data[:,:,:,1]
         W_mins = W_dists.min(axis=-1).values.min(axis=-1).values
@@ -89,15 +92,16 @@ def custom_hhc_eval(loader,model,device):
         l_tsps_tsp_edge_ratio.append(torch.sum(hhc_target*target).item()/(bs*number_of_edges))
         l_inf_tsp_edge_ratio.append(torch.sum(inf_tours *target).item()/(bs*number_of_edges))
 
-        l_tsp_len.append(torch.sum(tsp_len).item())
-        l_inf_len.append(torch.sum(inf_len).item())
-        l_tspstar_len.append(torch.sum(tsps_len).item())
+        l_tsp_len.append(torch.mean(tsp_len).item())
+        l_inf_len.append(torch.mean(inf_len).item())
+        l_tspstar_len.append(torch.mean(tsps_len).item())
 
-        l_inf_tsp_ratio.append(torch.sum(inf_len/tsp_len).item())
-        l_tsps_tsp_ratio.append(torch.sum(tsps_len/tsp_len).item())
+        l_inf_tsp_ratio.append(torch.mean(inf_len/tsp_len).item())
+        l_tsps_tsp_ratio.append(torch.mean(tsps_len/tsp_len).item())
     acc = np.mean(l_acc)
     perf = np.mean(l_perf)
-    auc = np.mean(l_auc)
+    auc_tsps = np.mean(l_auc_tsps)
+    auc_tsp  = np.mean(l_auc_tsp)
     tsp_len = np.mean(l_tsp_len)
     inf_len = np.mean(l_inf_len)
     tsps_len = np.mean(l_tspstar_len)
@@ -106,7 +110,7 @@ def custom_hhc_eval(loader,model,device):
     inf_tsp_ratio = np.mean(l_inf_tsp_ratio)
     inf_tsp_edge_ratio = np.mean(l_inf_tsp_edge_ratio)
 
-    return acc,perf,auc,tsp_len,inf_len,tsps_len,tsps_tsp_ratio,tsps_tsp_edge_ratio,inf_tsp_ratio,inf_tsp_edge_ratio
+    return acc,perf,auc_tsps,auc_tsp,tsp_len,tsps_len,inf_len,tsps_tsp_ratio,tsps_tsp_edge_ratio,inf_tsp_ratio,inf_tsp_edge_ratio
 
 
 if __name__=='__main__':
@@ -171,7 +175,7 @@ if __name__=='__main__':
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('fill_param_train,acc,perf_hhc,auc,tsp_length,tsps_length,inf_length,tsps_tsp_len_ratio,tsps_tsp_edge_ratio,inf_tsp_len_ratio,inf_tsp_edge_ratio\n')
+            f.write('fill_param_train,acc,perf_hhc,auc_tsps,auc_tsp,tsp_length,tsps_length,inf_length,tsps_tsp_len_ratio,tsps_tsp_edge_ratio,inf_tsp_len_ratio,inf_tsp_edge_ratio\n')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()
@@ -227,9 +231,9 @@ if __name__=='__main__':
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,True)
             
-            acc,hhc_proba,auc, tsp_len,inf_len,tspstar_len,tsp_tsps_ratio,tsps_tsp_edge_ratio,inf_tsp_ratio,inf_tsp_edge_ratio = custom_hhc_eval(test_loader,model,device)
+            acc,hhc_proba,auc_tsps,auc_tsp, tsp_len,tsps_len,inf_len,tsp_tsps_ratio,tsps_tsp_edge_ratio,inf_tsp_ratio,inf_tsp_edge_ratio = custom_hhc_eval(test_loader,model,device)
 
-            add_line(filepath,f'{fill_param},{acc},{hhc_proba},{auc},{tsp_len},{inf_len},{tspstar_len},{tsp_tsps_ratio},{tsps_tsp_edge_ratio},{inf_tsp_ratio},{inf_tsp_edge_ratio}')
+            add_line(filepath,f'{fill_param},{acc},{hhc_proba},{auc_tsps},{auc_tsp},{tsp_len},{tsps_len},{inf_len},{tsp_tsps_ratio},{tsps_tsp_edge_ratio},{inf_tsp_ratio},{inf_tsp_edge_ratio}')
 
         counter+=1
 

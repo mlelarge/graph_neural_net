@@ -625,7 +625,7 @@ class HHCTSP_Generator(Base_Generator):
     Hidden Hamilton Cycle Generator, finds the solution for 
     See article : https://arxiv.org/abs/1804.05436
     """
-    def __init__(self, name, args, coeff=1e6,timeout=100):
+    def __init__(self, name, args, coeff=1e6):
         self.generative_model = args['generative_model']
         self.cycle_param = args['cycle_param']
         self.fill_param  = args['fill_param']
@@ -644,7 +644,6 @@ class HHCTSP_Generator(Base_Generator):
         utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
         self.constant_n_vertices = True
         self.coeff = coeff
-        self.timeout = timeout
     
     def load_dataset(self):
         """
@@ -664,22 +663,6 @@ class HHCTSP_Generator(Base_Generator):
             print('Saving dataset at {}'.format(path))
             torch.save(self.data, path)
     
-    def create_dataset(self):
-        def handler(signum, frame):raise TimeOutException()
-        signal.signal(signal.SIGALRM,handler)
-        real_counter = 0
-        with tqdm.tqdm(total=self.num_examples) as pb:
-            while real_counter<self.num_examples:
-                t0 = time.ctime()
-                try:
-                    example = self.compute_example()
-                    self.data.append(example)
-                    real_counter+=1
-                    pb.update(1)
-                except TimeOutException:
-                    print(f"Took too much time to compute solution : {t0} => {time.ctime()}")
-
-    
     def compute_example(self):
         try:
             W = GENERATOR_FUNCTIONS_HHC[self.generative_model](self.n_vertices,self.cycle_param,self.fill_param)
@@ -690,7 +673,7 @@ class HHCTSP_Generator(Base_Generator):
         W = torch.tensor(W,dtype=torch.float)
 
         W_concorde = (W.detach()*self.coeff).to(int).numpy()
-        W_concorde += W_concorde.max()
+        W_concorde -= W_concorde.min()
         W_concorde[diag_indices(self.n_vertices)] =1e8
         
         problem = TSPSolver.from_data_explicit(W_concorde)
