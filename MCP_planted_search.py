@@ -165,7 +165,7 @@ if __name__=='__main__':
     
     cs_start=7
     cs_stop=21
-    l_cs = [elt for elt in range(cs_start,cs_stop)] + [0]
+    l_cs = range(cs_start,cs_stop)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Using device:', device)
@@ -323,11 +323,21 @@ if __name__=='__main__':
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
     
-            l_np_cs = custom_mcp_bl_eval(test_loader)
+            l_np_cs = custom_mcp_np_eval(test_loader)
             mean_cs_np = np.mean(l_np_cs)
             add_line(np_path,f'{cs1},{mean_cs_np}')
             gen_args['planted']=True
         np_counter+=1
+    
+    gen_args['clique_size'] = 0
+    test_gen=MCP_True_Generator('test',gen_args)
+    test_gen.load_dataset()
+    test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
+
+    l_bl_np_cs = custom_mcp_bl_np_eval(test_loader)
+    mean_cs_bl_np = np.mean(l_bl_np_cs)
+    with open(os.path.join(path,f'Baseline-{mean_cs_bl_np}.txt'),'w') as f:
+        pass
 
     
     model_data = pd.read_csv(filepath,delimiter=',')
