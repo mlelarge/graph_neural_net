@@ -188,7 +188,7 @@ if __name__=='__main__':
     bl_path = os.path.join(path,baseline_filename)
     if not os.path.isfile(bl_path):
         with open(bl_path,'w') as f:
-            f.write('cs_test,cs_inf,acc\n')
+            f.write('cs_test,cs_inf,error,acc\n')
         print(f'Creating baseline file')
     else:
         with open(bl_path,'r') as f:
@@ -216,7 +216,7 @@ if __name__=='__main__':
     pbcs = tqdm.tqdm(l_cs)
     for cs1 in pbcs:
         gen_args['planted'] = True
-        if counter+len(l_cs)<=n_lines:
+        if counter+len(l_cs)<=n_lines and np_counter<np_lines:
             print(f'\nSkipping model for cs1={cs1}')
             counter+=len(l_cs)
         else:
@@ -323,7 +323,7 @@ if __name__=='__main__':
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,shuffle=True)
     
-            l_np_cs = custom_mcp_np_eval(test_loader)
+            l_np_cs = custom_mcp_np_eval(test_loader,model,device)
             mean_cs_np = np.mean(l_np_cs)
             add_line(np_path,f'{cs1},{mean_cs_np}')
             gen_args['planted']=True
@@ -336,7 +336,7 @@ if __name__=='__main__':
 
     l_bl_np_cs = custom_mcp_bl_np_eval(test_loader)
     mean_cs_bl_np = np.mean(l_bl_np_cs)
-    with open(os.path.join(path,f'Baseline-{mean_cs_bl_np}.txt'),'w') as f:
+    with open(os.path.join(path,f'Baseline-n_{n_vertices}-{mean_cs_bl_np}.txt'),'w') as f:
         pass
 
     

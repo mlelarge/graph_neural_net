@@ -853,6 +853,8 @@ class SBM_Generator(Base_Generator):
         self.n_vertices = args['n_vertices']
         self.p_inter = args['p_inter']
         self.p_outer = args['p_outer']
+        self.pi_real = self.p_inter/self.n_vertices
+        self.po_real = self.p_outer/self.n_vertices
         self.alpha = args['alpha']
         num_examples = args['num_examples_' + name]
         subfolder_name = 'SBM_{}_{}_{}_{}_{}'.format(num_examples,
@@ -877,9 +879,10 @@ class SBM_Generator(Base_Generator):
         n_sub_a = n//2
         n_sub_b = n - n_sub_a # In case n_vertices is odd
 
-        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.p_inter)).to(torch.float)
-        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.p_inter)).to(torch.float)
-        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.p_outer).to(torch.float)
+
+        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.pi_real)).to(torch.float)
+        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.pi_real)).to(torch.float)
+        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.po_real).to(torch.float)
         
         adj = torch.zeros((self.n_vertices,self.n_vertices))
 

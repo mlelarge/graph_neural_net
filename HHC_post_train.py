@@ -176,7 +176,7 @@ if __name__=='__main__':
     pb = tqdm.tqdm(mu_to_test)
     for mu in pb:
 
-        filename=f'hhc_post_{n_vertices}.txt'
+        filename=f'hhc_post_{n_vertices}-mu_{mu}.txt'
         filepath = os.path.join(path,filename)
         n_lines=0
         if not os.path.isfile(filepath):
