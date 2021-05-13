@@ -148,7 +148,7 @@ if __name__=='__main__':
                 val_gen.load_dataset()
                 val_loader = siamese_loader(val_gen,batch_size,True,True)
 
-                helper = init_helper('hhc','train',helper_args)
+                helper = init_helper(pbm,'train',helper_args)
 
                 model = get_model(model_args)
                 model.to(device)

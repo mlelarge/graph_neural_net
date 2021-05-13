@@ -1,4 +1,4 @@
-from loaders.data_generator import SBM_Generator
+from loaders.data_generator import MCP_Generator,MCP_True_Generator
 import toolbox.utils as utils
 import tqdm
 import torch
@@ -9,32 +9,31 @@ from commander import get_model,init_helper
 from toolbox.optimizer import get_optimizer
 from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
-from toolbox.metrics import accuracy_sbm_two_categories_edge
+from toolbox.metrics import accuracy_mcp
 
-import sklearn.metrics as skmetrics
 
-MODEL_NAME = 'model_cfixed-n_{}-dc_{}.tar'
+MODEL_NAME = 'model-n_{}-cs_{}.tar'
 
 def add_line(filename,line) -> None:
     with open(filename,'a') as f:
         f.write(line + '\n')
 
-def check_model_exists(model_path,n_vertices,dc)->bool:
-    model_filename = os.path.join(model_path,MODEL_NAME.format(n_vertices,dc))
+def check_model_exists(model_path,n_vertices,pvalue)->bool:
+    model_filename = os.path.join(model_path,MODEL_NAME.format(n_vertices,pvalue))
     return os.path.isfile(model_filename)
 
-def save_model(model_path,model,n_vertices,dc)->None:
+def save_model(model_path,model,n_vertices,pvalue)->None:
     utils.check_dir(model_path)
-    model_filename = os.path.join(model_path,MODEL_NAME.format(n_vertices,dc))
+    model_filename = os.path.join(model_path,MODEL_NAME.format(n_vertices,pvalue))
     torch.save(model.state_dict(), model_filename)
 
-def load_model_dict(model_path,n_vertices,dc,device):
+def load_model_dict(model_path,n_vertices,pvalue,device):
     utils.check_dir(model_path)
-    model_filename = os.path.join(model_path,MODEL_NAME.format(n_vertices,dc))
+    model_filename = os.path.join(model_path,MODEL_NAME.format(n_vertices,pvalue))
     state_dict = torch.load(model_filename,map_location=device)
     return state_dict
 
-def custom_sbm_eval(loader,model,device)->float:
+def custom_mcp_eval(loader,model,device)->float:
 
     model.eval()
 
@@ -44,10 +43,9 @@ def custom_sbm_eval(loader,model,device)->float:
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
-        true_pos,n_total = accuracy_sbm_two_categories_edge(raw_scores,target)
+        true_pos,n_total = accuracy_mcp(raw_scores,target)
         l_acc.append((true_pos/n_total))
     acc = np.mean(l_acc)
-
     return acc
 
 
@@ -57,10 +55,10 @@ if __name__=='__main__':
         'num_examples_val': 1000,
         'num_examples_test': 1000,
         'n_vertices': 100,
-        'path_dataset': 'dataset_sbm',
-        'p_inter': None,
-        'p_outer': None,
-        'alpha': 0.5
+        'planted': True,
+        'path_dataset': 'dataset_mcp',
+        'clique_size': None,
+        'edge_density': 0.5
     }
     opt_args = {
         'lr': 5e-5,
@@ -94,27 +92,26 @@ if __name__=='__main__':
     tot_epoch = helper_args['train']['epoch']
     pbm = 'sbm'
 
-    c=3
+    
 
-    start_dc = 2.5
-    end_dc = 6
-    steps = 20
+    start_cs = 5
+    end_cs = 15
 
-    dc_list = np.linspace(start_dc,end_dc,steps)
+    cs_list = range(start_cs,end_cs+1)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Using device:', device)
 
-    path = 'sbm/'
+    path = 'mcp/'
     model_path = os.path.join(path,'models/')
     utils.check_dir(model_path)
 
-    filename=f'sbm_cfixed-n_{n_vertices}-c_{3}.txt'
+    filename=f'mcp_f1-n_{n_vertices}.txt'
     filepath = os.path.join(path,filename)
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('dc,acc\n')
+            f.write('cs,acc\n')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()
@@ -122,29 +119,26 @@ if __name__=='__main__':
             print(f'File has {n_lines} computations')
 
     counter = 0
-    pb = tqdm.tqdm(dc_list)
-    for dc in pb:
-        pb.set_description(desc=f'Using dc={dc}')
-        p_inter = c-dc/2
-        p_outer = c+dc/2
-        gen_args['p_inter'] = p_inter
-        gen_args['p_outer'] = p_outer
+    pb = tqdm.tqdm(cs_list)
+    for cs in pb:
+        pb.set_description(desc=f'Using cs={cs}')
+        gen_args['clique_size'] = cs
 
         if counter<n_lines:
-            print(f'Skipping dc={dc}')
+            print(f'Skipping cs={cs}')
         else:
-            if check_model_exists(model_path,n_vertices,dc): #If model already exists
-                print(f'Using already trained model for dc={dc}')
+            if check_model_exists(model_path,n_vertices,cs): #If model already exists
+                print(f'Using already trained model for cs={cs}')
                 model = get_model(model_args)
-                state_dict = load_model_dict(model_path,n_vertices,dc,device)
+                state_dict = load_model_dict(model_path,n_vertices,cs,device)
                 model.load_state_dict(state_dict)
                 model.to(device)
             else:
-                train_gen = SBM_Generator('train',gen_args)
+                train_gen = MCP_Generator('train',gen_args)
                 train_gen.load_dataset()
                 train_loader = siamese_loader(train_gen,batch_size,True,True)
 
-                val_gen = SBM_Generator('val',gen_args)
+                val_gen = MCP_Generator('val',gen_args)
                 val_gen.load_dataset()
                 val_loader = siamese_loader(val_gen,batch_size,True,True)
 
@@ -167,15 +161,15 @@ if __name__=='__main__':
                         print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
                         break
                 
-                save_model(model_path, model, n_vertices, dc)
+                save_model(model_path, model, n_vertices, c)
 
-            test_gen = SBM_Generator('test',gen_args)
+            test_gen = MCP_Generator('test',gen_args)
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,True)
             
-            acc = custom_sbm_eval(test_loader,model,device)
+            acc = custom_mcp_eval(test_loader,model,device)
 
-            add_line(filepath,f'{dc},{acc}')
+            add_line(filepath,f'{cs},{acc}')
 
         counter+=1
 

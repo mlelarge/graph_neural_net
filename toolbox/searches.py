@@ -1,12 +1,15 @@
 from random import seed
 import networkx as nx
+from networkx.readwrite.json_graph import adjacency
 import torch
 import numpy as np
-import toolbox.utils as utils
+#import toolbox.utils as utils
 import tqdm
 from scipy.spatial.distance import pdist, squareform
+import random
+import timeit
 
-#MCP
+
 
 def insert(container, new_item, key=len):
     """
@@ -25,40 +28,40 @@ def insert(container, new_item, key=len):
             r = mid
     return container[:l] + [new_item] + container[l:]
 
-def N(v, g):
-    return [i for i, n_v in enumerate(g[v]) if n_v]
+#MCP
 
-def bronk2(R, P, X, g):
-    if not any((P, X)):
+def neighs(v,adj):
+    return {i for i in range(adj.shape[0]) if adj[v,i]}
+
+
+def _bronk2(R,P,X,adj):
+    if len(P)==0 and len(X)==0:
         yield R
-    for v in P[:]:
-        R_v = R + [v]
-        P_v = [v1 for v1 in P if v1 in N(v, g)]
-        X_v = [v1 for v1 in X if v1 in N(v, g)]
-        for r in bronk2(R_v, P_v, X_v, g):
-            yield r
-        P.remove(v)
-        X.append(v)
+    else:
+        u = random.sample(P.union(X),1)
+        N_u = neighs(u,adj)
+        for v in P-N_u:
+            N_v = neighs(v,adj)
+            for clique in _bronk2(R.union({v}),P.intersection(N_v),X.intersection(N_v),adj):
+                yield clique
+            P = P - {v}
+            X = X.union({v})
 
-def find_maxclique(g,ind=None,clique_size=0):
-    l_clique = []
-    if ind is None:
-        ind = range(g.shape[0])
-    visited = set()
-    l = clique_size
-    for x in ind:
-        #print(x,visited)
-        if not (x in visited):
-            for clique in bronk2([x],N(x,g),[],g):
-                #print(set(clique))
-                if len(clique) > l-1:
-                    clique.sort()
-                    #print(clique)
-                    l = len(clique)
-                    visited.update(clique)
-                    l_clique.append(clique)
-                    #print(visited)
-    return l_clique
+def mc_bronk2(adj):
+    assert (adj==(adj.T+adj)/2).all(), "Matrix is not symmetric"
+    n,_ = adj.shape
+    adj = adj * (1 - torch.diag_embed(torch.ones(n)))
+    base_set = {i for i in range(n)}
+    max_cliques = []
+    max_length=0
+    for c in _bronk2(set(),base_set,set(),adj):
+        cur_l = len(c)
+        if cur_l==max_length:
+            max_cliques.append(c)
+        elif cur_l>max_length:
+            max_cliques = [c]
+            max_length=cur_l
+    return max_cliques
 
 def mcp_proba_cheat(data,raw_scores, solutions, overestimate=10):
     """
@@ -284,7 +287,15 @@ def tsp_beam_decode(raw_scores,l_xs=[],l_ys=[],W_dists=None,b=1280,start_mode="r
 
 
 if __name__ == "__main__":
-    g = nx.erdos_renyi_graph(50,0.7)
-    adj = torch.tensor(nx.adjacency_matrix(g).todense())
+    #g = nx.erdos_renyi_graph(50,0.7)
+    #adj = torch.tensor(nx.adjacency_matrix(g).todense())
     #l_time = timeit.repeat(lambda : find_maxclique(adj),number=1,repeat=1)
-
+    n=100
+    def time_bronk(n):
+        g = torch.empty((n,n)).uniform_()
+        g = (g.T+g)/2
+        #print(g)
+        g = (g<(0.9)).to(int)
+        #print(g)
+        print(mc_bronk2(g))
+    print(timeit.timeit(lambda : time_bronk(n),number=5))
