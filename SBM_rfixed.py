@@ -53,7 +53,7 @@ def custom_sbm_eval(loader,model,device)->float:
 
 if __name__=='__main__':
     gen_args = {
-        'num_examples_train': 20000,
+        'num_examples_train': 10000,
         'num_examples_val': 1000,
         'num_examples_test': 1000,
         'n_vertices': 100,
@@ -63,7 +63,7 @@ if __name__=='__main__':
         'alpha': 0.5
     }
     opt_args = {
-        'lr': 5e-5,
+        'lr': 1e-5,
         'scheduler_step': 1,
         'scheduler_decay': 0.1
     }
@@ -79,8 +79,8 @@ if __name__=='__main__':
     helper_args = {
         'train':{# Training parameters
             'epoch': 10,
-            'batch_size': 8,
-            'lr': 1e-4,
+            'batch_size': 4,
+            'lr': 1e-5,
             'scheduler_step': 1,
             'scheduler_decay': 0.5,
             'lr_stop': 1e-7,

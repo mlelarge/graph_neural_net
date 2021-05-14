@@ -6,6 +6,8 @@ from toolbox.utils import get_device
 import torch.nn.functional as F
 from sklearn.cluster import KMeans
 
+from toolbox.searches import mc_bronk2
+
 class Meter(object):
     """Computes and stores the sum, average and current value"""
     def __init__(self):
@@ -167,21 +169,21 @@ def accuracy_max_mcp(weights,clique_size):
         total_n_vertices += clique_size#len(weight)
     return true_pos, total_n_vertices
 
-def accuracy_mcp(weights,solutions):
+def accuracy_mcp(raw_scores,solutions):
     """
     weights and solutions should be (bs,n,n)
     """
     clique_sizes,_ = torch.max(solutions.sum(dim=-1),dim=-1) #The '+1' is because the diagonal of the solutions is 0
     clique_sizes += 1
-    bs,n,_ = weights.shape
+    bs,n,_ = raw_scores.shape
     true_pos = 0
     total_n_vertices = 0
 
-    probas = torch.sigmoid(weights)
+    probas = torch.sigmoid(raw_scores)
 
     deg = torch.sum(probas, dim=-1)
     inds = [ (torch.topk(deg[k],int(clique_sizes[k].item()),dim=-1))[1] for k in range(bs)]
-    for i,_ in enumerate(weights):
+    for i,_ in enumerate(raw_scores):
         sol = torch.sum(solutions[i],dim=1) #Sum over rows !
         ind = inds[i]
         for idx in ind:
@@ -190,6 +192,41 @@ def accuracy_mcp(weights,solutions):
                 true_pos += 1
         total_n_vertices+=clique_sizes[i].item()
     return true_pos, total_n_vertices
+
+def accuracy_mcp_exact(raw_scores,cliques_solutions):
+    """
+    weights should be (bs,n,n)
+    cliques_solutions should be a list of size bs of lists of sets (multiple possible max cliques for each problem)
+    returns
+    """
+    bs,n,_ = raw_scores.shape
+    clique_sizes = torch.zeros(bs)
+    for k,cliques_solution in enumerate(cliques_solutions):
+        if len(cliques_solution)!=0:
+            clique_sizes[k] = cliques_solution[0]
+
+    probas = torch.sigmoid(raw_scores)
+    deg = torch.sum(probas, dim=-1)
+    inds = [ (torch.topk(deg[k],int(clique_sizes[k].item()),dim=-1))[1] for k in range(bs)]
+
+    true_pos = 0
+    total_n_vertices = 0
+    l_sol_cliques = []
+    for k,_ in enumerate(raw_scores):
+        ind = inds[k]
+        ind_set = set([elt.item() for elt in ind])
+        possible_solutions = cliques_solutions[k]
+        max_pos = 0
+        best_clique = set()
+        for sol in possible_solutions:
+            cur_pos = len(sol.intersection(ind_set))
+            if cur_pos>=max_pos:
+                max_pos=cur_pos
+                best_clique = sol
+        true_pos+=max_pos
+        total_n_vertices+=clique_sizes[k].item()
+        l_sol_cliques.append(best_clique)
+    return true_pos, total_n_vertices, l_sol_cliques
 
 #TSP
 

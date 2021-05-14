@@ -9,8 +9,10 @@ from commander import get_model,init_helper
 from toolbox.optimizer import get_optimizer
 from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
-from toolbox.metrics import accuracy_mcp
+from toolbox.metrics import accuracy_mcp, accuracy_mcp_exact
+from toolbox.searches import mc_bronk2
 
+import sklearn.metrics as skmetrics
 
 MODEL_NAME = 'model-n_{}-cs_{}.tar'
 
@@ -37,23 +39,53 @@ def custom_mcp_eval(loader,model,device)->float:
 
     model.eval()
 
-    l_acc = []
-    for data,target in tqdm.tqdm(loader,desc='Inner Loop : testing SBMs'):
+    l_acc_inf_mcps = []
+    l_acc_mcps_mcp = []
+    l_acc_inf_mcp  = []
+    l_auc_inf_mcps = []
+    l_auc_inf_mcp  = []
+    for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving MCPs'):
         bs,n,_ = target.shape
+        target_mcp =[]
+        for k in range(bs):
+            cliques_sol = mc_bronk2(data[:,:,:,1].to(int))
+            target_mcp.append(cliques_sol)
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
-        true_pos,n_total = accuracy_mcp(raw_scores,target)
-        l_acc.append((true_pos/n_total))
-    acc = np.mean(l_acc)
-    return acc
+        probas = torch.sigmoid(raw_scores)
+
+        tp,ntot = accuracy_mcp(raw_scores, target)
+        l_acc_inf_mcps.append(tp/ntot)
+        tp,ntot,cliques_inf_mcp = accuracy_mcp_exact(target, target_mcp)
+        l_acc_mcps_mcp.append(tp/ntot)
+        tp,ntot,_ = accuracy_mcp_exact(raw_scores, target_mcp)
+        l_acc_inf_mcp.append(tp/ntot)
+        
+        target_inf_mcp = torch.zeros((bs,n,n))
+        for k in range(bs):
+            cur_clique = cliques_inf_mcp[k]
+            target_inf_mcp[k] = utils.mcp_ind_to_adj(cur_clique,n).detach().clone()
+
+        fpr, tpr, _ = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), probas.cpu().detach().reshape(bs*n*n).numpy())
+        l_auc_inf_mcps.append(skmetrics.auc(fpr,tpr))
+
+
+        fpr, tpr, _ = skmetrics.roc_curve(target_inf_mcp.cpu().detach().reshape(bs*n*n).numpy(), probas.cpu().detach().reshape(bs*n*n).numpy())
+        l_auc_inf_mcp.append(skmetrics.auc(fpr,tpr))
+    acc_inf_mcps = np.mean(l_acc_inf_mcps)
+    acc_mcps_mcp = np.mean(l_acc_mcps_mcp)
+    acc_inf_mcp  = np.mean(l_acc_inf_mcp)
+    auc_inf_mcps = np.mean(l_auc_inf_mcps)
+    auc_inf_mcp  = np.mean(l_auc_inf_mcp)
+    return acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp
 
 
 if __name__=='__main__':
     gen_args = {
         'num_examples_train': 10000,
         'num_examples_val': 1000,
-        'num_examples_test': 1000,
+        'num_examples_test': 100,
         'n_vertices': 100,
         'planted': True,
         'path_dataset': 'dataset_mcp',
@@ -76,7 +108,7 @@ if __name__=='__main__':
     }
     helper_args = {
         'train':{# Training parameters
-            'epoch': 10,
+            'epoch': 20,
             'batch_size': 4,
             'lr': 1e-5,
             'scheduler_step': 1,
@@ -106,12 +138,12 @@ if __name__=='__main__':
     model_path = os.path.join(path,'models/')
     utils.check_dir(model_path)
 
-    filename=f'mcp_f1-n_{n_vertices}.txt'
+    filename=f'mcp_comp-n_{n_vertices}.txt'
     filepath = os.path.join(path,filename)
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('cs,acc\n')
+            f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp\n')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()
@@ -163,13 +195,13 @@ if __name__=='__main__':
                 
                 save_model(model_path, model, n_vertices, cs)
 
-            test_gen = MCP_Generator('test',gen_args)
+            test_gen = MCP_True_Generator('test',gen_args)
             test_gen.load_dataset()
             test_loader = siamese_loader(test_gen,batch_size,True,True)
             
-            acc = custom_mcp_eval(test_loader,model,device)
+            acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp = custom_mcp_eval(test_loader,model,device)
 
-            add_line(filepath,f'{cs},{acc}')
+            add_line(filepath,f'{cs},{acc_inf_mcps},{acc_mcps_mcp},{acc_inf_mcp},{auc_inf_mcps},{auc_inf_mcp}')
 
         counter+=1
 
