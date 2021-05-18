@@ -48,7 +48,7 @@ def custom_mcp_eval(loader,model,device)->float:
         bs,n,_ = target.shape
         target_mcp =[]
         for k in range(bs):
-            cliques_sol = mc_bronk2(data[:,:,:,1].to(int))
+            cliques_sol = mc_bronk2(data[k,:,:,1].to(int))
             target_mcp.append(cliques_sol)
         data = data.to(device)
         target = target.to(device)

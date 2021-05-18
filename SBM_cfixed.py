@@ -93,10 +93,13 @@ if __name__=='__main__':
     batch_size = helper_args['train']['batch_size']
     tot_epoch = helper_args['train']['epoch']
     pbm = 'sbm'
+    
+    retrain = True
+    n_retrain = 5
 
     c=3
 
-    start_dc = 2.5
+    start_dc = 0
     end_dc = 6
     steps = 20
 
@@ -109,7 +112,7 @@ if __name__=='__main__':
     model_path = os.path.join(path,'models/')
     utils.check_dir(model_path)
 
-    filename=f'sbm_cfixed-n_{n_vertices}-c_{3}.txt'
+    filename=f'sbm_cfixed-n_{n_vertices}-c_{c}.txt'
     filepath = os.path.join(path,filename)
     n_lines=0
     if not os.path.isfile(filepath):
@@ -120,6 +123,19 @@ if __name__=='__main__':
             data = f.readlines()
             n_lines = len(data)-1
             print(f'File has {n_lines} computations')
+    
+    list_fname=f'sbm_cfixed-l-n_{n_vertices}-c_{c}.txt'
+    lpath = os.path.join(path,list_fname)
+    n_lines=0
+    if not os.path.isfile(lpath):
+        with open(lpath,'w') as f:
+            f.write('dc,list\n')
+    else:
+        with open(lpath,'r') as f:
+            l_data = f.readlines()
+            l_n_lines = len(l_data)-1
+            print(f'File has {l_n_lines} computations')
+
 
     counter = 0
     pb = tqdm.tqdm(dc_list)
@@ -133,49 +149,54 @@ if __name__=='__main__':
         if counter<n_lines:
             print(f'Skipping dc={dc}')
         else:
-            if check_model_exists(model_path,n_vertices,dc): #If model already exists
-                print(f'Using already trained model for dc={dc}')
-                model = get_model(model_args)
-                state_dict = load_model_dict(model_path,n_vertices,dc,device)
-                model.load_state_dict(state_dict)
-                model.to(device)
-            else:
-                train_gen = SBM_Generator('train',gen_args)
-                train_gen.load_dataset()
-                train_loader = siamese_loader(train_gen,batch_size,True,True)
+            l_acc = []
+            for train_number in range(n_retrain):
+                if not retrain and check_model_exists(model_path,n_vertices,dc): #If model already exists
+                    print(f'Using already trained model for dc={dc}')
+                    model = get_model(model_args)
+                    state_dict = load_model_dict(model_path,n_vertices,dc,device)
+                    model.load_state_dict(state_dict)
+                    model.to(device)
+                else:
+                    train_gen = SBM_Generator('train',gen_args)
+                    train_gen.load_dataset()
+                    train_loader = siamese_loader(train_gen,batch_size,True,True)
 
-                val_gen = SBM_Generator('val',gen_args)
-                val_gen.load_dataset()
-                val_loader = siamese_loader(val_gen,batch_size,True,True)
+                    val_gen = SBM_Generator('val',gen_args)
+                    val_gen.load_dataset()
+                    val_loader = siamese_loader(val_gen,batch_size,True,True)
 
-                helper = init_helper(pbm,'train',helper_args)
+                    helper = init_helper(pbm,'train',helper_args)
 
-                model = get_model(model_args)
-                model.to(device)
+                    model = get_model(model_args)
+                    model.to(device)
 
-                optimizer, scheduler = get_optimizer(opt_args,model)
+                    optimizer, scheduler = get_optimizer(opt_args,model)
 
-                for epoch in range(tot_epoch):
-                    train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+                    for epoch in range(tot_epoch):
+                        train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+                        
+                        _, loss = val_triplet(val_loader,model,helper,device,epoch,eval_score=True)
+
+                        scheduler.step(loss)
+
+                        cur_lr = utils.get_lr(optimizer)
+                        if helper.stop_condition(cur_lr):
+                            print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+                            break
                     
-                    _, loss = val_triplet(val_loader,model,helper,device,epoch,eval_score=True)
+                    save_model(model_path, model, n_vertices, dc)
 
-                    scheduler.step(loss)
-
-                    cur_lr = utils.get_lr(optimizer)
-                    if helper.stop_condition(cur_lr):
-                        print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
-                        break
+                test_gen = SBM_Generator('test',gen_args)
+                test_gen.load_dataset()
+                test_loader = siamese_loader(test_gen,batch_size,True,True)
                 
-                save_model(model_path, model, n_vertices, dc)
-
-            test_gen = SBM_Generator('test',gen_args)
-            test_gen.load_dataset()
-            test_loader = siamese_loader(test_gen,batch_size,True,True)
-            
-            acc = custom_sbm_eval(test_loader,model,device)
-
+                cur_acc = custom_sbm_eval(test_loader,model,device)
+                l_acc.append(cur_acc)
+            acc = np.mean(l_acc)
             add_line(filepath,f'{dc},{acc}')
+            if retrain:
+                add_line(lpath,f'{dc},{l_acc}')
 
         counter+=1
 

@@ -200,10 +200,10 @@ def accuracy_mcp_exact(raw_scores,cliques_solutions):
     returns
     """
     bs,n,_ = raw_scores.shape
-    clique_sizes = torch.zeros(bs)
+    clique_sizes = [torch.zeros(bs)]
     for k,cliques_solution in enumerate(cliques_solutions):
         if len(cliques_solution)!=0:
-            clique_sizes[k] = cliques_solution[0]
+            clique_sizes[k] = len(cliques_solution[0])
 
     probas = torch.sigmoid(raw_scores)
     deg = torch.sum(probas, dim=-1)

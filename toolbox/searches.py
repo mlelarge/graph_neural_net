@@ -7,7 +7,9 @@ import numpy as np
 import tqdm
 from scipy.spatial.distance import pdist, squareform
 import random
-import timeit
+import time
+import string
+import os
 
 
 
@@ -62,6 +64,49 @@ def mc_bronk2(adj):
             max_cliques = [c]
             max_length=cur_l
     return max_cliques
+
+def write_adj(fname,adj):
+    with open(fname,'w') as f:
+        for row in adj:
+            line = ""
+            for value in row:
+                line+=f"{int(value)} "
+            line = line[:-1] + "\n"
+            f.write(line)
+
+def read_adj(fname):
+    with open(fname,'r') as f:
+        data = f.readlines()
+    cliques = []
+    for i,line in enumerate(data):
+        cur_data = {int(elt) for elt in line.split(' ')}
+        cliques.append(cur_data)
+    return cliques
+
+def mc_bronk2_cpp(adjs,max_instances=4):
+    """
+    adj should be of shape (bs,n,n) or (n,n)
+    """
+    path = "tmp_mcp/"
+    #utils.check_dir(path)
+    solo=False
+    if len(adjs.shape)==2:
+        solo = True
+        adjs = adjs.unsqueeze(0)
+    bs,n,_ = adjs.shape
+    sol_cliques = []
+    for adj in adjs:
+        random_name = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+        fwname = os.path.join(path,random_name + '.mcp')
+        frname = os.path.join(path,random_name + '.mcps')
+        write_adj(fwname,adj)
+        os.system(f'./mcp_solver.exe {fwname}')
+        cliques = read_adj(frname)
+        sol_cliques.append(cliques)
+    if solo:
+        sol_cliques = sol_cliques[0]
+    return sol_cliques
+
 
 def mcp_proba_cheat(data,raw_scores, solutions, overestimate=10):
     """
@@ -291,11 +336,19 @@ if __name__ == "__main__":
     #adj = torch.tensor(nx.adjacency_matrix(g).todense())
     #l_time = timeit.repeat(lambda : find_maxclique(adj),number=1,repeat=1)
     n=100
-    def time_bronk(n):
-        g = torch.empty((n,n)).uniform_()
-        g = (g.T+g)/2
-        #print(g)
-        g = (g<(0.9)).to(int)
-        #print(g)
-        print(mc_bronk2(g))
-    print(timeit.timeit(lambda : time_bronk(n),number=5))
+    #def time_bronk(n):
+    #    g = torch.empty((n,n)).uniform_()
+    #    g = (g.T+g)/2
+    #    #print(g)
+    #    g = (g<(0.9)).to(int)
+    #    #print(g)
+    #    print(mc_bronk2(g))
+    #print(timeit.timeit(lambda : time_bronk(n),number=5))
+    
+    def test_mcp_solver(bs,n):
+        adjs = torch.empty((bs,n,n)).uniform_()
+        adjs = (adjs.transpose(-1,-2)+adjs)/2
+        adjs = (adjs<(0.5)).to(int)
+        clique_sols = mc_bronk2_cpp(adjs)
+        return clique_sols
+    clique_sols = test_mcp_solver(10,n)
