@@ -96,6 +96,8 @@ if __name__=='__main__':
     
     retrain = True
     n_retrain = 5
+    if not retrain:
+        n_retrain=1
 
     c=3
 
@@ -126,7 +128,7 @@ if __name__=='__main__':
     
     list_fname=f'sbm_cfixed-l-n_{n_vertices}-c_{c}.txt'
     lpath = os.path.join(path,list_fname)
-    n_lines=0
+    l_n_lines=0
     if not os.path.isfile(lpath):
         with open(lpath,'w') as f:
             f.write('dc,list\n')

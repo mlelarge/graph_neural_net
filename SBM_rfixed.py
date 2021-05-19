@@ -96,7 +96,9 @@ if __name__=='__main__':
 
     retrain = True
     n_retrain = 5
-
+    if not retrain:
+        n_retrain=1
+    
     r=0.3
 
     start_c = 2
@@ -151,7 +153,7 @@ if __name__=='__main__':
         else:
             l_acc = []
             for train_number in range(n_retrain):
-                if check_model_exists(model_path,n_vertices,c): #If model already exists
+                if not retrain and check_model_exists(model_path,n_vertices,c): #If model already exists
                     print(f'Using already trained model for c={c}')
                     model = get_model(model_args)
                     state_dict = load_model_dict(model_path,n_vertices,c,device)

@@ -784,12 +784,12 @@ class MCP_Generator(Base_Generator):
         B = adjacency_matrix_to_tensor_representation(W)
 
 
-        #k_size = len(torch.where(K.sum(dim=-1)!=0)[0])
-        #seed = utils.mcp_adj_to_ind(K)
-        #K2 = mcp_beam_method(B,K,seeds=seed,add_singles=False) #Finds a probably better solution with beam search in the form of a list of indices
-        #k2_size = len(K2)
-        #if k2_size>k_size:
-            #K = utils.mcp_ind_to_adj(K2,self.n_vertices)
+        k_size = len(torch.where(K.sum(dim=-1)!=0)[0])
+        seed = utils.mcp_adj_to_ind(K)
+        K2 = mcp_beam_method(B,K,seeds=seed,add_singles=False) #Finds a probably better solution with beam search in the form of a list of indices
+        k2_size = len(K2)
+        if k2_size>k_size:
+            K = utils.mcp_ind_to_adj(K2,self.n_vertices)
         return (B, K)
         
     @classmethod
