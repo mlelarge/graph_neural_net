@@ -3,7 +3,8 @@ import networkx as nx
 from networkx.readwrite.json_graph import adjacency
 import torch
 import numpy as np
-#import toolbox.utils as utils
+import toolbox.utils as utils
+from toolbox.mcp_solver import MCP_Solver
 import tqdm
 from scipy.spatial.distance import pdist, squareform
 import random
@@ -83,29 +84,16 @@ def read_adj(fname):
         cliques.append(cur_data)
     return cliques
 
-def mc_bronk2_cpp(adjs,max_instances=4):
+def mc_bronk2_cpp(adjs,max_threads=4):
     """
     adj should be of shape (bs,n,n) or (n,n)
     """
     path = "tmp_mcp/"
-    #utils.check_dir(path)
-    solo=False
-    if len(adjs.shape)==2:
-        solo = True
-        adjs = adjs.unsqueeze(0)
-    bs,n,_ = adjs.shape
-    sol_cliques = []
-    for adj in adjs:
-        random_name = ''.join(random.choice(string.ascii_letters) for _ in range(10))
-        fwname = os.path.join(path,random_name + '.mcp')
-        frname = os.path.join(path,random_name + '.mcps')
-        write_adj(fwname,adj)
-        os.system(f'./mcp_solver.exe {fwname}')
-        cliques = read_adj(frname)
-        sol_cliques.append(cliques)
-    if solo:
-        sol_cliques = sol_cliques[0]
-    return sol_cliques
+    utils.check_dir(path)
+    solver = MCP_Solver(adjs,max_threads=max_threads)
+    solver.solve()
+    clique_sols = solver.solutions
+    return clique_sols
 
 
 def mcp_proba_cheat(data,raw_scores, solutions, overestimate=10):

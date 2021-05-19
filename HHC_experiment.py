@@ -132,7 +132,7 @@ if __name__=='__main__':
         'num_examples_train': 20000,
         'num_examples_val': 1000,
         'num_examples_test': 1000,
-        'n_vertices': 50,
+        'n_vertices': 100,
         'path_dataset': 'dataset_hhc',
         'generative_model': 'Gauss',
         'cycle_param': 0,
@@ -140,7 +140,7 @@ if __name__=='__main__':
         'timeout': 60
     }
     opt_args = {
-        'lr': 5e-5,
+        'lr': 1e-5,
         'scheduler_step': 1,
         'scheduler_decay': 0.1
     }
@@ -156,10 +156,10 @@ if __name__=='__main__':
     helper_args = {
         'train':{# Training parameters
             'epoch': 10,
-            'batch_size': 8,
-            'lr': 1e-4,
+            'batch_size': 4,
+            'lr': 1e-5,
             'scheduler_step': 1,
-            'scheduler_decay': 0.5,
+            'scheduler_decay': 0.1,
             'lr_stop': 1e-7,
             'print_freq': 100,
             'anew': True
