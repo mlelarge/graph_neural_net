@@ -82,7 +82,7 @@ if __name__=='__main__':
             'batch_size': 4,
             'lr': 1e-5,
             'scheduler_step': 1,
-            'scheduler_decay': 0.5,
+            'scheduler_decay': 0.1,
             'lr_stop': 1e-7,
             'print_freq': 100,
             'anew': True

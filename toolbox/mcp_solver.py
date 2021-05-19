@@ -4,6 +4,7 @@ import time
 import torch
 import numpy as np
 import random
+import toolbox.utils as utils
 
 from string import ascii_letters,digits
 NAME_CHARS = ascii_letters+digits
@@ -58,6 +59,7 @@ class Thread_MCP_Solver(threading.Thread):
 
 class MCP_Solver():
     def __init__(self,adjs=None, max_threads=8):
+        utils.check_dir('./tmp_mcp')
         if adjs is None:
             self.adjs = []
         self.adjs = adjs

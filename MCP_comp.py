@@ -10,7 +10,7 @@ from toolbox.optimizer import get_optimizer
 from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
 from toolbox.metrics import accuracy_mcp, accuracy_mcp_exact
-from toolbox.searches import mc_bronk2_cpp
+from toolbox.searches import mc_bronk2_cpp,mc_bronk2
 
 import sklearn.metrics as skmetrics
 
@@ -47,7 +47,9 @@ def custom_mcp_eval(loader,model,device)->float:
     for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving MCPs'):
         bs,n,_ = target.shape
         target_mcp =[]
-        target_mcp = mc_bronk2_cpp(data[k,:,:,1].to(int))
+        for k in range(bs):
+            cliques_sols = mc_bronk2(data[k,:,:,1].to(int))
+            target_mcp.append(cliques_sols)
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
