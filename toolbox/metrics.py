@@ -197,10 +197,9 @@ def accuracy_mcp_exact(raw_scores,cliques_solutions):
     """
     weights should be (bs,n,n)
     cliques_solutions should be a list of size bs of lists of sets (multiple possible max cliques for each problem)
-    returns
     """
     bs,n,_ = raw_scores.shape
-    clique_sizes = [torch.zeros(bs)]
+    clique_sizes = torch.zeros(bs)
     for k,cliques_solution in enumerate(cliques_solutions):
         if len(cliques_solution)!=0:
             clique_sizes[k] = len(cliques_solution[0])

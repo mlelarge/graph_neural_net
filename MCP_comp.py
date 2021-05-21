@@ -16,6 +16,41 @@ import sklearn.metrics as skmetrics
 
 MODEL_NAME = 'model-n_{}-cs_{}.tar'
 
+def add_line_lists(filename,param1,values_list):
+    chaine = f'{param1}'
+    assert len(values_list)>0, "Empty list, can't write anything."
+    try:
+        n_to_write = len(values_list[0])
+    except TypeError:
+        n_to_write=1
+        values_list = [[elt] for elt in values_list]
+    for value_number in range(n_to_write):
+        chaine+=','
+        l_temp_values = [elt[value_number] for elt in values_list]
+        chaine+=str(l_temp_values)
+    add_line(filename,chaine)
+
+def add_line_mean(filename,param1,values_list):
+    chaine = f'{param1}'
+    assert len(values_list)>0, "Empty list, can't write anything."
+    try:
+        n_to_write = len(values_list[0])
+    except TypeError:
+        n_to_write=1
+        values_list = [[elt] for elt in values_list]
+    for value_number in range(n_to_write):
+        chaine+=','
+        l_temp_values = [elt[value_number] for elt in values_list]
+        chaine+=str(np.mean(l_temp_values))
+    add_line(filename,chaine)
+
+def add_line_mean(filename,param1,values_list):
+    chaine = f'{param1}'
+    for i in range(len(values_list[0])):
+        value = np.mean([it_value[i] for it_value in values_list])
+        chaine+= ',' + str(value)
+    add_line(filename,chaine)
+
 def add_line(filename,line) -> None:
     with open(filename,'a') as f:
         f.write(line + '\n')
@@ -122,9 +157,12 @@ if __name__=='__main__':
     n_vertices = gen_args['n_vertices']
     batch_size = helper_args['train']['batch_size']
     tot_epoch = helper_args['train']['epoch']
-    pbm = 'sbm'
+    pbm = 'mcp'
 
-    
+    retrain=True
+    n_retrain = 5
+    if not retrain:
+        n_retrain=1
 
     start_cs = 5
     end_cs = 15
@@ -149,6 +187,19 @@ if __name__=='__main__':
             data = f.readlines()
             n_lines = len(data)-1
             print(f'File has {n_lines} computations')
+    
+    lname=f'mcp_comp-l-n_{n_vertices}.txt'
+    lpath = os.path.join(path,lname)
+    l_n_lines=0
+    if not os.path.isfile(lpath):
+        with open(lpath,'w') as f:
+            f.write('fill_param_train,acc,perf_hhc,auc_tsps,auc_tsp,tsp_length,tsps_length,inf_length,tsps_tsp_len_ratio,tsps_tsp_edge_ratio,inf_tsp_len_ratio,inf_tsp_edge_ratio\n')
+    else:
+        with open(lpath,'r') as f:
+            ldata = f.readlines()
+            ln_lines = len(ldata)-1
+            print(f'List file has {l_n_lines} computations')
+
 
     counter = 0
     pb = tqdm.tqdm(cs_list)
@@ -159,49 +210,53 @@ if __name__=='__main__':
         if counter<n_lines:
             print(f'Skipping cs={cs}')
         else:
-            if check_model_exists(model_path,n_vertices,cs): #If model already exists
-                print(f'Using already trained model for cs={cs}')
-                model = get_model(model_args)
-                state_dict = load_model_dict(model_path,n_vertices,cs,device)
-                model.load_state_dict(state_dict)
-                model.to(device)
-            else:
-                train_gen = MCP_Generator('train',gen_args)
-                train_gen.load_dataset()
-                train_loader = siamese_loader(train_gen,batch_size,True,True)
+            l_values = []
+            for _ in range(n_retrain):
+                if not retrain and check_model_exists(model_path,n_vertices,cs): #If model already exists
+                    print(f'Using already trained model for cs={cs}')
+                    model = get_model(model_args)
+                    state_dict = load_model_dict(model_path,n_vertices,cs,device)
+                    model.load_state_dict(state_dict)
+                    model.to(device)
+                else:
+                    train_gen = MCP_Generator('train',gen_args)
+                    train_gen.load_dataset()
+                    train_loader = siamese_loader(train_gen,batch_size,True,True)
 
-                val_gen = MCP_Generator('val',gen_args)
-                val_gen.load_dataset()
-                val_loader = siamese_loader(val_gen,batch_size,True,True)
+                    val_gen = MCP_Generator('val',gen_args)
+                    val_gen.load_dataset()
+                    val_loader = siamese_loader(val_gen,batch_size,True,True)
 
-                helper = init_helper(pbm,'train',helper_args)
+                    helper = init_helper(pbm,'train',helper_args)
 
-                model = get_model(model_args)
-                model.to(device)
+                    model = get_model(model_args)
+                    model.to(device)
 
-                optimizer, scheduler = get_optimizer(opt_args,model)
+                    optimizer, scheduler = get_optimizer(opt_args,model)
 
-                for epoch in range(tot_epoch):
-                    train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+                    for epoch in range(tot_epoch):
+                        train_triplet(train_loader,model,optimizer,helper,device,epoch,eval_score=True,print_freq=100)
+                        
+                        _, loss = val_triplet(val_loader,model,helper,device,epoch,eval_score=True)
+
+                        scheduler.step(loss)
+
+                        cur_lr = utils.get_lr(optimizer)
+                        if helper.stop_condition(cur_lr):
+                            print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+                            break
                     
-                    _, loss = val_triplet(val_loader,model,helper,device,epoch,eval_score=True)
+                    save_model(model_path, model, n_vertices, cs)
 
-                    scheduler.step(loss)
-
-                    cur_lr = utils.get_lr(optimizer)
-                    if helper.stop_condition(cur_lr):
-                        print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
-                        break
+                test_gen = MCP_Generator('test',gen_args)
+                test_gen.load_dataset()
+                test_loader = siamese_loader(test_gen,batch_size,True,True)
                 
-                save_model(model_path, model, n_vertices, cs)
-
-            test_gen = MCP_True_Generator('test',gen_args)
-            test_gen.load_dataset()
-            test_loader = siamese_loader(test_gen,batch_size,True,True)
-            
-            acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp = custom_mcp_eval(test_loader,model,device)
-
-            add_line(filepath,f'{cs},{acc_inf_mcps},{acc_mcps_mcp},{acc_inf_mcp},{auc_inf_mcps},{auc_inf_mcp}')
+                l_values.append(custom_mcp_eval(test_loader,model,device))
+                #acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp = custom_mcp_eval(test_loader,model,device)
+            add_line_mean(filepath,cs,l_values)
+            add_line_lists(lpath,cs,l_values)
+            #add_line(filepath,f'{cs},{acc_inf_mcps},{acc_mcps_mcp},{acc_inf_mcp},{auc_inf_mcps},{auc_inf_mcp}')
 
         counter+=1
 
