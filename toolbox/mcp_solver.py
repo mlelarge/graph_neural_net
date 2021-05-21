@@ -34,7 +34,7 @@ class Thread_MCP_Solver(threading.Thread):
                 f.write(line)
 
     def _read_adj(self):
-        with open(self.fwname,'r') as f:
+        with open(self.frname,'r') as f:
             data = f.readlines()
         cliques = []
         for i,line in enumerate(data):
@@ -42,12 +42,14 @@ class Thread_MCP_Solver(threading.Thread):
             cliques.append(cur_data)
         self.solutions = cliques
     
-    def clear(self,erase=True):
-        if erase:
+    def clear(self,erase_mode='all'):
+        if erase_mode=='all':
             os.remove(self.frname)
             os.remove(self.fwname)
             os.remove(self.flname)
-
+        elif erase_mode=='i':
+            os.remove(self.flname)
+            os.remove(self.fwname)
 
     def run(self):
         self._write_adj()
@@ -58,8 +60,9 @@ class Thread_MCP_Solver(threading.Thread):
 
 
 class MCP_Solver():
-    def __init__(self,adjs=None, max_threads=8):
-        utils.check_dir('./tmp_mcp')
+    def __init__(self,adjs=None, max_threads=8,path='tmp_mcp/',erase_mode ='all'):
+        utils.check_dir(path)
+        self.path = path
         if adjs is None:
             self.adjs = []
         self.adjs = adjs
@@ -67,6 +70,7 @@ class MCP_Solver():
         self.max_threads = max_threads
         self.threads = [None for _ in range(self.max_threads)]
         self.solutions  = []
+        self.erase_mode=erase_mode
     
     @classmethod
     def from_data(adjs,max_threads=8):
@@ -85,13 +89,13 @@ class MCP_Solver():
     def is_thread_available(self,i):
         return self.threads[i] is None
     
-    def clean_threads(self,erase=True):
+    def clean_threads(self):
         for i,thread in enumerate(self.threads):
             if thread is not None and thread.done:
                 id = thread.threadID
                 print(f"Solution {id} on thread {i} is done.")
                 self.solutions[id] = thread.solutions
-                thread.clear(erase=erase)
+                thread.clear(erase_mode=self.erase_mode)
                 self.threads[i] = None
     
     def reset(self,bs):
@@ -112,7 +116,7 @@ class MCP_Solver():
             for thread_slot in range(self.max_threads):
                 if counter <bs and self.is_thread_available(thread_slot):
                     adj = adjs[counter]
-                    new_thread = Thread_MCP_Solver(counter,adj,name=f'./tmp_mcp/tmp-mcp-{counter}')
+                    new_thread = Thread_MCP_Solver(counter,adj,name=os.path.join(self.path,f'tmp-mcp-{counter}'))
                     #print(f"Putting problem {counter} on thread {thread_slot}")
                     self.threads[thread_slot] = new_thread
                     new_thread.start()

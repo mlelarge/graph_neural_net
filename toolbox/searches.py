@@ -84,13 +84,13 @@ def read_adj(fname):
         cliques.append(cur_data)
     return cliques
 
-def mc_bronk2_cpp(adjs,max_threads=4):
+def mc_bronk2_cpp(adjs,**kwargs):
     """
     adj should be of shape (bs,n,n) or (n,n)
     """
-    path = "tmp_mcp/"
+    path = 'tmp_mcp/'
     utils.check_dir(path)
-    solver = MCP_Solver(adjs,max_threads=max_threads)
+    solver = MCP_Solver(adjs,**kwargs)
     solver.solve()
     clique_sols = solver.solutions
     return clique_sols
