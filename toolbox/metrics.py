@@ -6,7 +6,7 @@ from toolbox.utils import get_device
 import torch.nn.functional as F
 from sklearn.cluster import KMeans
 
-from toolbox.searches import mc_bronk2
+from toolbox.searches import mcp_beam_method
 
 class Meter(object):
     """Computes and stores the sum, average and current value"""
@@ -226,6 +226,39 @@ def accuracy_mcp_exact(raw_scores,cliques_solutions):
         total_n_vertices+=clique_sizes[k].item()
         l_sol_cliques.append(best_clique)
     return true_pos, total_n_vertices, l_sol_cliques
+
+
+def accuracy_inf_sol(inferred,cliques_solution):
+    """
+    'inferred' should be a set of vertices
+    'cliques_solution' an iterable of all the solution cliques (as sets)
+    """
+    assert len(cliques_solution)!=0, "No solution provided!"
+    max_overlap = 0
+    best_clique_sol = cliques_solution[0]
+    clique_size = len(cliques_solution[0])
+    for cur_clique in cliques_solution:
+        temp_inter = cur_clique.intersection(inferred)
+        cur_overlap = len(temp_inter)
+        if cur_overlap > max_overlap:
+            max_overlap = cur_overlap
+            best_clique_sol = cur_clique
+    return max_overlap, clique_size, best_clique_sol
+
+def accuracy_inf_sol_multiple(inferred,cliques_solutions):
+    """
+    Batch sized version of accuracy_inf_sol
+    """
+    bs = len(inferred)
+    true_pos = 0
+    n_tot = 0
+    l_sol_cliques = []
+    for k in range(bs):
+        cur_tp, cur_n, best_clique = accuracy_inf_sol(inferred[k],cliques_solutions[k])
+        true_pos += cur_tp
+        n_tot += cur_n
+        l_sol_cliques.append(best_clique)
+    return true_pos, n_tot, l_sol_cliques
 
 #TSP
 

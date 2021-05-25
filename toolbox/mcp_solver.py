@@ -135,7 +135,7 @@ if __name__=='__main__':
         clique_sols = mcp_solver.solutions
         return clique_sols
     
-    n=50
+    n=100
     t0 = time.time()
     [test_mcp_solver(10,n,max_threads=4) for _ in range(10)]
     print("Time taken :", time.time()-t0)

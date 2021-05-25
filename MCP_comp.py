@@ -9,8 +9,8 @@ from commander import get_model,init_helper
 from toolbox.optimizer import get_optimizer
 from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
-from toolbox.metrics import accuracy_mcp, accuracy_mcp_exact
-from toolbox.searches import mc_bronk2_cpp,mc_bronk2
+from toolbox.metrics import accuracy_inf_sol_multiple, accuracy_mcp, accuracy_mcp_exact
+from toolbox.searches import mc_bronk2_cpp,mc_bronk2, mcp_beam_method
 
 import sklearn.metrics as skmetrics
 
@@ -85,13 +85,15 @@ def custom_mcp_eval(loader,model,device)->float:
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
+        inf_cliques = mcp_beam_method(data,raw_scores,beam_size=500) 
+        target_as_set = [utils.mcp_adj_to_ind(elt) for elt in target]
         probas = torch.sigmoid(raw_scores)
 
-        tp,ntot = accuracy_mcp(raw_scores, target)
+        tp,ntot, = accuracy_inf_sol_multiple(inf_cliques, [[elt] for elt in target_as_set])
         l_acc_inf_mcps.append(tp/ntot)
-        tp,ntot,cliques_inf_mcp = accuracy_mcp_exact(target, target_mcp)
+        tp,ntot,cliques_inf_mcp = accuracy_inf_sol_multiple(target_as_set, target_mcp)
         l_acc_mcps_mcp.append(tp/ntot)
-        tp,ntot,_ = accuracy_mcp_exact(raw_scores, target_mcp)
+        tp,ntot,_ = accuracy_inf_sol_multiple(inf_cliques, target_mcp)
         l_acc_inf_mcp.append(tp/ntot)
         
         target_inf_mcp = torch.zeros((bs,n,n))
@@ -190,7 +192,7 @@ if __name__=='__main__':
     l_n_lines=0
     if not os.path.isfile(lpath):
         with open(lpath,'w') as f:
-            f.write('fill_param_train,acc,perf_hhc,auc_tsps,auc_tsp,tsp_length,tsps_length,inf_length,tsps_tsp_len_ratio,tsps_tsp_edge_ratio,inf_tsp_len_ratio,inf_tsp_edge_ratio\n')
+            f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp\n')
     else:
         with open(lpath,'r') as f:
             ldata = f.readlines()
