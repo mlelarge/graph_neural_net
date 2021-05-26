@@ -202,6 +202,10 @@ if __name__=='__main__':
                 if counter<n_lines:
                     print(f'\nSkipping dc_test={dc_test}')
                 else:
+                    p_inter = c-dc_test/2
+                    p_outer = c+dc_test/2
+                    gen_args['p_inter'] = p_inter
+                    gen_args['p_outer'] = p_outer
                     test_gen = SBM_Generator('test',gen_args)
                     test_gen.load_dataset()
                     test_loader = siamese_loader(test_gen,batch_size,True,True)
@@ -211,7 +215,7 @@ if __name__=='__main__':
 
         
                 acc = np.mean(l_acc)
-                add_line(filepath,f'{dc},{acc}')
+                add_line(filepath,f'{dc_test},{acc}')
                 if retrain:
-                    add_line(lpath,f'{dc},{l_acc}')
+                    add_line(lpath,f'{dc_test},{l_acc}')
                 counter+=1

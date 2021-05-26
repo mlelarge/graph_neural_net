@@ -258,7 +258,7 @@ if __name__=='__main__':
                     print(f'\nSkipping cs_test={cs_test}')
                 else:
                     l_values = []
-                    
+                    gen_args['clique_size'] = cs_test
 
                     test_gen = MCP_Generator('test',gen_args)
                     test_gen.load_dataset()
@@ -266,8 +266,8 @@ if __name__=='__main__':
                     
                     l_values.append(custom_mcp_eval(test_loader,model,device))
                     #acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp = custom_mcp_eval(test_loader,model,device)
-                    add_line_mean(filepath,cs,l_values)
-                    add_line_lists(lpath,cs,l_values)
+                    add_line_mean(filepath,cs_test,l_values)
+                    add_line_lists(lpath,cs_test,l_values)
                     #add_line(filepath,f'{cs},{acc_inf_mcps},{acc_mcps_mcp},{acc_inf_mcp},{auc_inf_mcps},{auc_inf_mcp}')
 
                 counter+=1
