@@ -115,7 +115,7 @@ if __name__=='__main__':
     model_path = os.path.join(path,'models/')
     utils.check_dir(model_path)
 
-    filename_template='sbm_cfixed-dc_{}-' + f'n_{n_vertices}-c_{c}.txt'
+    filename_template='sbm_cgen-dc_{}-' + f'n_{n_vertices}-c_{c}.txt'
     
     lname_template='sbm_cgen-l-dc_{}-'+ f'n_{n_vertices}-c_{c}.txt'
 
@@ -210,8 +210,8 @@ if __name__=='__main__':
                     l_acc.append(cur_acc)
 
         
-        acc = np.mean(l_acc)
-        add_line(filepath,f'{dc},{acc}')
-        if retrain:
-            add_line(lpath,f'{dc},{l_acc}')
-        counter+=1
+                acc = np.mean(l_acc)
+                add_line(filepath,f'{dc},{acc}')
+                if retrain:
+                    add_line(lpath,f'{dc},{l_acc}')
+                counter+=1
