@@ -214,7 +214,7 @@ if __name__=='__main__':
 
         counter = 0
         lcounter= 0
-
+        l_l_values = [list() for _ in cs_list]
         for _ in range(n_retrain):
             if not retrain and check_model_exists(model_path,n_vertices,cs): #If model already exists
                 print(f'Using already trained model for cs={cs}')
@@ -251,8 +251,9 @@ if __name__=='__main__':
                         break
                 
                 save_model(model_path, model, n_vertices, cs)
-            pb2 = tqdm.tqdm(cs_list)
-            for cs_test in pb2:
+            pb2 = tqdm.tenumerate(cs_list)
+            counter=0
+            for i,cs_test in pb2:
                 pb2.set_description(f'Testing cs={cs} on cs_test={cs_test}')
                 if counter<n_lines:
                     print(f'\nSkipping cs_test={cs_test}')
@@ -264,14 +265,17 @@ if __name__=='__main__':
                     test_gen.load_dataset()
                     test_loader = siamese_loader(test_gen,batch_size,True,True)
                     
-                    l_values.append(custom_mcp_eval(test_loader,model,device))
+                    l_l_values[i].append(custom_mcp_eval(test_loader,model,device))
                     #acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp = custom_mcp_eval(test_loader,model,device)
-                    add_line_mean(filepath,cs_test,l_values)
-                    add_line_lists(lpath,cs_test,l_values)
+                    #add_line_mean(filepath,cs_test,l_values)
+                    #add_line_lists(lpath,cs_test,l_values)
                     #add_line(filepath,f'{cs},{acc_inf_mcps},{acc_mcps_mcp},{acc_inf_mcp},{auc_inf_mcps},{auc_inf_mcp}')
 
                 counter+=1
-
+            
+            for l_values in l_l_values:
+                add_line_mean(filepath,cs_test,l_values)
+                add_line_lists(lpath,cs_test,l_values)
 
 
 

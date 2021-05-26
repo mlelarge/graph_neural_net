@@ -158,7 +158,7 @@ if __name__=='__main__':
         counter = 0
         lcounter= 0
 
-        l_acc = []
+        l_acc = [list() for _ in dc_list]
         for _ in range(n_retrain):
             if not retrain and check_model_exists(model_path,n_vertices,dc): #If model already exists
                 print(f'Using already trained model for dc={dc}')
@@ -196,8 +196,9 @@ if __name__=='__main__':
                 
                 save_model(model_path, model, n_vertices, dc)
 
-            pb2 = tqdm.tqdm(dc_list)
-            for dc_test in pb2:
+            pb2 = tqdm.tenumerate(dc_list)
+            counter=0
+            for i,dc_test in pb2:
                 pb2.set_description(f'Testing dc={dc} on dc_test={dc_test}')
                 if counter<n_lines:
                     print(f'\nSkipping dc_test={dc_test}')
@@ -211,11 +212,11 @@ if __name__=='__main__':
                     test_loader = siamese_loader(test_gen,batch_size,True,True)
                     
                     cur_acc = custom_sbm_eval(test_loader,model,device)
-                    l_acc.append(cur_acc)
+                    l_acc[i].append(cur_acc)
+                counter+=1
 
-        
-                acc = np.mean(l_acc)
+            for values in l_acc:
+                acc = np.mean(values)
                 add_line(filepath,f'{dc_test},{acc}')
                 if retrain:
-                    add_line(lpath,f'{dc_test},{l_acc}')
-                counter+=1
+                    add_line(lpath,f'{dc_test},{values}')
