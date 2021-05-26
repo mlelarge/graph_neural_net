@@ -196,9 +196,10 @@ if __name__=='__main__':
                 
                 save_model(model_path, model, n_vertices, dc)
 
-            pb2 = tqdm.tenumerate(dc_list)
+            pb2 = tqdm.trange(len(dc_list))
             counter=0
-            for i,dc_test in pb2:
+            for i in pb2:
+                dc_test = dc_list[i]
                 pb2.set_description(f'Testing dc={dc} on dc_test={dc_test}')
                 if counter<n_lines:
                     print(f'\nSkipping dc_test={dc_test}')

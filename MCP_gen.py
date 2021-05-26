@@ -251,9 +251,10 @@ if __name__=='__main__':
                         break
                 
                 save_model(model_path, model, n_vertices, cs)
-            pb2 = tqdm.tenumerate(cs_list)
+            pb2 = tqdm.trange(len(cs_list))
             counter=0
-            for i,cs_test in pb2:
+            for i in pb2:
+                cs_test = cs_list[i]
                 pb2.set_description(f'Testing cs={cs} on cs_test={cs_test}')
                 if counter<n_lines:
                     print(f'\nSkipping cs_test={cs_test}')
