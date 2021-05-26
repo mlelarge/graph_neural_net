@@ -176,17 +176,17 @@ if __name__=='__main__':
     model_path = os.path.join(path,'models/')
     utils.check_dir(model_path)
 
-    filename='mcp_gen-cs_{}-'+f'n_{n_vertices}.txt'
+    filename_template='mcp_gen-cs_{}-'+f'n_{n_vertices}.txt'
     
-    lname='mcp_gen-cs{}-'+f'n_{n_vertices}.txt'
+    lname_template='mcp_gen-cs{}-'+f'n_{n_vertices}.txt'
 
 
     
     pb = tqdm.tqdm(cs_model_used)
     for cs in pb:
         pb.set_description(desc=f'Using cs={cs}')
-        lname.format(cs)
-        filename.format(cs)
+        lname = lname_template.format(cs)
+        filename = filename_template.format(cs)
         gen_args['clique_size'] = cs
 
         

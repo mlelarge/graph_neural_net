@@ -115,9 +115,9 @@ if __name__=='__main__':
     model_path = os.path.join(path,'models/')
     utils.check_dir(model_path)
 
-    filename='sbm_cfixed-dc_{}-' + f'n_{n_vertices}-c_{c}.txt'
+    filename_template='sbm_cfixed-dc_{}-' + f'n_{n_vertices}-c_{c}.txt'
     
-    lname='sbm_cgen-l-dc_{}-'+ f'n_{n_vertices}-c_{c}.txt'
+    lname_template='sbm_cgen-l-dc_{}-'+ f'n_{n_vertices}-c_{c}.txt'
 
 
     
@@ -125,8 +125,8 @@ if __name__=='__main__':
     for model_idx in pb:
         dc = dc_list[model_idx]
         pb.set_description(desc=f'Using dc={dc}')
-        lname.format(dc)
-        filename.format(dc)
+        lname = lname_template.format(dc)
+        filename = filename_template.format(dc)
         p_inter = c-dc/2
         p_outer = c+dc/2
         gen_args['p_inter'] = p_inter
