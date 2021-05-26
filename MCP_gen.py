@@ -274,9 +274,9 @@ if __name__=='__main__':
 
                 counter+=1
             
-            for l_values in l_l_values:
-                add_line_mean(filepath,cs_test,l_values)
-                add_line_lists(lpath,cs_test,l_values)
+        for i,l_values in enumerate(l_l_values):
+            add_line_mean(filepath,cs_list[i],l_values)
+            add_line_lists(lpath,cs_list[i],l_values)
 
 
 

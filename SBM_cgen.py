@@ -216,8 +216,8 @@ if __name__=='__main__':
                     l_acc[i].append(cur_acc)
                 counter+=1
 
-            for values in l_acc:
-                acc = np.mean(values)
-                add_line(filepath,f'{dc_test},{acc}')
-                if retrain:
-                    add_line(lpath,f'{dc_test},{values}')
+        for values in l_acc:
+            acc = np.mean(values)
+            add_line(filepath,f'{dc_list[i]},{acc}')
+            if retrain:
+                add_line(lpath,f'{dc_list[i]},{values}')
