@@ -79,17 +79,27 @@ def custom_mcp_eval(loader,model,device)->float:
     l_acc_inf_mcp  = []
     l_auc_inf_mcps = []
     l_auc_inf_mcp  = []
+    l_cs_inf_mcp = []
+    l_cs_mcps_mcp= []
     for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving MCPs'):
         bs,n,_ = target.shape
         target_mcp = mc_bronk2_cpp(data[:,:,:,1].to(int))
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
-        inf_cliques = mcp_beam_method(data,raw_scores,beam_size=500) 
-        target_as_set = [utils.mcp_adj_to_ind(elt) for elt in target]
         probas = torch.sigmoid(raw_scores)
 
-        tp,ntot, = accuracy_inf_sol_multiple(inf_cliques, [[elt] for elt in target_as_set])
+        inf_cliques = mcp_beam_method(data,raw_scores,beam_size=500)
+        cs_inf_cliques = np.array([len(elt) for elt in inf_cliques])
+        target_as_set = [utils.mcp_adj_to_ind(elt) for elt in target]
+        cs_target_cliques = np.array([len(elt) for elt in target_as_set])
+        cs_sol_cliques = np.array([len(elt[0]) for elt in target_mcp])
+
+        l_cs_inf_mcp.append(np.sum(cs_inf_cliques/cs_sol_cliques))
+        l_cs_mcps_mcp.append(np.sum(cs_target_cliques/cs_sol_cliques))
+        
+
+        tp,ntot,_ = accuracy_inf_sol_multiple(inf_cliques, [[elt] for elt in target_as_set])
         l_acc_inf_mcps.append(tp/ntot)
         tp,ntot,cliques_inf_mcp = accuracy_inf_sol_multiple(target_as_set, target_mcp)
         l_acc_mcps_mcp.append(tp/ntot)
@@ -99,7 +109,7 @@ def custom_mcp_eval(loader,model,device)->float:
         target_inf_mcp = torch.zeros((bs,n,n))
         for k in range(bs):
             cur_clique = cliques_inf_mcp[k]
-            target_inf_mcp[k] = utils.mcp_ind_to_adj(cur_clique,n).detach().clone()
+            target_inf_mcp[k] = utils.ind_to_adj(cur_clique,n).detach().clone()
 
         fpr, tpr, _ = skmetrics.roc_curve(target.cpu().detach().reshape(bs*n*n).numpy(), probas.cpu().detach().reshape(bs*n*n).numpy())
         l_auc_inf_mcps.append(skmetrics.auc(fpr,tpr))
@@ -112,7 +122,9 @@ def custom_mcp_eval(loader,model,device)->float:
     acc_inf_mcp  = np.mean(l_acc_inf_mcp)
     auc_inf_mcps = np.mean(l_auc_inf_mcps)
     auc_inf_mcp  = np.mean(l_auc_inf_mcp)
-    return acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp
+    cs_inf_mcp   = np.mean(l_cs_inf_mcp)
+    cs_mcps_mcp  = np.mean(l_cs_mcps_mcp)
+    return acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp,cs_inf_mcp,cs_mcps_mcp
 
 
 if __name__=='__main__':
@@ -180,7 +192,7 @@ if __name__=='__main__':
     n_lines=0
     if not os.path.isfile(filepath):
         with open(filepath,'w') as f:
-            f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp\n')
+            f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp,cs_inf_mcp,cs_mcps_mcp\n')
     else:
         with open(filepath,'r') as f:
             data = f.readlines()
@@ -192,7 +204,7 @@ if __name__=='__main__':
     l_n_lines=0
     if not os.path.isfile(lpath):
         with open(lpath,'w') as f:
-            f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp\n')
+            f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp,cs_inf_mcp,cs_mcps_mcp\n')
     else:
         with open(lpath,'r') as f:
             ldata = f.readlines()

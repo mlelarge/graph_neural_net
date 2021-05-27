@@ -789,7 +789,7 @@ class MCP_Generator(Base_Generator):
         K2 = mcp_beam_method(B,K,seeds=seed,add_singles=False) #Finds a probably better solution with beam search in the form of a list of indices
         k2_size = len(K2)
         if k2_size>k_size:
-            K = utils.mcp_ind_to_adj(K2,self.n_vertices)
+            K = utils.ind_to_adj(K2,self.n_vertices)
         return (B, K)
         
     @classmethod
@@ -891,10 +891,11 @@ class SBM_Generator(Base_Generator):
         adj[n_sub_a:,:n_sub_a] = glink.T.detach().clone()
         adj[n_sub_a:,n_sub_a:] = gb.detach().clone()
 
+
         K = torch.zeros((n,n))
         K[:n_sub_a,:n_sub_a] = 1
         K[n_sub_a:,n_sub_a:] = 1
-        K,adj = utils.permute_adjacency_twin(K,adj)
+        #K,adj = utils.permute_adjacency_twin(K,adj)
         B = adjacency_matrix_to_tensor_representation(adj)
         return (B, K) 
 

@@ -108,7 +108,7 @@ def mcp_adj_to_ind(adj)->list:
         l_clique_sol=l_clique_sol[0]
     return l_clique_sol
 
-def mcp_ind_to_adj(ind,n)->torch.Tensor:
+def ind_to_adj(ind,n)->torch.Tensor:
     """
     ind should be a set of indices (or iterable)
     Transforms it into the adjacency matrix of shape (n,n)
@@ -196,6 +196,12 @@ def tour_to_adj(n,path):
         m[v,u] = 1
     return m
 
+#SBM
 
+def part_to_adj(p1,p2):
+    n = len(p1)+len(p2)
+    adj1 = ind_to_adj(p1)
+    adj2 = ind_to_adj(p2)
+    return adj1 + adj2 + torch.eye(n)
 
 
