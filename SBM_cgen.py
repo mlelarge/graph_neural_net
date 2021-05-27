@@ -10,10 +10,46 @@ from toolbox.optimizer import get_optimizer
 from loaders.siamese_loaders import siamese_loader
 from trainer import train_triplet,val_triplet
 from toolbox.metrics import accuracy_sbm_two_categories_edge
+from toolbox.searches import cut_value_part, my_minb_kl,get_partition
 
 import sklearn.metrics as skmetrics
 
 MODEL_NAME = 'model_cfixed-n_{}-dc_{}.tar'
+
+def add_line_lists(filename,param1,values_list):
+    chaine = f'{param1}'
+    assert len(values_list)>0, "Empty list, can't write anything."
+    try:
+        n_to_write = len(values_list[0])
+    except TypeError:
+        n_to_write=1
+        values_list = [[elt] for elt in values_list]
+    for value_number in range(n_to_write):
+        chaine+=','
+        l_temp_values = [elt[value_number] for elt in values_list]
+        chaine+=str(l_temp_values)
+    add_line(filename,chaine)
+
+def add_line_mean(filename,param1,values_list):
+    chaine = f'{param1}'
+    assert len(values_list)>0, "Empty list, can't write anything."
+    try:
+        n_to_write = len(values_list[0])
+    except TypeError:
+        n_to_write=1
+        values_list = [[elt] for elt in values_list]
+    for value_number in range(n_to_write):
+        chaine+=','
+        l_temp_values = [elt[value_number] for elt in values_list]
+        chaine+=str(np.mean(l_temp_values))
+    add_line(filename,chaine)
+
+def add_line_mean(filename,param1,values_list):
+    chaine = f'{param1}'
+    for i in range(len(values_list[0])):
+        value = np.mean([it_value[i] for it_value in values_list])
+        chaine+= ',' + str(value)
+    add_line(filename,chaine)
 
 def add_line(filename,line) -> None:
     with open(filename,'a') as f:
@@ -38,17 +74,54 @@ def custom_sbm_eval(loader,model,device)->float:
 
     model.eval()
 
-    l_acc = []
+    l_cut_sbm = []
+    l_cut_inf = []
+    l_cut_min = []
+    l_acc_inf_sbm = []
+    l_acc_inf_min = []
+    l_acc_sbm_min = []
     for data,target in tqdm.tqdm(loader,desc='Inner Loop : testing SBMs'):
         bs,n,_ = target.shape
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
-        true_pos,n_total = accuracy_sbm_two_categories_edge(raw_scores,target)
-        l_acc.append((true_pos/n_total))
-    acc = np.mean(l_acc)
+        inf_parts = get_partition(raw_scores)
 
-    return acc
+        adj = data[:,:,:,1]
+        kl_parts = [my_minb_kl(cur_adj) for cur_adj in adj]
+        l_kl_adj = [utils.part_to_adj(*elt) for elt in kl_parts]
+        kl_adj_t = torch.zeros((bs,n,n))
+        cut_sbm = 0
+        cut_inf = 0
+        cut_min = 0
+        for k in range(bs):
+            kl_adj_t[k] = utils.part_to_adj(*(kl_parts[k]))[:,:]
+
+            cut_sbm += cut_value_part(adj,range(0,n//2),range(n//2,n))
+            cut_inf += cut_value_part(adj,*(inf_parts[k]))
+            cut_min += cut_value_part(adj,*(kl_parts[k]))
+        cut_sbm/=bs
+        cut_inf/=bs
+        cut_min/=bs
+        l_cut_sbm.append(cut_sbm)
+        l_cut_inf.append(cut_inf)
+        l_cut_min.append(cut_min)
+
+        true_pos,n_total = accuracy_sbm_two_categories_edge(raw_scores,target)
+        l_acc_inf_sbm.append((true_pos/n_total))
+        tp,nt = accuracy_sbm_two_categories_edge(raw_scores,kl_adj_t)
+        l_acc_inf_min.append(tp/nt)
+        tp,nt = accuracy_sbm_two_categories_edge(target,kl_adj_t)
+        l_acc_sbm_min.append(tp/nt)
+
+    cut_sbm = np.mean(l_cut_sbm)
+    cut_inf = np.mean(l_cut_inf)
+    cut_min = np.mean(l_cut_min)
+    acc_inf_sbm = np.mean(l_acc_inf_sbm)
+    acc_inf_min = np.mean(l_acc_inf_min)
+    acc_sbm_min = np.mean(l_acc_sbm_min)
+
+    return cut_sbm,cut_inf,cut_min,acc_inf_sbm,acc_inf_min,acc_sbm_min
 
 
 if __name__=='__main__':
@@ -94,7 +167,7 @@ if __name__=='__main__':
     tot_epoch = helper_args['train']['epoch']
     pbm = 'sbm'
     
-    retrain = False
+    retrain = True
     n_retrain = 5
     if not retrain:
         n_retrain=1
@@ -137,7 +210,7 @@ if __name__=='__main__':
         n_lines=0
         if not os.path.isfile(filepath):
             with open(filepath,'w') as f:
-                f.write('dc,acc\n')
+                f.write('dc,cut_sbm,cut_inf,cut_min,acc_inf_sbm,acc_inf_min,acc_sbm_min\n')
         else:
             with open(filepath,'r') as f:
                 data = f.readlines()
@@ -148,7 +221,7 @@ if __name__=='__main__':
         l_n_lines=0
         if not os.path.isfile(lpath):
             with open(lpath,'w') as f:
-                f.write('dc,list\n')
+                f.write('dc,cut_sbm,cut_inf,cut_min,acc_inf_sbm,acc_inf_min,acc_sbm_min\n')
         else:
             with open(lpath,'r') as f:
                 ldata = f.readlines()
@@ -158,7 +231,7 @@ if __name__=='__main__':
         counter = 0
         lcounter= 0
 
-        l_acc = [list() for _ in dc_list]
+        l_l_values = [list() for _ in dc_list]
         for _ in range(n_retrain):
             if not retrain and check_model_exists(model_path,n_vertices,dc): #If model already exists
                 print(f'Using already trained model for dc={dc}')
@@ -212,12 +285,9 @@ if __name__=='__main__':
                     test_gen.load_dataset()
                     test_loader = siamese_loader(test_gen,batch_size,True,True)
                     
-                    cur_acc = custom_sbm_eval(test_loader,model,device)
-                    l_acc[i].append(cur_acc)
+                    l_l_values[i].append(custom_sbm_eval(test_loader,model,device))
                 counter+=1
 
-        for values in l_acc:
-            acc = np.mean(values)
-            add_line(filepath,f'{dc_list[i]},{acc}')
-            if retrain:
-                add_line(lpath,f'{dc_list[i]},{values}')
+        for i,l_values in enumerate(l_l_values):
+            add_line_mean(filepath,dc_list[i],l_values)
+            add_line_lists(lpath,dc_list[i],l_values)

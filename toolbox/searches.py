@@ -1,12 +1,14 @@
 from random import seed
 import networkx as nx
 from networkx.readwrite.json_graph import adjacency
+from networkx.algorithms.community.kernighan_lin import kernighan_lin_bisection as klbisection
 import torch
 import numpy as np
 import toolbox.utils as utils
 from toolbox.mcp_solver import MCP_Solver
 import tqdm
 from scipy.spatial.distance import pdist, squareform
+from sklearn.cluster import KMeans
 import random
 import time
 import string
@@ -182,6 +184,160 @@ def mcp_beam_method(data, raw_scores, seeds=None, add_singles=True, beam_size=12
     if solo:
         l_clique_inf = l_clique_inf[0]
     return l_clique_inf
+
+def compute_d_doesntwork(data,A,B):
+    n,_ = data.shape
+    adja = utils.ind_to_adj(A,n)
+    ia = (adja*data).sum(dim=-1)
+    adjb = utils.ind_to_adj(B,n)
+    ib = (adjb*data).sum(dim=-1)
+
+    adjea = torch.zeros_like(data)
+    adjeb = torch.zeros_like(data)
+    for a in A:
+        for b in B:
+            adjea[a,b] = 1
+            adjea[b,a] = 1
+            adjeb[b,a] = 1
+            adjeb[a,b] = 1
+    ea = (adjea*data).sum(dim=-1)
+    eb = (adjeb*data).sum(dim=-1)
+    da = ea-ia
+    db = eb-ib
+    return da,db
+
+def compute_d(data,A,B):
+    n,_ = data.shape
+    ia = torch.zeros(n)
+    ea = torch.zeros(n)
+    ib = torch.zeros(n)
+    eb = torch.zeros(n)
+    for a in A:
+        for a2 in A-{a}:
+            ia[a] += data[a,a2]
+        for b in B:
+            ea[a] += data[a,b]
+            eb[b] += data[b,a]
+    for b in B:
+        for b2 in B-{b}:
+            ib[b] += data[b,b2]
+    #print("A:",ea,ia)
+    #print("B:",eb,ib)
+    da = ea - ia
+    db = eb - ib
+    return da,db
+
+def find_best_ab(data,A,B,da,db,av,bv):
+    g_max = -np.infty
+    best_a,best_b = -1,-1
+    for a in A:
+        if a in av:
+            continue
+        for b in B:
+            if b not in bv:
+                cur_g = da[a] + db[b] - 2*data[a,b]
+                if cur_g>g_max:
+                    g_max = cur_g
+                    best_a,best_b = a,b
+    assert g_max!=-np.infty, "Couldn't find the best a and b"
+    return best_a,best_b,g_max
+
+def find_g_max(gv):
+    assert len(gv)!=0, "No data given"
+    k = 0
+    g_max = gv[0]
+    cur_sum = gv[0]
+    for i,value in enumerate(gv[1:]):
+        cur_sum += value
+        if cur_sum>g_max:
+            k = i+1
+            g_max = cur_sum
+    return k,g_max
+
+def my_minb_kl(data,part = None):
+    with torch.no_grad():
+        n,_ = data.shape
+        if part is None:
+            A = set(range(0,n//2))
+            B = set(range(n//2,n))
+        else:
+            A,B = part
+        g_max=1
+        while g_max>0:
+            gv,av,bv,iav,ibv=[],[],[],[],[]
+            temp_A = set([elt for elt in A])
+            temp_B = set([elt for elt in B])
+            for i in range(n//2):
+                da,db = compute_d(data,temp_A,temp_B)
+                #print("d:",da,db)
+                a,b,g = find_best_ab(data,temp_A,temp_B,da,db,av,bv)
+                #print("ab",a,b,g)
+                av.append(a)
+                bv.append(b)
+                gv.append(g)
+                temp_A.remove(a)
+                temp_A.add(b)
+                temp_B.remove(b)
+                temp_B.add(a)
+            k,g_max = find_g_max(gv)
+            #print('k,g:',k,g_max)
+            #print('v:',av,bv)
+            if g_max>0:
+                for i in range(k+1):
+                    a,b = av[i],bv[i]
+                    A.remove(a)
+                    B.remove(b)
+                    A.add(b)
+                    B.add(a)
+            #print(A,B)
+    return set(A),set(B)
+
+def minb_kl(data,**kwargs):
+    n,_ = data.shape
+    g = nx.empty_graph(n)
+    for i in range(0,n-1):
+        for j in range(i+1,n):
+            g.add_edge(i,j,weight = data[i,j].item())
+    A = set(range(0,n//2))
+    B = set(range(n//2,n))
+    pa,pb = klbisection(g,(A,B),weight='weight',**kwargs)
+    return set(pa),set(pb)
+
+def cut_value_part(data,p1,p2):
+    somme = 0
+    for a in p1:
+        for b in p2:
+            somme+=data[a,b]
+    return somme
+
+def cut_value_part_asym(data,p1,p2):
+    somme = 0
+    for a in p1:
+        for b in p2:
+            somme+=data[a,b].item()
+            somme+=data[b,a].item()
+    return somme
+
+def get_partition(raw_scores):
+
+    bs,n,_ = raw_scores.shape
+    
+    true_pos = 0
+
+    embeddings = torch.normalize(raw_scores,dim=-1) #Compute E
+    similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
+    p1=set()
+    p2=set()
+    for batch_embed in similarity:
+        kmeans = KMeans(n_clusters=2).fit(batch_embed.cpu().detach().numpy())
+        labels = kmeans.labels_
+        for i,label in enumerate(labels):
+            if label==1:
+                p1.update(i)
+            else:
+                p2.update(i)
+    return p1,p2
+
 
 #TSP
 
