@@ -3,6 +3,7 @@ import networkx as nx
 from networkx.readwrite.json_graph import adjacency
 from networkx.algorithms.community.kernighan_lin import kernighan_lin_bisection as klbisection
 import torch
+import torch.nn.functional as F
 import numpy as np
 import toolbox.utils as utils
 from toolbox.mcp_solver import MCP_Solver
@@ -185,26 +186,6 @@ def mcp_beam_method(data, raw_scores, seeds=None, add_singles=True, beam_size=12
         l_clique_inf = l_clique_inf[0]
     return l_clique_inf
 
-def compute_d_doesntwork(data,A,B):
-    n,_ = data.shape
-    adja = utils.ind_to_adj(A,n)
-    ia = (adja*data).sum(dim=-1)
-    adjb = utils.ind_to_adj(B,n)
-    ib = (adjb*data).sum(dim=-1)
-
-    adjea = torch.zeros_like(data)
-    adjeb = torch.zeros_like(data)
-    for a in A:
-        for b in B:
-            adjea[a,b] = 1
-            adjea[b,a] = 1
-            adjeb[b,a] = 1
-            adjeb[a,b] = 1
-    ea = (adjea*data).sum(dim=-1)
-    eb = (adjeb*data).sum(dim=-1)
-    da = ea-ia
-    db = eb-ib
-    return da,db
 
 def compute_d(data,A,B):
     n,_ = data.shape
@@ -255,6 +236,7 @@ def find_g_max(gv):
     return k,g_max
 
 def my_minb_kl(data,part = None):
+    data = data.cpu().detach()
     with torch.no_grad():
         n,_ = data.shape
         if part is None:
@@ -324,7 +306,7 @@ def get_partition(raw_scores):
     
     true_pos = 0
 
-    embeddings = torch.normalize(raw_scores,dim=-1) #Compute E
+    embeddings = F.normalize(raw_scores,dim=-1) #Compute E
     similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
     p1=set()
     p2=set()
@@ -333,9 +315,9 @@ def get_partition(raw_scores):
         labels = kmeans.labels_
         for i,label in enumerate(labels):
             if label==1:
-                p1.update(i)
+                p1.add(i)
             else:
-                p2.update(i)
+                p2.add(i)
     return p1,p2
 
 
