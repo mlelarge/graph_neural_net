@@ -235,7 +235,7 @@ def find_g_max(gv):
             g_max = cur_sum
     return k,g_max
 
-def my_minb_kl(data,part = None):
+def my_minb_kl(data,part = None,max_iter=10):
     data = data.cpu().detach()
     with torch.no_grad():
         n,_ = data.shape
@@ -245,7 +245,8 @@ def my_minb_kl(data,part = None):
         else:
             A,B = part
         g_max=1
-        while g_max>0:
+        counter = 0
+        while g_max>0 and counter<max_iter:
             gv,av,bv,iav,ibv=[],[],[],[],[]
             temp_A = set([elt for elt in A])
             temp_B = set([elt for elt in B])
@@ -272,6 +273,8 @@ def my_minb_kl(data,part = None):
                     A.add(b)
                     B.add(a)
             #print(A,B)
+            print(counter)
+            counter+=1
     return set(A),set(B)
 
 def minb_kl(data,**kwargs):

@@ -80,7 +80,7 @@ def custom_sbm_eval(loader,model,device)->float:
     l_acc_inf_sbm = []
     l_acc_inf_min = []
     l_acc_sbm_min = []
-    for data,target in tqdm.tqdm(loader,desc='Inner Loop : testing SBMs'):
+    for data,target in tqdm.tqdm(loader,desc='Inner Loop : solving SBMs'):
         bs,n,_ = target.shape
         data = data.to(device)
         target = target.to(device)
@@ -128,7 +128,7 @@ if __name__=='__main__':
     gen_args = {
         'num_examples_train': 10000,
         'num_examples_val': 1000,
-        'num_examples_test': 1000,
+        'num_examples_test': 20,
         'n_vertices': 100,
         'path_dataset': 'dataset_sbm',
         'p_inter': None,
@@ -167,7 +167,7 @@ if __name__=='__main__':
     tot_epoch = helper_args['train']['epoch']
     pbm = 'sbm'
     
-    retrain = True
+    retrain = False
     n_retrain = 5
     if not retrain:
         n_retrain=1
