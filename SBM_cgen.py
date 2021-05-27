@@ -99,6 +99,7 @@ def custom_sbm_eval(loader,model,device)->float:
             cut_sbm += cut_value_part(adj[k],range(0,n//2),range(n//2,n))
             cut_inf += cut_value_part(adj[k],*(inf_parts[k]))
             cut_min += cut_value_part(adj[k],*(kl_parts[k]))
+        kl_adj_t = kl_adj_t.to(device)
         cut_sbm/=bs
         cut_inf/=bs
         cut_min/=bs
