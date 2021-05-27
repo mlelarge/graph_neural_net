@@ -101,9 +101,9 @@ def custom_mcp_eval(loader,model,device):
 
         tp,ntot,_ = accuracy_inf_sol_multiple(inf_cliques, [[elt] for elt in target_as_set])
         l_acc_inf_mcps.append(tp/ntot)
-        tp,ntot,cliques_inf_mcp = accuracy_inf_sol_multiple(target_as_set, target_mcp)
+        tp,ntot,_ = accuracy_inf_sol_multiple(target_as_set, target_mcp)
         l_acc_mcps_mcp.append(tp/ntot)
-        tp,ntot,_ = accuracy_inf_sol_multiple(inf_cliques, target_mcp)
+        tp,ntot,cliques_inf_mcp = accuracy_inf_sol_multiple(inf_cliques, target_mcp)
         l_acc_inf_mcp.append(tp/ntot)
         
         target_inf_mcp = torch.zeros((bs,n,n))
