@@ -177,7 +177,7 @@ if __name__=='__main__':
     start_dc = 0
     end_dc = 6
     steps = 20
-    model_used = [-4]
+    model_used = [-2]
 
     dc_list = np.linspace(start_dc,end_dc,steps)
 
