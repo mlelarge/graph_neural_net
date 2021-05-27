@@ -103,6 +103,8 @@ class MCP_Solver():
         self.threads = [None for _ in range(self.max_threads)]
     
     def solve(self):
+        exp_name = ''.join(random.choice(NAME_CHARS) for _ in range(10))
+
         solo = False
         adjs = self.adjs.detach().clone()
         if len(adjs.shape)==2:
@@ -116,7 +118,7 @@ class MCP_Solver():
             for thread_slot in range(self.max_threads):
                 if counter <bs and self.is_thread_available(thread_slot):
                     adj = adjs[counter]
-                    new_thread = Thread_MCP_Solver(counter,adj,name=os.path.join(self.path,f'tmp-mcp-{counter}'))
+                    new_thread = Thread_MCP_Solver(counter,adj,name=os.path.join(self.path,f'tmp-mcp-{counter}-{exp_name}'))
                     #print(f"Putting problem {counter} on thread {thread_slot}")
                     self.threads[thread_slot] = new_thread
                     new_thread.start()
