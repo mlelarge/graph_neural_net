@@ -273,7 +273,6 @@ def my_minb_kl(data,part = None,max_iter=10):
                     A.add(b)
                     B.add(a)
             #print(A,B)
-            print(counter)
             counter+=1
     return set(A),set(B)
 
@@ -306,22 +305,24 @@ def cut_value_part_asym(data,p1,p2):
 def get_partition(raw_scores):
 
     bs,n,_ = raw_scores.shape
-    
-    true_pos = 0
+    l_parts = []
+    for k in range(bs):
+        true_pos = 0
 
-    embeddings = F.normalize(raw_scores,dim=-1) #Compute E
-    similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
-    p1=set()
-    p2=set()
-    for batch_embed in similarity:
-        kmeans = KMeans(n_clusters=2).fit(batch_embed.cpu().detach().numpy())
-        labels = kmeans.labels_
-        for i,label in enumerate(labels):
-            if label==1:
-                p1.add(i)
-            else:
-                p2.add(i)
-    return p1,p2
+        embeddings = F.normalize(raw_scores,dim=-1) #Compute E
+        similarity = embeddings @ embeddings.transpose(-2,-1) #Similarity = E@E.T
+        p1=set()
+        p2=set()
+        for batch_embed in similarity:
+            kmeans = KMeans(n_clusters=2).fit(batch_embed.cpu().detach().numpy())
+            labels = kmeans.labels_
+            for i,label in enumerate(labels):
+                if label==1:
+                    p1.add(i)
+                else:
+                    p2.add(i)
+        l_parts.append((p1,p2))
+    return l_parts
 
 
 #TSP

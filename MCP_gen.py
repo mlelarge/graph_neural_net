@@ -190,7 +190,7 @@ if __name__=='__main__':
 
     filename_template='mcp_gen-cs_{}-'+f'n_{n_vertices}.txt'
     
-    lname_template='mcp_gen-cs{}-'+f'n_{n_vertices}.txt'
+    lname_template='mcp_gen-l-cs_{}-'+f'n_{n_vertices}.txt'
 
 
     

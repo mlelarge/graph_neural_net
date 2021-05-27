@@ -89,7 +89,6 @@ def custom_sbm_eval(loader,model,device)->float:
 
         adj = data[:,:,:,1]
         kl_parts = [my_minb_kl(cur_adj) for cur_adj in adj]
-        l_kl_adj = [utils.part_to_adj(*elt) for elt in kl_parts]
         kl_adj_t = torch.zeros((bs,n,n))
         cut_sbm = 0
         cut_inf = 0
@@ -97,9 +96,9 @@ def custom_sbm_eval(loader,model,device)->float:
         for k in range(bs):
             kl_adj_t[k] = utils.part_to_adj(*(kl_parts[k]))[:,:]
 
-            cut_sbm += cut_value_part(adj,range(0,n//2),range(n//2,n))
-            cut_inf += cut_value_part(adj,*(inf_parts[k]))
-            cut_min += cut_value_part(adj,*(kl_parts[k]))
+            cut_sbm += cut_value_part(adj[k],range(0,n//2),range(n//2,n))
+            cut_inf += cut_value_part(adj[k],*(inf_parts[k]))
+            cut_min += cut_value_part(adj[k],*(kl_parts[k]))
         cut_sbm/=bs
         cut_inf/=bs
         cut_min/=bs

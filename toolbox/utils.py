@@ -200,8 +200,8 @@ def tour_to_adj(n,path):
 
 def part_to_adj(p1,p2):
     n = len(p1)+len(p2)
-    adj1 = ind_to_adj(p1)
-    adj2 = ind_to_adj(p2)
+    adj1 = ind_to_adj(p1,n)
+    adj2 = ind_to_adj(p2,n)
     return adj1 + adj2 + torch.eye(n)
 
 
