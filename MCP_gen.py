@@ -95,8 +95,8 @@ def custom_mcp_eval(loader,model,device):
         cs_target_cliques = np.array([len(elt) for elt in target_as_set])
         cs_sol_cliques = np.array([len(elt[0]) for elt in target_mcp])
 
-        l_cs_inf_mcp.append(np.sum(cs_inf_cliques/cs_sol_cliques))
-        l_cs_mcps_mcp.append(np.sum(cs_target_cliques/cs_sol_cliques))
+        l_cs_inf_mcp.append(np.mean(cs_inf_cliques/cs_sol_cliques))
+        l_cs_mcps_mcp.append(np.mean(cs_target_cliques/cs_sol_cliques))
         
 
         tp,ntot,_ = accuracy_inf_sol_multiple(inf_cliques, [[elt] for elt in target_as_set])
@@ -206,7 +206,7 @@ if __name__=='__main__':
         n_lines=0
         if not os.path.isfile(filepath):
             with open(filepath,'w') as f:
-                f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp\n')
+                f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp,cs_inf_mcp,cs_mcps_mcp\n')
         else:
             with open(filepath,'r') as f:
                 data = f.readlines()
@@ -217,7 +217,7 @@ if __name__=='__main__':
         l_n_lines=0
         if not os.path.isfile(lpath):
             with open(lpath,'w') as f:
-                f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp\n')
+                f.write('cs,acc_inf_mcps,acc_mcps_mcp,acc_inf_mcp,auc_inf_mcps,auc_inf_mcp,cs_inf_mcp,cs_mcps_mcp\n')
         else:
             with open(lpath,'r') as f:
                 ldata = f.readlines()

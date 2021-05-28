@@ -291,7 +291,7 @@ def cut_value_part(data,p1,p2):
     somme = 0
     for a in p1:
         for b in p2:
-            somme+=data[a,b]
+            somme+=data[a,b].item()
     return somme
 
 def cut_value_part_asym(data,p1,p2):

@@ -85,7 +85,8 @@ def custom_sbm_eval(loader,model,device)->float:
         data = data.to(device)
         target = target.to(device)
         raw_scores = model(data).squeeze(-1)
-        inf_parts = get_partition(raw_scores)
+        probas = torch.sigmoid(raw_scores)
+        inf_parts = [my_minb_kl(proba) for proba in probas]
 
         adj = data[:,:,:,1]
         kl_parts = [my_minb_kl(cur_adj) for cur_adj in adj]
