@@ -1,4 +1,4 @@
-# Expressive Power of Invariant and Equivaraint Graph Neural Networks 
+# Expressive Power of Invariant and Equivariant Graph Neural Networks 
 
 In this repository, we show how to use powerful GNN (2-FGNN) to solve a  graph alignment problem. This code was used to derive the practical results in the following paper:
 
