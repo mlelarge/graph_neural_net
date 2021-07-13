@@ -12,6 +12,14 @@ def check_dir(dir_path):
     dir_path = dir_path.replace('//','/')
     os.makedirs(dir_path, exist_ok=True)
 
+def check_file(file_path):
+    file_path = file_path.replace('//','/')
+    dir_path = os.path.dirname(file_path)
+    check_dir(dir_path)
+    if not os.path.exists(file_path):
+        with open(file_path,'w') as f:
+            pass
+
 # from https://stackoverflow.com/questions/50916422/python-typeerror-object-of-type-int64-is-not-json-serializable/50916741
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -58,6 +66,24 @@ def get_device(t):
     if t.is_cuda:
         return t.get_device()
     return 'cpu'
+
+#Matrix operation
+
+def symmetrize_matrix(A):
+    Af = A.triu(0) + A.triu(1).T
+    return Af
+
+def list_to_tensor(liste) -> torch.Tensor:
+    """Transforms a list of same shaped tensors"""
+    if isinstance(liste,torch.Tensor):
+        return liste
+    bs = len(liste)
+    shape = liste[0].shape
+    final_shape = (bs,*shape)
+    tensor_eq = torch.empty(final_shape)
+    for k in range(bs):
+        tensor_eq[k] = liste[k]
+    return tensor_eq
 
 
 #MCP
@@ -108,7 +134,7 @@ def mcp_adj_to_ind(adj)->list:
         l_clique_sol=l_clique_sol[0]
     return l_clique_sol
 
-def ind_to_adj(ind,n)->torch.Tensor:
+def mcp_ind_to_adj(ind,n)->torch.Tensor:
     """
     ind should be a set of indices (or iterable)
     Transforms it into the adjacency matrix of shape (n,n)
@@ -121,6 +147,7 @@ def ind_to_adj(ind,n)->torch.Tensor:
     adj[x,y] = 1
     adj *= (1-torch.eye(n))
     return adj
+
 
 #TSP
 
@@ -200,8 +227,8 @@ def tour_to_adj(n,path):
 
 def part_to_adj(p1,p2):
     n = len(p1)+len(p2)
-    adj1 = ind_to_adj(p1,n)
-    adj2 = ind_to_adj(p2,n)
+    adj1 = mcp_ind_to_adj(p1,n)
+    adj2 = mcp_ind_to_adj(p2,n)
     return adj1 + adj2 + torch.eye(n)
 
 

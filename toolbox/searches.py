@@ -15,6 +15,10 @@ import time
 import string
 import os
 
+try:
+    from concorde.tsp import TSPSolver
+except ModuleNotFoundError:
+    print("Trying to continue without pyconcorde as it is not installed. TSP solving will fail.")
 
 
 def insert(container, new_item, key=len):
@@ -38,7 +42,6 @@ def insert(container, new_item, key=len):
 
 def neighs(v,adj):
     return {i for i in range(adj.shape[0]) if adj[v,i]}
-
 
 def _bronk2(R,P,X,adj):
     if len(P)==0 and len(X)==0:
@@ -98,7 +101,6 @@ def mc_bronk2_cpp(adjs,**kwargs):
     clique_sols = solver.solutions
     return clique_sols
 
-
 def mcp_proba_cheat(data,raw_scores, solutions, overestimate=10):
     """
     data should be (bs,in_features,n,n) with data[:,:,:,1] the adjacency matrices
@@ -133,7 +135,7 @@ def mcp_proba_cheat(data,raw_scores, solutions, overestimate=10):
         l_clique_inf.append(best_set)
     return l_clique_inf,l_clique_sol
 
-def mcp_beam_method(data, raw_scores, seeds=None, add_singles=True, beam_size=1280):
+def mcp_beam_method(adjs, raw_scores, seeds=None, add_singles=True, beam_size=1280):
     """
     The idea of this method is to establish a growing clique, keeping only the biggest cliques starting from the most probable nodes
     seeds should be a list of sets
@@ -144,16 +146,12 @@ def mcp_beam_method(data, raw_scores, seeds=None, add_singles=True, beam_size=12
     if len(raw_scores.shape)==2:
         solo=True
         raw_scores = raw_scores.unsqueeze(0)
-        data = data.unsqueeze(0)
+        adjs = adjs.unsqueeze(0)
         if seeding: seeds = [seeds] #In that case we'd only have a set
-    
-    if len(data.shape)==3:
-        data = data.unsqueeze(0)
     
 
     bs,n,_ = raw_scores.shape
 
-    adjs = data[:,:,:,1]
     probas = torch.sigmoid(raw_scores)
 
     degrees = torch.sum(probas, dim=-1)
@@ -186,6 +184,26 @@ def mcp_beam_method(data, raw_scores, seeds=None, add_singles=True, beam_size=12
         l_clique_inf = l_clique_inf[0]
     return l_clique_inf
 
+def mcp_clique_size(adj):
+    if isinstance(adj,list):
+        if isinstance(adj[0],list):
+            return np.mean([len(cliques[0]) for cliques in adj])
+        elif isinstance(adj[0],set):
+            return np.mean([len(clique) for clique in adj])
+    return int(adj[0].sum())
+
+#Min Bisection
+
+def part_to_adj(A,B):
+    n = max(max(A),max(B)) + 1
+    adj = torch.zeros((n,n))
+    for a in A:
+        for a2 in A:
+            adj[a,a2] = 1
+    for b in B:
+        for b2 in B:
+            adj[b,b2] = 1
+    return adj
 
 def compute_d(data,A,B):
     n,_ = data.shape
@@ -207,6 +225,24 @@ def compute_d(data,A,B):
     da = ea - ia
     db = eb - ib
     return da,db
+
+def compute_D(data,A,B):
+    n,_ = data.shape
+    i = torch.zeros(n)
+    e = torch.zeros(n)
+    for v1 in range(n):
+        v1_in_A = (v1 in A)
+        for v2 in range(v1+1,n):
+            cost = data[v1,v2]
+            v2_in_A = (v2 in A)
+            if v1_in_A==v2_in_A:
+                i[v1] += cost
+                i[v2] += cost
+            else:
+                e[v1] += cost
+                e[v2] += cost
+    d = e-i
+    return d
 
 def find_best_ab(data,A,B,da,db,av,bv):
     g_max = -np.infty
@@ -287,6 +323,57 @@ def minb_kl(data,**kwargs):
     pa,pb = klbisection(g,(A,B),weight='weight',**kwargs)
     return set(pa),set(pb)
 
+def minb_kl_multiple(adjs,**kwargs):
+    bs,n,_ = adjs.shape
+    SOLS = torch.zeros(bs,n,n,dtype=float)
+    for k,adj in enumerate(adjs):
+        A,B = minb_kl(adj, **kwargs)
+        SOLS[k,:,:] = part_to_adj(A,B)[:,:]
+    return SOLS
+
+def greedy_bisection(data, seed=None):
+    n,_ = data.shape
+    if seed is None:
+        A = set(range(0,n//2))
+        B = set(range(n//2,n))
+    elif seed=='random' or seed=='r':
+        A = set(random.sample(range(n),n//2))
+        B = set(range(n))-A
+    else:
+        A,B = seed
+    
+    done = False
+    while not done:
+        change_cost = -n**2
+        swap = (-1,-1)
+        D = compute_D(data, A, B)
+        for a in A:
+            for b in B:
+                cost = D[a] + D[b] -2 * data[min(a,b),max(a,b)]
+                if cost > change_cost:
+                    change_cost = cost
+                    swap = (a,b)
+        assert swap!=(-1,-1), "Haven't done any swapping, this shouldn't happen."
+        if change_cost>0:
+            a,b = swap
+            A.remove(a)
+            B.remove(b)
+            A.add(b)
+            B.add(a)
+        else:
+            done = True
+    return A,B
+
+def cut_value(data,sol):
+    """Careful : the ones in the solution matrix are interpreted as the 'intra' vertices, i.e. the vertices not counted in the cut"""
+    inverted_sol = 1 - sol # Now the ones are the inter-population edges
+    edge_values = data*sol # Calculate the 
+    edge_values = edge_values.triu(1) #Keep only the upper values without the diagonal for the count
+    value = edge_values.sum()
+    if isinstance(value,torch.Tensor):
+        value = value.item()
+    return value
+
 def cut_value_part(data,p1,p2):
     somme = 0
     for a in p1:
@@ -324,8 +411,29 @@ def get_partition(raw_scores):
         l_parts.append((p1,p2))
     return l_parts
 
+def sbm_get_adj(raw_scores):
+    solutions = [part_to_adj(*part) for part in get_partition(raw_scores)]
+    return solutions
 
 #TSP
+
+def tsp_concorde(adjs):
+    bs,n,_ = adjs.shape
+
+    SOLS = torch.zeros((bs,n,n))
+
+    for k,adj in enumerate(adjs):
+        adj = adj - adj.min()
+        problem = TSPSolver.from_data_explicit(adj)
+        solution = problem.solve(verbose=False)
+        assert solution.success, f"Couldn't find solution! \n W={adj} \n {solution}"
+        prec = solution.tour[-1]
+        for i in range(n):
+            curr = solution.tour[i]
+            SOLS[k,curr,prec] = 1
+            SOLS[k,prec,curr] = 1
+            prec = curr
+    return SOLS
 
 def tsp_greedy_decoding(G):
     '''
@@ -374,7 +482,7 @@ def get_surest(n,G):
     node_idx = torch.argmax(G.flatten())//n
     return node_idx
 
-def tsp_beam_decode(raw_scores,l_xs=[],l_ys=[],W_dists=None,b=1280,start_mode="r",chosen=0,keep_beams=0):
+def tsp_beam_decode(raw_scores,W_dists=None,l_xs=[],l_ys=[],b=1280,start_mode="r",chosen=0,keep_beams=0):
 
     start_mode = start_mode.lower()
     if start_mode=='r':
@@ -460,25 +568,12 @@ def tsp_beam_decode(raw_scores,l_xs=[],l_ys=[],W_dists=None,b=1280,start_mode="r
         return output, l_beam
     return output
 
+def tsp_sym_value(data, adj):
+    """symmetrizes adj"""
+    adj = utils.symmetrize_matrix(adj)
+    value = (adj.triu(1)*data).sum()
+    return value
+    
 
 if __name__ == "__main__":
-    #g = nx.erdos_renyi_graph(50,0.7)
-    #adj = torch.tensor(nx.adjacency_matrix(g).todense())
-    #l_time = timeit.repeat(lambda : find_maxclique(adj),number=1,repeat=1)
-    n=100
-    #def time_bronk(n):
-    #    g = torch.empty((n,n)).uniform_()
-    #    g = (g.T+g)/2
-    #    #print(g)
-    #    g = (g<(0.9)).to(int)
-    #    #print(g)
-    #    print(mc_bronk2(g))
-    #print(timeit.timeit(lambda : time_bronk(n),number=5))
-    
-    def test_mcp_solver(bs,n):
-        adjs = torch.empty((bs,n,n)).uniform_()
-        adjs = (adjs.transpose(-1,-2)+adjs)/2
-        adjs = (adjs<(0.5)).to(int)
-        clique_sols = mc_bronk2_cpp(adjs)
-        return clique_sols
-    clique_sols = test_mcp_solver(10,n)
+    pass

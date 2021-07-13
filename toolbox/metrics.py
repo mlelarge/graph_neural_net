@@ -1,10 +1,13 @@
 import numpy as np
+from numpy.lib.arraysetops import isin
 import torch
 from scipy.optimize import linear_sum_assignment
 from torch.nn.modules.activation import Sigmoid, Softmax
 from toolbox.utils import get_device
 import torch.nn.functional as F
 from sklearn.cluster import KMeans
+import sklearn.metrics as skmetrics
+import toolbox.utils as utils
 
 from toolbox.searches import mcp_beam_method
 
@@ -227,6 +230,19 @@ def accuracy_mcp_exact(raw_scores,cliques_solutions):
         l_sol_cliques.append(best_clique)
     return true_pos, total_n_vertices, l_sol_cliques
 
+def mcp_auc(probas,cliques_solutions):
+    bs,n,_ = probas.shape
+    aucs = []
+    for k in range(bs):
+        best_auc_value = 0
+        for _ in cliques_solutions[k]:
+            clique = cliques_solutions[k]
+            if isinstance(clique[0], set):
+                clique = utils.mcp_ind_to_adj(clique[0],n)
+            cur_auc = skmetrics.roc_auc_score(clique.reshape(n*n).numpy(), probas[k].cpu().detach().reshape(n*n).numpy())
+            best_auc_value = max(best_auc_value, cur_auc)
+        aucs.append(best_auc_value)
+    return aucs
 
 def accuracy_inf_sol(inferred,cliques_solution):
     """
@@ -259,6 +275,23 @@ def accuracy_inf_sol_multiple(inferred,cliques_solutions):
         n_tot += cur_n
         l_sol_cliques.append(best_clique)
     return true_pos, n_tot, l_sol_cliques
+
+def mcp_acc(inferred, cliques_or_target):
+    def convert(t):
+        if isinstance(t[0],torch.Tensor):
+            if len(t[0].shape)>1:
+                t = utils.mcp_adj_to_ind(t)
+                t = [[elt] for elt in t] # Add a depth to have a shape of bs,1,set_size, as we work with possible multiple set solutions
+        return t
+
+
+    cliques_or_target = convert(cliques_or_target)
+    #if (not isinstance(cliques_or_target,set)):
+    #    if isinstance(cliques_or_target,list):
+    #        cliques_or_target = utils.list_to_tensor(cliques_or_target)
+    #    cliques_or_target = utils.mcp_adj_to_ind(cliques_or_target)
+    tp,n_tot,_ = accuracy_inf_sol_multiple(inferred, cliques_or_target)
+    return tp/n_tot
 
 #TSP
 
@@ -327,7 +360,7 @@ def tspd_dumb(raw_scores, target):
 def accuracy_hhc(raw_scores, target):
     """ Computes simple accuracy by choosing the most probable edge
     For HHC:    - raw_scores and target of shape (bs,n,n)
-                - target should be ones over the diagonal
+                - target should be ones over the diagonal for the normal HHC (but can be changed to fit another solution)
      """
     bs,n,_ = raw_scores.shape
     device = get_device(raw_scores)

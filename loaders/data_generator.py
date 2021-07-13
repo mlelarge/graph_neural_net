@@ -757,7 +757,7 @@ class MCP_Generator(Base_Generator):
     """
     def __init__(self, name, args):
         self.edge_density = args['edge_density']
-        self.clique_size = args['clique_size']
+        self.clique_size = int(args['clique_size'])
         num_examples = args['num_examples_' + name]
         self.n_vertices = args['n_vertices']
         subfolder_name = 'MCP_{}_{}_{}_{}'.format(num_examples,
@@ -789,7 +789,7 @@ class MCP_Generator(Base_Generator):
         K2 = mcp_beam_method(B,K,seeds=seed,add_singles=False) #Finds a probably better solution with beam search in the form of a list of indices
         k2_size = len(K2)
         if k2_size>k_size:
-            K = utils.ind_to_adj(K2,self.n_vertices)
+            K = utils.mcp_ind_to_adj(K2,self.n_vertices)
         return (B, K)
         
     @classmethod
@@ -880,8 +880,13 @@ class SBM_Generator(Base_Generator):
         n_sub_b = n - n_sub_a # In case n_vertices is odd
 
 
-        ga = (torch.empty((n_sub_a,n_sub_a)).uniform_()<(self.pi_real)).to(torch.float)
-        gb = (torch.empty((n_sub_b,n_sub_b)).uniform_()<(self.pi_real)).to(torch.float)
+        ga = torch.empty((n_sub_a,n_sub_a)).uniform_()
+        ga = (ga<(self.pi_real)).to(torch.float)
+        gb = torch.empty((n_sub_b,n_sub_b)).uniform_()
+        gb = (gb<(self.pi_real)).to(torch.float)
+        ga = utils.symmetrize_matrix(ga)
+        gb = utils.symmetrize_matrix(gb)
+
         glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.po_real).to(torch.float)
         
         adj = torch.zeros((self.n_vertices,self.n_vertices))

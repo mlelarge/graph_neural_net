@@ -1,4 +1,3 @@
-from toolbox import metrics
 import time
 import torch
 
@@ -88,3 +87,59 @@ def val_triplet(val_loader,model,helper,device,epoch,eval_score=False,print_freq
     helper.log_meters(val_test, n=epoch)
     relevant_metric = helper.get_relevant_metric(val_test)
     return relevant_metric.avg, los.avg
+
+
+
+def train_simple(train_loader,model,optimizer,
+                helper,device,epoch,eval_score=False,print_freq=100):
+    model.train()
+    learning_rate = optimizer.param_groups[0]['lr']
+    end = time.time()
+    batch_size = train_loader.batch_size
+
+    for i, (data, target) in enumerate(train_loader):
+
+        data = data.to(device)
+        target_deviced = target.to(device)
+        output = model(data)#,input2)
+        raw_scores = output.squeeze(-1)
+
+        loss = helper.criterion(raw_scores,target_deviced)
+        helper.update_meter('train', 'loss', loss.data.item(), n=1)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        end = time.time()
+
+    
+        if i % print_freq == 0:
+            if eval_score:
+                #print(np_out.shape)
+                values = helper.eval_function(raw_scores,target_deviced)
+                #print(acc_max, n, bs)
+                helper.update_eval('train', values)
+            print('Epoch: [{0}][{1}/{2}]\t'
+                  'LR {lr:.2e}\t'
+                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                  '{helper_str}'.format(
+                   epoch, i, len(train_loader),
+                   lr=learning_rate,
+                   loss=helper.get_meter('train', 'loss'), helper_str=helper.get_eval_str('train')))
+    optimizer.zero_grad()   
+    helper.log_meters('train', n=epoch)
+    helper.log_meters('hyperparams', n=epoch)
+
+def cycle_simple(n_epochs, train_loader, val_loader, model, optimizer, scheduler, helper, device):
+    for current_epoch in range(n_epochs):
+        train_simple(train_loader,model,optimizer,helper,device,epoch=current_epoch,eval_score=True,print_freq=100)
+        
+        _, loss = val_triplet(val_loader,model,helper,device,epoch=current_epoch,eval_score=True)
+
+        scheduler.step(loss)
+
+        cur_lr = optimizer.param_groups[0]['lr']
+        if helper.stop_condition(cur_lr):
+            print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+            break
