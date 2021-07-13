@@ -70,7 +70,11 @@ def get_device(t):
 #Matrix operation
 
 def symmetrize_matrix(A):
-    Af = A.triu(0) + A.triu(1).T
+    """
+    Symmetrizes a matrix :
+    If shape is (a,b,c) will symmetrize by considering a is batch size
+    """
+    Af = A.triu(0) + A.triu(1).transpose(-2,-1)
     return Af
 
 def list_to_tensor(liste) -> torch.Tensor:

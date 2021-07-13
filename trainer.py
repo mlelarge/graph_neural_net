@@ -93,6 +93,7 @@ def val_triplet(val_loader,model,helper,device,epoch,eval_score=False,print_freq
 def train_simple(train_loader,model,optimizer,
                 helper,device,epoch,eval_score=False,print_freq=100):
     model.train()
+    model.to(device)
     learning_rate = optimizer.param_groups[0]['lr']
     end = time.time()
     batch_size = train_loader.batch_size
@@ -110,8 +111,6 @@ def train_simple(train_loader,model,optimizer,
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        end = time.time()
 
     
         if i % print_freq == 0:

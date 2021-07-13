@@ -197,13 +197,12 @@ def eval(model, dataset, exact_solver_function, overlap_function, beam_search_fu
         adj = data[:,:,:,1] #Keep the connectivity/adjacency matrix before changing the device
 
         data = data.to(device)
-        P = P.to(device)
 
         output = model(data)
         raw_scores = output.squeeze(-1)
         probas = torch.sigmoid(raw_scores)
 
-        model_solution = beam_search_function(adj,raw_scores)
+        model_solution = beam_search_function(adj,raw_scores.cpu())
         if isinstance(model_solution[0],torch.Tensor):
             model_solution = utils.list_to_tensor(model_solution)
 

@@ -417,13 +417,16 @@ def sbm_get_adj(raw_scores):
 
 #TSP
 
-def tsp_concorde(adjs):
+def tsp_concorde(adjs,coeff=1e7):
     bs,n,_ = adjs.shape
 
     SOLS = torch.zeros((bs,n,n))
 
     for k,adj in enumerate(adjs):
         adj = adj - adj.min()
+        adj = adj*coeff
+        adj[np.diag_indices(n)] = coeff * 100
+        adj = adj.to(int)
         problem = TSPSolver.from_data_explicit(adj)
         solution = problem.solve(verbose=False)
         assert solution.success, f"Couldn't find solution! \n W={adj} \n {solution}"
@@ -572,6 +575,8 @@ def tsp_sym_value(data, adj):
     """symmetrizes adj"""
     adj = utils.symmetrize_matrix(adj)
     value = (adj.triu(1)*data).sum()
+    if isinstance(value,torch.Tensor):
+        value = value.item()
     return value
     
 
