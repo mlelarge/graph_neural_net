@@ -131,14 +131,19 @@ def train_simple(train_loader,model,optimizer,
     helper.log_meters('hyperparams', n=epoch)
 
 def cycle_simple(n_epochs, train_loader, val_loader, model, optimizer, scheduler, helper, device):
+    best_state_dict = model.state_dict()
+    prev_loss = -1
     for current_epoch in range(n_epochs):
         train_simple(train_loader,model,optimizer,helper,device,epoch=current_epoch,eval_score=True,print_freq=100)
         
         _, loss = val_triplet(val_loader,model,helper,device,epoch=current_epoch,eval_score=True)
-
+        if prev_loss == -1 or prev_loss > loss:
+            prev_loss = loss
+            best_state_dict = model.state_dict()
         scheduler.step(loss)
 
         cur_lr = optimizer.param_groups[0]['lr']
         if helper.stop_condition(cur_lr):
             print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
             break
+    model.load_state_dict(best_state_dict)
