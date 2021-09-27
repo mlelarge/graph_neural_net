@@ -21,11 +21,11 @@ class BaseModel(nn.Module):
         # First part - sequential mlp blocks
         last_layer_features = self.original_features_num
         self.reg_blocks = nn.ModuleList()
-        for _ in range(self.num_blocks-1):
-            mlp_block = RegularBlock(last_layer_features, in_features, self.depth_of_mlp)
+        for i in range(self.num_blocks-1):
+            mlp_block = RegularBlock(last_layer_features, in_features, self.depth_of_mlp, name=f'block_{i}')
             self.reg_blocks.append(mlp_block)
             last_layer_features = in_features
-        mlp_block = RegularBlock(in_features,out_features,depth_of_mlp)
+        mlp_block = RegularBlock(in_features,out_features,depth_of_mlp,name=f'block_{self.num_blocks-1}')
         self.reg_blocks.append(mlp_block)
 
     def forward(self, x):

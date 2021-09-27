@@ -6,3 +6,8 @@ sacred
 PyYAML
 neptune-contrib
 psutil
+Cython
+sklearn
+tqdm
+seaborn
+pandas

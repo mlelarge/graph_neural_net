@@ -3,7 +3,11 @@ import json
 import copy
 import os
 from collections import defaultdict
-from toolbox import utils
+import toolbox.utils as utils
+from loaders.data_generator import QAP_Generator, SBM_Generator,TSP_Generator,MCP_Generator
+import toolbox.metrics as metrics
+import toolbox.losses as losses
+from torch.nn import BCELoss
 
 '''
 Object of the Experiment class keep track of scores and metrics across epochs.
@@ -76,12 +80,12 @@ class Experiment(object):
             meter.reset()
 
     def get_meters(self, tag):
-        assert tag in list(self.meters.keys())
+        assert tag in list(self.meters.keys()), f"Tag {tag} not in {list(self.meters.keys())}"
         return self.meters[tag]
 
     def get_meter(self, tag, name):
-        assert tag in list(self.meters.keys())
-        assert name in list(self.meters[tag].keys())
+        assert tag in list(self.meters.keys()), f"Tag {tag} not in {list(self.meters.keys())}"
+        assert name in list(self.meters[tag].keys()), f"Name {name} not in {self.meters[tag].keys()}"
         return self.meters[tag][name]
 
     def to_json(self, log_dir, filename):
