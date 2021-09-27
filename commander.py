@@ -1,4 +1,5 @@
 import os
+import pathlib
 import shutil
 import json
 from sacred import Experiment
@@ -19,6 +20,7 @@ SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 ### BEGIN Sacred setup
 ex = Experiment()
+
 #ex.add_config('default_config.yaml')
 
 @ex.config
@@ -31,6 +33,7 @@ def create_config():
     pbm_key='_'+pbm
     config = utils.clean_config(config,pbm_key)
     ex.add_config(config)
+
 
 @ex.config_hook
 def set_experiment_name(config, command_name, logger):
@@ -106,18 +109,24 @@ def init_observers(config, command_name, logger):
     if neptune['enable']:
         from neptunecontrib.monitoring.sacred import NeptuneObserver
         ex.observers.append(NeptuneObserver(project_name=neptune['project']+problem.upper()))
+
     return config
 
 @ex.post_run_hook
 def clean_observer(observers):
     """ Observers that are added in a config_hook need to be cleaned """
-    neptune = observers['neptune']
-    if neptune['enable']:
-        from neptunecontrib.monitoring.sacred import NeptuneObserver
-        ex.observers = [obs for obs in ex.observers if not isinstance(obs, NeptuneObserver)]
+    try:
+        neptune = observers['neptune']
+        if neptune['enable']:
+            from neptunecontrib.monitoring.sacred import NeptuneObserver
+            ex.observers = [obs for obs in ex.observers
+                            if not isinstance(obs, NeptuneObserver)]
+    except KeyError:
+        pass
 
 ### END Sacred setup
 
+### Training
 @ex.capture
 def init_helper(problem, name, _config, _run, type='train'):
     exp_helper_object = get_helper(problem)
@@ -160,6 +169,7 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
 
 
+
 @ex.capture
 def load_model(model, device, model_path):
     """ Load model. Note that the model_path argument is captured """
@@ -173,6 +183,7 @@ def load_model(model, device, model_path):
 
 @ex.command
 def train(cpu, train, problem, train_data_dict, arch, test_enabled):
+
     """ Main func.
     """
     print("Heading to Training.")
@@ -186,9 +197,11 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
 
     # init random seeds 
     setup_env()
+    print("Models saved in ", log_dir)
 
     init_output_env()
     
+
     if problem == 'mcp' and not train_data_dict['planted']:
         problem = 'mcptrue'
     exp_helper = init_helper(problem)
@@ -200,6 +213,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     train_loader = siamese_loader(gene_train, train['batch_size'],
                                   gene_train.constant_n_vertices)
     gene_val = generator('val', train_data_dict)
+
     gene_val.load_dataset()
     val_loader = siamese_loader(gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
@@ -218,8 +232,6 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
     model.to(device)
 
     is_best = True
-    #log_dir_ckpt = get_log_dir()
-    #print(log_dir_ckpt)
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
         trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
@@ -241,6 +253,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled):
             'best_epoch': best_epoch,
             'exp_logger': exp_helper.get_logger(),
             }, is_best)
+
         cur_lr = utils.get_lr(optimizer)
         if exp_helper.stop_condition(cur_lr):
             print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
@@ -266,11 +279,13 @@ def create_key(problem, test_data_dict, _config):
     return key
 
 def save_to_json(jsonkey, loss, relevant_metric_dict, filename):
+
     if os.path.exists(filename):
         with open(filename, "r") as jsonFile:
             data = json.load(jsonFile)
     else:
         data = {}
+
     data[jsonkey] = {'loss':loss}
 
     for dkey, value in relevant_metric_dict.items():
@@ -281,6 +296,7 @@ def save_to_json(jsonkey, loss, relevant_metric_dict, filename):
 @ex.command
 def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
     print("Heading to evaluation.")
+
     use_cuda = not cpu and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
     print('Using device:', device)
@@ -288,6 +304,7 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
     model = get_model(arch)
     model.to(device)
     model = load_model(model, device)
+
 
     if problem == 'tsprl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
         problem = 'tsp'
@@ -314,3 +331,4 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
 @ex.automain
 def main():
     print("Main does nothing ! Use 'train' or 'eval' argument.")
+
