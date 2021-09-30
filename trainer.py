@@ -18,7 +18,8 @@ def train_triplet(train_loader,model,optimizer,
         data = data.to(device)
         target_deviced = target.to(device)
         output = model(data)#,input2)
-        raw_scores = output.squeeze(-1)
+        rawscores = output.squeeze(-1)
+        raw_scores = torch.softmax(rawscores,-1)
 
         loss = helper.criterion(raw_scores,target_deviced)
         helper.update_meter('train', 'loss', loss.data.item(), n=1)
@@ -47,8 +48,8 @@ def train_triplet(train_loader,model,optimizer,
                    epoch, i, len(train_loader), batch_time=helper.get_meter('train', 'batch_time'),
                    data_time=helper.get_meter('train', 'data_time'), lr=learning_rate,
                    loss=helper.get_meter('train', 'loss'), helper_str=helper.get_eval_str('train')))
-    optimizer.zero_grad()   
-    helper.log_meters('train', n=epoch)
+    
+        helper.log_meters('train', n=epoch)
     helper.log_meters('hyperparams', n=epoch)
 
 
@@ -61,8 +62,9 @@ def val_triplet(val_loader,model,helper,device,epoch,eval_score=False,print_freq
             data = data.to(device)
             target_deviced = target.to(device)
             output = model(data)
-            raw_scores = output.squeeze(-1)
-        
+            rawscores = output.squeeze(-1)
+            raw_scores = torch.softmax(rawscores,-1)
+            
             loss = helper.criterion(raw_scores,target_deviced)
             helper.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
@@ -84,7 +86,7 @@ def val_triplet(val_loader,model,helper,device,epoch,eval_score=False,print_freq
                         epoch, i, len(val_loader), loss=helper.get_meter(val_test, 'loss'),
                         helper_str = helper.get_eval_str(val_test)))
 
-    helper.log_meters(val_test, n=epoch)
+        helper.log_meters(val_test, n=epoch)
     relevant_metric = helper.get_relevant_metric(val_test)
     return relevant_metric.avg, los.avg
 

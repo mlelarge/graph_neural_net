@@ -199,7 +199,7 @@ class QAP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss_reduction='mean', loss=CrossEntropyLoss(reduction='sum')) -> None:
         self.generator = dg.QAP_Generator
         self.criterion = losses.triplet_loss(loss_reduction=loss_reduction, loss=loss)
-        self.eval_function = metrics.accuracy_linear_assignment
+        self.eval_function = metrics.accuracy_max#accuracy_linear_assignment
         
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('qap', name, options=options, run=run)

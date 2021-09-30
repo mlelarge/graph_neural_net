@@ -46,14 +46,15 @@ def update_paths(config, command_name, logger):
     pbm = utils.reduce_name(pbm)
 
     pbm_key = "_"+pbm
-    l_params =[value for _,value in (config['data']['train'][pbm_key]).items()]
+    l_params = [config['data']['train']['n_vertices']]
+    l_params += [value for _,value in (config['data']['train'][pbm_key]).items()]
     config_str = "_".join([str(item) for item in l_params])
     log_dir = '{}/runs/{}/{}-{}/'.format(config['root_dir'], config['name'],
                                          config['problem'].upper(),
                                          config_str)
     config.update(  log_dir=log_dir, #End log_dir
                     path_dataset=config['data']['train'][pbm_key]['path_dataset'],
-                    model_path = os.path.join(log_dir, 'model_best.pth.tar'),
+                    model_path = os.path.join(log_dir, 'model_best.pth.tar') if config['train']['anew']  else os.path.join(config['train']['model_path'], 'model_best.pth.tar'),
                     output_filename = 'test.json'
     )
     return config
@@ -182,7 +183,7 @@ def load_model(model, device, model_path):
         raise RuntimeError('Model does not exist!')
 
 @ex.command
-def train(cpu, train, problem, train_data_dict, arch, test_enabled):
+def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
 
     """ Main func.
     """

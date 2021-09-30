@@ -89,22 +89,25 @@ def make_meter_f1():
 
 #QAP
 
-def accuracy_linear_assignment(weights, target, labels=None, aggregate_score=True):
+def accuracy_linear_assignment(weights, dummy_target, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
     total_n_vertices = 0
     acc = 0
     all_acc = []
+    #print(target)
     for i, weight in enumerate(weights):
         if labels:
             label = labels[i]
         else:
             label = np.arange(len(weight))
         cost = -weight.cpu().detach().numpy()
+        #print(i, " | ", cost)
         _, preds = linear_sum_assignment(cost)
         if aggregate_score:
             acc += np.sum(preds == label)
+            #print(i, " | ", acc, preds, label)
             total_n_vertices += len(weight)
         else:
             all_acc += [np.sum(preds == label) / len(weight)]
@@ -120,21 +123,28 @@ def all_losses_acc(val_loader,model,criterion,
     all_losses =[]
     all_acc = []
 
-    for (input1, input2) in val_loader:
-        input1 = input1.to(device)
-        input2 = input2.to(device)
-        output = model(input1,input2)
+    for (data, target) in val_loader:
+        data = data.to(device)
+        target_deviced = target.to(device)
+        output = model(data)
+        rawscores = output.squeeze(-1)
+        raw_scores = torch.softmax(rawscores,-1)
+            
+        loss = criterion(raw_scores,target_deviced)
+        #input1 = input1.to(device)
+        #input2 = input2.to(device)
+        #output = model(input1,input2)
 
-        loss = criterion(output)
+        #loss = criterion(output)
         #print(output.shape)
         all_losses.append(loss.item())
     
         if eval_score is not None:
-            acc = eval_score(output, aggregate_score=False)
+            acc = eval_score(raw_scores,target_deviced,aggregate_score=False)#eval_score(output, aggregate_score=False)
             all_acc += acc
-    return all_losses, np.array(all_acc)
+    return np.array(all_losses), np.array(all_acc)
    
-def accuracy_max(weights,labels=None):
+def accuracy_max(weights,dummy_target, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
@@ -150,7 +160,11 @@ def accuracy_max(weights,labels=None):
         #print(preds)
         acc += np.sum(preds == label)
         total_n_vertices += len(weight)
-    return acc, total_n_vertices
+    if aggregate_score:
+        return acc, total_n_vertices
+    else:
+        return acc/total_n_vertices
+    #return acc, total_n_vertices
 
 #MCP
 

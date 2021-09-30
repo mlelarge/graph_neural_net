@@ -1,22 +1,22 @@
 ---
-name: Fusion
+name: qap_er_bp_inc
 cpu: No
 root_dir: .
-problem: 'hhc' #qap, tsp, hhc, tsprl, mcp, sbm
+problem: 'qap' #qap, tsp, hhc, tsprl, mcp, sbm
 test_enabled: Yes
 
 data:
     train: # Train/Val data generation parameters
         num_examples_train: 20000
         num_examples_val: 1000
-        n_vertices: 50
+        n_vertices: 100
 
         _qap:
             generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
             noise_model: ErdosRenyi
-            edge_density: 0.2
+            edge_density: 0.03
             vertex_proba: 1. # Parameter of the binomial distribution of vertices
-            noise: 0.05
+            noise: 0.1
             path_dataset: dataset_qap # Path where datasets are stored
         _tsp:
             generative_model: Square01
@@ -40,15 +40,15 @@ data:
             
     test: #Test data generation parameters
         num_examples_test: 1000
-        n_vertices: 50
+        n_vertices: 100
         custom: No #If No, keeps the data_generation from train, just a failsafe so people consciously have to activate custom test
         
         _qap:
             generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
             noise_model: ErdosRenyi
-            edge_density: 0.2
+            edge_density: 0.03
             vertex_proba: 1. # Parameter of the binomial distribution of vertices
-            noise: 0.05
+            noise: 0.1
         _tsp:
             generative_model: Square01
             distance_used: EUC_2D
@@ -67,26 +67,27 @@ data:
 
 
 train: # Training parameters
-    epoch: 50
-    batch_size: 16
-    lr: !!float 1e-4
-    scheduler_step: 1
-    scheduler_decay: 0.5
+    epoch: 10
+    batch_size: 32 #10
+    lr: !!float 5e-6 #5e-6
+    scheduler_step: 2
+    scheduler_decay: 0.7
     lr_stop: !!float 1e-7
     print_freq: 100
-    anew: Yes
+    anew: No
+    model_path: './runs/qap_er_bp_inc/QAP-50_ErdosRenyi_ErdosRenyi_0.06_1.0_0.1_dataset_qap/' #'/home/mlelarge/GitHub/graph_neural_net/runs/qap_er_bp/QAP-100_ErdosRenyi_ErdosRenyi_0.03_1.0_0.1_dataset_qap'
     #loss_reduction: mean
 
 arch: # Architecture and model
-    arch: simple #siamese or simple
-    embedding: edge #node or edge
-    num_blocks: 5
+    arch: siamese #siamese or simple
+    embedding: node #node or edge
+    num_blocks: 2
     original_features_num: 2
     in_features: 64
-    out_features: 1
+    out_features: 64
     depth_of_mlp: 3
 
 observers:
     neptune:
         enable: Yes
-        project: mautrib/
+        project: mlelarge/GNN

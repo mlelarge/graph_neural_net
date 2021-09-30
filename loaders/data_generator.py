@@ -75,7 +75,7 @@ def noise(name):
     return decorator
 
 @noise("ErdosRenyi")
-def noise_erdos_renyi(g, W, noise, edge_density):
+def noise_erdos_renyi(W, noise, edge_density):
     n_vertices = len(W)
     pe1 = noise
     pe2 = (edge_density*noise)/(1-edge_density)
@@ -241,7 +241,7 @@ class Base_Generator(torch.utils.data.Dataset):
             data = torch.load(path)
             self.data = list(data)
         else:
-            print('Creating dataset.')
+            print('Creating dataset at {}'.format(path))
             self.data = []
             self.create_dataset()
             print('Saving dataset at {}'.format(path))
@@ -298,7 +298,7 @@ class QAP_Generator(Base_Generator):
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
         try:
-            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, self.edge_density)
+            W_noise = NOISE_FUNCTIONS[self.noise_model](W, self.noise, self.edge_density)
         except KeyError:
             raise ValueError('Noise model {} not supported'
                              .format(self.noise_model))
