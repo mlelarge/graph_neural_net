@@ -90,4 +90,4 @@ arch: # Architecture and model
 observers:
     neptune:
         enable: Yes
-        project: mlelarge/GNN
+        project: mautrib/GNN
