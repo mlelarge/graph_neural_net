@@ -49,12 +49,13 @@ def update_paths(config, command_name, logger):
     l_params = [config['data']['train']['n_vertices']]
     l_params += [value for _,value in (config['data']['train'][pbm_key]).items()]
     config_str = "_".join([str(item) for item in l_params])
+    final_model_name = config['train']['model_name']
     log_dir = '{}/runs/{}/{}-{}/'.format(config['root_dir'], config['name'],
                                          config['problem'].upper(),
                                          config_str)
     config.update(  log_dir=log_dir, #End log_dir
                     path_dataset=config['data']['train'][pbm_key]['path_dataset'],
-                    model_path = os.path.join(log_dir, 'model_best.pth.tar') if config['train']['anew']  else os.path.join(config['train']['model_path'], 'model_best.pth.tar'),
+                    model_path = os.path.join(log_dir, final_model_name) if config['train']['anew']  else os.path.join(config['train']['template_model_path']),
                     output_filename = 'test.json'
     )
     return config
@@ -260,7 +261,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
             print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
             break
     if test_enabled:
-        eval()
+        eval(use_model=model)
 
 
 @ex.capture
@@ -295,16 +296,19 @@ def save_to_json(jsonkey, loss, relevant_metric_dict, filename):
         json.dump(data, jsonFile)
 
 @ex.command
-def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
+def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, use_model=None):
     print("Heading to evaluation.")
 
     use_cuda = not cpu and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
     print('Using device:', device)
 
-    model = get_model(arch)
-    model.to(device)
-    model = load_model(model, device)
+    if use_model is None:
+        model = get_model(arch)
+        model.to(device)
+        model = load_model(model, device)
+    else:
+        model = use_model
 
 
     if problem == 'tsprl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
