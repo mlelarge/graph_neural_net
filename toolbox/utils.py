@@ -6,6 +6,7 @@ from numpy.lib.arraysetops import isin
 import torch
 import numpy as np
 from scipy.spatial.distance import cdist
+from scipy.optimize import linear_sum_assignment
 
 # create directory if it does not exist
 def check_dir(dir_path):
@@ -89,6 +90,40 @@ def list_to_tensor(liste) -> torch.Tensor:
         tensor_eq[k] = liste[k]
     return tensor_eq
 
+#QAP
+
+def perm_matrix(row,preds):
+    n = len(row)
+    permutation_matrix = np.zeros((n, n))
+    permutation_matrix[row, preds] = 1
+    return permutation_matrix
+
+def score(A,B,perm):
+    return np.trace(A @ perm @ B @ np.transpose(perm))/2, np.sum(A)/2, np.sum(B)/2
+
+def improve(A,B,perm):
+    label = np.arange(A.shape[0])
+    cost_adj = - A @ perm @ B
+    r, p = linear_sum_assignment(cost_adj)
+    acc = np.sum(p == label)
+    return perm_matrix(r,p), acc
+
+def greedy_qap(A,B,perm,T,verbose=False):
+    #perm_p = perm
+    s_best, na, nb = score(A,B,perm) 
+    perm_p, acc_best = improve(A,B,perm)
+    T_best = 0
+    for i in range(T):
+        perm_n, acc = improve(A,B,perm_p)
+        perm_p = perm_n
+        s,na,nb = score(A,B,perm_p)
+        if s > s_best:
+            acc_best = acc
+            s_best = s
+            T_best = i
+        if verbose:
+            print(s,na,nb,acc)
+    return s_best, na, nb, acc_best, T_best
 
 #MCP
 
