@@ -11,8 +11,6 @@ import toolbox.metrics as metrics
 import toolbox.losses as losses
 import toolbox.utils as utils
 
-from abc import abstractmethod
-
 
 #This file is here to create the handler for each experiment.
 #
@@ -192,8 +190,6 @@ class Experiment_Helper(Experiment): #Should not be called as such. Only its chi
         #        var_dict.pop(key)    
         with open(json_file, 'w') as f:
             json.dump(var_dict, f, cls=utils.NpEncoder)
-
-
 
 class QAP_Experiment(Experiment_Helper):
     def __init__(self, name, options=dict(), run=None, loss_reduction='mean', loss=CrossEntropyLoss(reduction='sum')) -> None:

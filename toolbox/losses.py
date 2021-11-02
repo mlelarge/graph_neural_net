@@ -17,13 +17,14 @@ class triplet_loss(nn.Module):
         else:
             raise ValueError('Unknown loss_reduction parameters {}'.format(loss_reduction))
 
-    def forward(self, outputs, target_dummy):#Keep target for modularity, target should be an empty tensor, but it's not used anyways
+    def forward(self, raw_scores, target_dummy):#Keep target for modularity, target should be an empty tensor, but it's not used anyways
         """
         outputs is the output of siamese network (bs,n_vertices,n_vertices)
         """
-        device = get_device(outputs)
+        device = get_device(raw_scores)
         loss = 0
         total = 0
+        outputs = torch.softmax(raw_scores,-1)
         for out in outputs:
             n_vertices = out.shape[0]
             ide = torch.arange(n_vertices)

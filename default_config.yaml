@@ -14,9 +14,9 @@ data:
         _qap:
             generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
             noise_model: ErdosRenyi
-            edge_density: 0.03
+            edge_density: 0.2
             vertex_proba: 1. # Parameter of the binomial distribution of vertices
-            noise: 0.1
+            noise: 0.05
             path_dataset: dataset_qap # Path where datasets are stored
         _tsp:
             generative_model: Square01
@@ -80,7 +80,8 @@ train: # Training parameters
     #loss_reduction: mean
 
 arch: # Architecture and model
-    arch: siamese #siamese or simple
+    arch: fgnn #fgnn or gcn
+    arch_load: siamese #siamese or simple
     embedding: node #node or edge
     num_blocks: 2
     original_features_num: 2
@@ -90,5 +91,5 @@ arch: # Architecture and model
 
 observers:
     neptune:
-        enable: Yes
+        enable: No
         project: mautrib/GNN
