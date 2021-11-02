@@ -3,7 +3,7 @@ from numpy.lib.arraysetops import isin
 import torch
 from scipy.optimize import linear_sum_assignment
 from torch.nn.modules.activation import Sigmoid, Softmax
-from toolbox.utils import get_device
+from toolbox.utils import get_device, greedy_qap, perm_matrix
 import torch.nn.functional as F
 from sklearn.cluster import KMeans
 import sklearn.metrics as skmetrics
@@ -131,17 +131,42 @@ def all_losses_acc(val_loader,model,criterion,
         raw_scores = torch.softmax(rawscores,-1)
             
         loss = criterion(raw_scores,target_deviced)
-        #input1 = input1.to(device)
-        #input2 = input2.to(device)
-        #output = model(input1,input2)
-
-        #loss = criterion(output)
-        #print(output.shape)
+        
         all_losses.append(loss.item())
     
         if eval_score is not None:
-            acc = eval_score(raw_scores,target_deviced,aggregate_score=False)#eval_score(output, aggregate_score=False)
+            acc = eval_score(raw_scores,target_deviced,aggregate_score=False)
             all_acc += acc
+    return np.array(all_losses), np.array(all_acc)
+
+# code below should be refactored...
+
+def all_greedy_losses_acc(val_loader,model,criterion,
+            device,T=10):
+    # only tested with batch size = 1
+    model.eval()
+    all_losses =[]
+    all_acc = []
+
+    for (data, target) in val_loader:
+        data = data.to(device)
+        target_deviced = target.to(device)
+        output = model(data)
+        rawscores = output.squeeze(-1)
+        raw_scores = torch.softmax(rawscores,-1)
+            
+        loss = criterion(raw_scores,target_deviced)
+        
+        all_losses.append(loss.item())
+
+        A = data[0,0,:,:,1].data.cpu().detach().numpy()
+        B = data[0,1,:,:,1].data.cpu().detach().numpy()
+        cost = -raw_scores.cpu().detach().numpy().squeeze()
+        #print(i, " | ", cost)
+        row, preds = linear_sum_assignment(cost)
+        a, na,nb, acc, _ = greedy_qap(A,B,perm_matrix(row,preds),T)
+        all_acc.append(acc)
+    
     return np.array(all_losses), np.array(all_acc)
    
 def accuracy_max(weights,dummy_target, labels=None, aggregate_score=True):
