@@ -61,10 +61,10 @@ class DGL_Loader(torch.utils.data.Dataset):
         return len(self.data)
 
 class BaseGCN(nn.Module):
-    def __init__(self, in_feats, h_feats, num_classes):
+    def __init__(self, original_features_num, in_features, out_features, **kwargs):
         super(BaseGCN, self).__init__()
-        self.conv1 = GraphConv(in_feats, h_feats)
-        self.conv2 = GraphConv(h_feats, num_classes)
+        self.conv1 = GraphConv(original_features_num, in_features)
+        self.conv2 = GraphConv(in_features, out_features)
 
     def forward(self, g):
         g = dgl.add_self_loop(g)
