@@ -1,5 +1,4 @@
 import os
-import pathlib
 import shutil
 import json
 from sacred import Experiment
@@ -8,8 +7,8 @@ import yaml
 
 import torch
 import torch.backends.cudnn as cudnn
-from models import get_model
-from loaders.siamese_loaders import siamese_loader
+from models import get_model,get_model_gen
+from loaders.siamese_loaders import get_loader
 from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
@@ -212,15 +211,16 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
     
     gene_train = generator('train', train_data_dict)
     gene_train.load_dataset()
-    train_loader = siamese_loader(gene_train, train['batch_size'],
-                                  gene_train.constant_n_vertices)
-    gene_val = generator('val', train_data_dict)
 
+    gene_val = generator('val', train_data_dict)
     gene_val.load_dataset()
-    val_loader = siamese_loader(gene_val, train['batch_size'],
+    
+    train_loader = get_loader(arch['arch'],gene_train, train['batch_size'],
+                                  gene_train.constant_n_vertices)
+    val_loader = get_loader(arch['arch'],gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
     
-    model = get_model(arch)
+    model = get_model_gen(arch)
     optimizer, scheduler = get_optimizer(train,model)
     print("Model #parameters : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
 
@@ -320,7 +320,8 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, us
 
     gene_test = helper.generator('test', test_data_dict)
     gene_test.load_dataset()
-    test_loader = siamese_loader(gene_test, train['batch_size'],
+
+    test_loader = get_loader(arch['arch'],gene_test, train['batch_size'],
                                  gene_test.constant_n_vertices)
     
     relevant_metric, loss = trainer.val_triplet(test_loader, model, helper, device,
