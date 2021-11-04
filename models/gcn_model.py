@@ -93,7 +93,7 @@ class BaseGCN(nn.Module):
         h = self.conv_start(g, in_feat)
         h = F.relu(h)
         for layer in self.layers:
-            h = layer(h)
+            h = layer(g,h)
             h = F.relu(h)
         h = self.conv_final(g, h)
         return h.unsqueeze(0)

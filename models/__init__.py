@@ -60,7 +60,7 @@ def get_model_gen(args):
     else:
         raise NotImplementedError(f"{arch} architectuce not implemented")
     
-    print('Fetching model %s %s - %s ' % (arch,args['arch_load'], args['embedding'] + ' embedding (if fgnn for now)'))
+    print('Fetching model %s %s - (%s  embedding if fgnn)' % (arch,args['arch_load'], args['embedding']))
 
     model =  loader_function(Model_instance,**args_dict)
     return model
