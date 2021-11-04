@@ -24,7 +24,7 @@ def _connectivity_to_dgl_adj(connectivity):
     edges = edges.T #To have the shape (2,n_edges)
     src,dst = [elt for elt in edges[0]], [elt for elt in edges[1]] #DGLGraphs don't like Tensors as inputs...
     gdgl = dgl.graph((src,dst),num_nodes=N)
-    gdgl.ndata['feat'] = torch.ones((N,1))
+    gdgl.ndata['feat'] = connectivity[:,:,0].diagonal() #Keep only degree
     return gdgl
 
 def connectivity_to_dgl(connectivity_graph):
