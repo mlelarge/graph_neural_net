@@ -78,7 +78,7 @@ class SimpleGCN(nn.Module):
         return h.unsqueeze(0)
 
 class BaseGCN(nn.Module):
-    def __init__(self,n_layers=20,original_features_num=1,in_features=20,out_features=20):
+    def __init__(self,n_layers=20,original_features_num=1,in_features=20,out_features=20, **kwargs):
         super().__init__()
         self.conv_start = GraphConv(original_features_num, in_features)
         self.layers = nn.ModuleList()
