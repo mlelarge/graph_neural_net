@@ -21,7 +21,6 @@ def _collate_fn_dgl_qap(samples_list):
     return ((input1_batch,input2_batch),torch.empty(1))
 
 def _has_dgl(data):
-    print(data, type(data))
     if isinstance(data,DGL_Loader):
         return True
     if isinstance(data,Iterable):
