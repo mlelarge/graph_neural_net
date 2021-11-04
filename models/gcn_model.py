@@ -60,7 +60,7 @@ class DGL_Loader(torch.utils.data.Dataset):
         """ Get dataset length """
         return len(self.data)
 
-class BaseGCN(nn.Module):
+class SimpleGCN(nn.Module):
     def __init__(self, original_features_num, in_features, out_features, **kwargs):
         super(BaseGCN, self).__init__()
         self.conv1 = GraphConv(original_features_num, in_features)
@@ -72,4 +72,25 @@ class BaseGCN(nn.Module):
         h = self.conv1(g, in_feat)
         h = F.relu(h)
         h = self.conv2(g, h)
+        return h.unsqueeze(0)
+
+class BaseGCN(nn.Module):
+    def __init__(self,n_layers=20,original_features_num=1,in_features=20,out_features=20):
+        super().__init__()
+        self.conv_start = GraphConv(original_features_num, in_features)
+        self.layers = nn.ModuleList()
+        for _ in range(n_layers-2):
+            layer = GraphConv(in_features, in_features)
+            self.layers.append(layer)
+        self.conv_final = GraphConv(in_features, out_features)
+    
+    def forward(self,g):
+        g = dgl.add_self_loop(g)
+        in_feat = g.ndata['feat']
+        h = self.conv_start(g, in_feat)
+        h = F.relu(h)
+        for layer in self.layers:
+            h = layer(h)
+            h = F.relu(h)
+        h = self.conv_final(g, h)
         return h.unsqueeze(0)
