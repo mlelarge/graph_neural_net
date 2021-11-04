@@ -8,6 +8,7 @@ from numpy import indices as npindices
 import dgl
 from dgl.nn import GraphConv
 from numpy import mgrid as npmgrid
+import tqdm
 
 from typing import Tuple
 
@@ -47,9 +48,11 @@ class DGL_Loader(torch.utils.data.Dataset):
     @staticmethod
     def from_data_generator(data_object):
         loader = DGL_Loader()
-        for data,target in data_object.data:
+        print("Converting data to DGL format")
+        for data,target in tqdm.tqdm(data_object.data):
             elt_dgl = connectivity_to_dgl(data)
             loader.data.append((elt_dgl,target))
+        print("Conversion ended.")
         return loader
     
     def __getitem__(self, i):
