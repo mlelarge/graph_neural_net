@@ -24,8 +24,7 @@ class triplet_loss(nn.Module):
         device = get_device(raw_scores)
         loss = 0
         total = 0
-        outputs = torch.softmax(raw_scores,-1)
-        for out in outputs:
+        for out in raw_scores:
             n_vertices = out.shape[0]
             ide = torch.arange(n_vertices)
             target = ide.to(device)

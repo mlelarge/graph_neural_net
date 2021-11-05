@@ -33,7 +33,7 @@ def train_triplet(train_loader,model,optimizer,
         end = time.time()
 
     
-        if i % print_freq == 0:
+        if (i+1) % print_freq == 0:
             if eval_score:
                 #print(np_out.shape)
                 values = helper.eval_function(raw_scores,target_deviced)
@@ -49,7 +49,7 @@ def train_triplet(train_loader,model,optimizer,
                    data_time=helper.get_meter('train', 'data_time'), lr=learning_rate,
                    loss=helper.get_meter('train', 'loss'), helper_str=helper.get_eval_str('train')))
     
-        helper.log_meters('train', n=epoch)
+            helper.log_meters('train', n=epoch)
     helper.log_meters('hyperparams', n=epoch)
 
 
