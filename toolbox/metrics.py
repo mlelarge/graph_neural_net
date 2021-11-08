@@ -89,25 +89,23 @@ def make_meter_f1():
 
 #QAP
 
-def accuracy_linear_assignment(weights, dummy_target, labels=None, aggregate_score=True):
+def accuracy_linear_assignment(rawscores, dummy_target, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
     total_n_vertices = 0
     acc = 0
     all_acc = []
-    #print(target)
+    weights = torch.log_softmax(rawscores,-1)
     for i, weight in enumerate(weights):
         if labels:
             label = labels[i]
         else:
             label = np.arange(len(weight))
         cost = -weight.cpu().detach().numpy()
-        #print(i, " | ", cost)
         _, preds = linear_sum_assignment(cost)
         if aggregate_score:
             acc += np.sum(preds == label)
-            #print(i, " | ", acc, preds, label)
             total_n_vertices += len(weight)
         else:
             all_acc += [np.sum(preds == label) / len(weight)]
@@ -116,6 +114,32 @@ def accuracy_linear_assignment(weights, dummy_target, labels=None, aggregate_sco
         return acc, total_n_vertices
     else:
         return all_acc
+
+def accuracy_max(weights,dummy_target, labels=None, aggregate_score=True):
+    """
+    weights should be (bs,n,n) and labels (bs,n) numpy arrays
+    """
+    acc = 0
+    all_acc = []
+    total_n_vertices = 0
+    for i, weight in enumerate(weights):
+        if labels is not None:
+            label = labels[i]
+        else:
+            label = np.arange(len(weight))
+        weight = weight.cpu().detach().numpy()
+        preds = np.argmax(weight, 1)
+        if aggregate_score:
+            acc += np.sum(preds == label)
+            total_n_vertices += len(weight)
+        else:
+            all_acc += [np.sum(preds == label) / len(weight)]
+
+    if aggregate_score:
+        return acc, total_n_vertices
+    else:
+        return all_acc
+
 
 def all_losses_acc(val_loader,model,criterion,
             device,eval_score=None):
@@ -127,19 +151,18 @@ def all_losses_acc(val_loader,model,criterion,
         data = data.to(device)
         target_deviced = target.to(device)
         output = model(data)
-        rawscores = output.squeeze(-1)
-        raw_scores = torch.softmax(rawscores,-1)
+        rawscores = output
             
-        loss = criterion(raw_scores,target_deviced)
+        loss = criterion(rawscores,target_deviced)
         
         all_losses.append(loss.item())
     
         if eval_score is not None:
-            acc = eval_score(raw_scores,target_deviced,aggregate_score=False)
+            acc = eval_score(rawscores,target_deviced,aggregate_score=False)
             all_acc += acc
     return np.array(all_losses), np.array(all_acc)
 
-# code below should be refactored...
+# code below should be corrected/refactored...
 
 def all_greedy_losses_acc(val_loader,model,criterion,
             device,T=10):
@@ -169,27 +192,7 @@ def all_greedy_losses_acc(val_loader,model,criterion,
     
     return np.array(all_losses), np.array(all_acc)
    
-def accuracy_max(weights,dummy_target, labels=None, aggregate_score=True):
-    """
-    weights should be (bs,n,n) and labels (bs,n) numpy arrays
-    """
-    acc = 0
-    total_n_vertices = 0
-    for i, weight in enumerate(weights):
-        if labels is not None:
-            label = labels[i]
-        else:
-            label = np.arange(len(weight))
-        weight = weight.cpu().detach().numpy()
-        preds = np.argmax(weight, 1)
-        #print(preds)
-        acc += np.sum(preds == label)
-        total_n_vertices += len(weight)
-    if aggregate_score:
-        return acc, total_n_vertices
-    else:
-        return acc/total_n_vertices
-    #return acc, total_n_vertices
+
 
 #MCP
 
