@@ -21,13 +21,13 @@ def _collate_fn_dgl_qap(samples_list):
     input2_batch = dgl.batch(input2_list)
     return ((input1_batch,input2_batch),torch.empty(1))
 
-def get_uncollate_function(num_nodes_original):
+def get_uncollate_function(num_nodes_original,device='cpu'):
     def uncollate_function(dgl_out):
-        N,_ = dgl_out.shape
+        _,N,_ = dgl_out.shape
         bs = N//num_nodes_original
-        final_array = torch.zeros((bs,N,N))
+        final_array = torch.zeros((bs,N,N)).to(device)
         for i in range(bs):
-            final_array[i,:,:] = dgl_out[i*N:(i+1*N),i*N:(i+1*N)]
+            final_array[i,:,:] = dgl_out[0,i*N:(i+1*N),i*N:(i+1*N)]
         return final_array
     return uncollate_function
 
@@ -73,4 +73,5 @@ if __name__=='__main__':
     print(edge)
     print(final_list)
     print(final_list[0])
+    
     

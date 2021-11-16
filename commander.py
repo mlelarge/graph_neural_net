@@ -183,7 +183,7 @@ def load_model(model, device, model_path):
         raise RuntimeError('Model does not exist!')
 
 @ex.command
-def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
+def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
 
     """ Main func.
     """
@@ -209,7 +209,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
 
     if arch!='fgnn':
         from loaders.siamese_loaders import get_uncollate_function
-        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
+        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"], device=device)
         exp_helper.criterion = lambda output, target : exp_helper.criterion(uncollate_function(output), target)
     
     generator = exp_helper.generator
