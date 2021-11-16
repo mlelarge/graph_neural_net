@@ -1,5 +1,6 @@
 import toolbox.maskedtensor as maskedtensor
 from torch.utils.data import DataLoader
+from toolbox.utils import get_device
 from models.gcn_model import data_to_dgl_format,DGL_Loader
 import dgl
 import torch
@@ -21,11 +22,13 @@ def _collate_fn_dgl_qap(samples_list):
     input2_batch = dgl.batch(input2_list)
     return ((input1_batch,input2_batch),torch.empty(1))
 
-def get_uncollate_function(N,device='cpu'):
+def get_uncollate_function(N):
     def uncollate_function(dgl_out):
         _,fake_N,_ = dgl_out.shape
-        bs = fake_N//N
-        final_array = torch.zeros((bs,N,N)).to(device)
+        bs = int(fake_N//N)
+        final_array = torch.zeros((bs,N,N))
+        device = get_device(dgl_out)
+        final_array = final_array.to(device)
         for i in range(bs):
             final_array[i,:,:] = dgl_out[0,(i*N):((i+1)*N),(i*N):((i+1)*N)]
         return final_array
