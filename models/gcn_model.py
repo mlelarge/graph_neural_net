@@ -1,3 +1,4 @@
+from networkx.algorithms.assortativity import connectivity
 import torch
 import torch.nn as nn
 from torch.functional import Tensor
@@ -24,8 +25,31 @@ def _connectivity_to_dgl_adj(connectivity):
     edges = edges.T #To have the shape (2,n_edges)
     src,dst = [elt for elt in edges[0]], [elt for elt in edges[1]] #DGLGraphs don't like Tensors as inputs...
     gdgl = dgl.graph((src,dst),num_nodes=N)
-    gdgl.ndata['feat'] = connectivity[:,:,0].diagonal() #Keep only degree
+    gdgl.ndata['feat'] = connectivity[:,:,0].diagonal().reshape((N,1)) #Keep only degree
     return gdgl
+
+def _dgl_adj_to_connectivity(dglgraph):
+    N = len(dglgraph.nodes())
+    connectivity = torch.zeros((N,N,2))
+    edges = dglgraph.edges()
+    for i in range(dglgraph.num_edges()):
+        connectivity[edges[0][i],edges[1][i],1] = 1
+    degrees = connectivity[:,:,1].sum(1)
+    indices = torch.arange(N)
+    print(degrees.shape)
+    connectivity[indices, indices, 0] = degrees
+    return connectivity
+
+def _connectivity_to_dgl_edge(connectivity,sparsify=None):
+    """Converts a connectivity tensor to a dgl graph with edge and node features.
+    if 'sparsify' is specified, it should be an integer : the number of closest nodes to keep
+    """
+    assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
+    N,_,_ = connectivity.shape
+    distances = connectivity[:,:,1]
+    mask = torch.ones((N,N))
+    if sparsify is not None:
+        pass
 
 def connectivity_to_dgl(connectivity_graph):
     """Converts a simple connectivity graph (with weights on edges if needed) to a pytorch-geometric data format"""
@@ -65,7 +89,7 @@ class DGL_Loader(torch.utils.data.Dataset):
 
 class SimpleGCN(nn.Module):
     def __init__(self, original_features_num, in_features, out_features, **kwargs):
-        super(BaseGCN, self).__init__()
+        super(SimpleGCN, self).__init__()
         self.conv1 = GraphConv(original_features_num, in_features)
         self.conv2 = GraphConv(in_features, out_features)
 
@@ -97,3 +121,14 @@ class BaseGCN(nn.Module):
             h = F.relu(h)
         h = self.conv_final(g, h)
         return h.unsqueeze(0)
+
+if __name__=="__main__":
+    print("Main executing")
+    from loaders.data_generator import generate_erdos_renyi_netx, adjacency_matrix_to_tensor_representation
+    N = 50
+    p = 0.2
+    g, W = generate_erdos_renyi_netx(p,N)
+    connect = adjacency_matrix_to_tensor_representation(W)
+    dglgraph = _connectivity_to_dgl_adj(connect)
+    connect_back = _dgl_adj_to_connectivity(dglgraph)
+    print(torch.all(connect==connect_back))

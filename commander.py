@@ -206,6 +206,11 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
     if problem == 'mcp' and not train_data_dict['planted']:
         problem = 'mcptrue'
     exp_helper = init_helper(problem)
+
+    if arch!='fgnn':
+        from loaders.siamese_loaders import get_uncollate_function
+        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
+        exp_helper.criterion = lambda output, target : exp_helper.criterion(uncollate_function(output), target)
     
     generator = exp_helper.generator
     
