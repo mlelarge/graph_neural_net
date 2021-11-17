@@ -1,5 +1,4 @@
 import os
-import pathlib
 import shutil
 import json
 from sacred import Experiment
@@ -8,8 +7,8 @@ import yaml
 
 import torch
 import torch.backends.cudnn as cudnn
-from models import get_model
-from loaders.siamese_loaders import siamese_loader
+from models import get_model,get_model_gen
+from loaders.siamese_loaders import get_loader
 from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
@@ -49,12 +48,13 @@ def update_paths(config, command_name, logger):
     l_params = [config['data']['train']['n_vertices']]
     l_params += [value for _,value in (config['data']['train'][pbm_key]).items()]
     config_str = "_".join([str(item) for item in l_params])
+    final_model_name = config['train']['model_name']
     log_dir = '{}/runs/{}/{}-{}/'.format(config['root_dir'], config['name'],
                                          config['problem'].upper(),
                                          config_str)
     config.update(  log_dir=log_dir, #End log_dir
                     path_dataset=config['data']['train'][pbm_key]['path_dataset'],
-                    model_path = os.path.join(log_dir, 'model_best.pth.tar') if config['train']['anew']  else os.path.join(config['train']['model_path'], 'model_best.pth.tar'),
+                    model_path = os.path.join(log_dir, final_model_name) if config['train']['anew']  else os.path.join(config['train']['template_model_path']),
                     output_filename = 'test.json'
     )
     return config
@@ -183,7 +183,7 @@ def load_model(model, device, model_path):
         raise RuntimeError('Model does not exist!')
 
 @ex.command
-def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
+def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
 
     """ Main func.
     """
@@ -206,20 +206,26 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
     if problem == 'mcp' and not train_data_dict['planted']:
         problem = 'mcptrue'
     exp_helper = init_helper(problem)
+
+    if arch!='fgnn':
+        from loaders.siamese_loaders import get_uncollate_function
+        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
+        exp_helper.criterion = lambda output, target : exp_helper.criterion(uncollate_function(output), target)
     
     generator = exp_helper.generator
     
     gene_train = generator('train', train_data_dict)
     gene_train.load_dataset()
-    train_loader = siamese_loader(gene_train, train['batch_size'],
-                                  gene_train.constant_n_vertices)
-    gene_val = generator('val', train_data_dict)
 
+    gene_val = generator('val', train_data_dict)
     gene_val.load_dataset()
-    val_loader = siamese_loader(gene_val, train['batch_size'],
+    
+    train_loader = get_loader(arch['arch'],gene_train, train['batch_size'],
+                                  gene_train.constant_n_vertices)
+    val_loader = get_loader(arch['arch'],gene_val, train['batch_size'],
                                 gene_val.constant_n_vertices)
     
-    model = get_model(arch)
+    model = get_model_gen(arch)
     optimizer, scheduler = get_optimizer(train,model)
     print("Model #parameters : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
 
@@ -260,7 +266,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled,log_dir):
             print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
             break
     if test_enabled:
-        eval()
+        eval(use_model=model)
 
 
 @ex.capture
@@ -295,16 +301,19 @@ def save_to_json(jsonkey, loss, relevant_metric_dict, filename):
         json.dump(data, jsonFile)
 
 @ex.command
-def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
+def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, use_model=None):
     print("Heading to evaluation.")
 
     use_cuda = not cpu and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
     print('Using device:', device)
 
-    model = get_model(arch)
-    model.to(device)
-    model = load_model(model, device)
+    if use_model is None:
+        model = get_model(arch)
+        model.to(device)
+        model = load_model(model, device)
+    else:
+        model = use_model
 
 
     if problem == 'tsprl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
@@ -316,7 +325,8 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem):
 
     gene_test = helper.generator('test', test_data_dict)
     gene_test.load_dataset()
-    test_loader = siamese_loader(gene_test, train['batch_size'],
+
+    test_loader = get_loader(arch['arch'],gene_test, train['batch_size'],
                                  gene_test.constant_n_vertices)
     
     relevant_metric, loss = trainer.val_triplet(test_loader, model, helper, device,

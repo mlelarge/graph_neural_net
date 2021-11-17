@@ -1,4 +1,5 @@
 import time
+from typing import Tuple
 import torch
 
 def train_triplet(train_loader,model,optimizer,
@@ -14,8 +15,11 @@ def train_triplet(train_loader,model,optimizer,
     for i, (data, target) in enumerate(train_loader):
         # measure data loading time
         helper.update_meter('train', 'data_time', time.time() - end, n=batch_size)
-
-        data = data.to(device)
+        
+        if isinstance(data,Tuple):
+            data = (data[0].to(device),data[1].to(device))
+        else:
+            data = data.to(device)
         target_deviced = target.to(device)
         raw_scores = model(data)
 
@@ -54,8 +58,11 @@ def val_triplet(val_loader,model,helper,device,epoch,eval_score=False,print_freq
     helper.reset_meters(val_test)
     with torch.no_grad():
         for i, (data, target) in enumerate(val_loader):
-
-            data = data.to(device)
+            
+            if isinstance(data,Tuple):
+                data = (data[0].to(device),data[1].to(device))
+            else:
+                data = data.to(device)
             target_deviced = target.to(device)
             raw_scores = model(data)
             

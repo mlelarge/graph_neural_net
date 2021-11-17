@@ -4,7 +4,7 @@ from models.layers import RegularBlock, ColumnMaxPooling
 
 
 class BaseModel(nn.Module):
-    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp):
+    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp, **kwargs):
         """
         take a batch of graphs (bs, n_vertices, n_vertices, in_features)
         and return a batch of graphs with new features
@@ -55,7 +55,7 @@ class BaseModel(nn.Module):
         return x.permute(0,2,3,1)
 
 class Simple_Node_Embedding(nn.Module):
-    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp):
+    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp, **kwargs):
         """
         take a batch of graphs (bs, n_vertices, n_vertices, in_features)
         and return a batch of node embedding (bs, n_vertices, out_features)
@@ -77,7 +77,7 @@ class Simple_Node_Embedding(nn.Module):
         return  x
 
 class Simple_Edge_Embedding(nn.Module):
-    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp):
+    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp, **kwargs):
         """
         take a batch of graphs (bs, n_vertices, n_vertices, in_features)
         and return a batch of node embedding (bs, n_vertices, out_features)

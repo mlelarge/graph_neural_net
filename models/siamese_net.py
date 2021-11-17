@@ -1,3 +1,5 @@
+from typing import Tuple
+from numpy.lib.arraysetops import isin
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -29,6 +31,36 @@ class Siamese_Model(nn.Module):
         x = x.permute(1,0,2,3,4)
         x1 = x[0]
         x2 = x[1]
+        x1 = self.node_embedder(x1)
+        x2 = self.node_embedder(x2)
+        raw_scores = torch.matmul(x1,torch.transpose(x2, 1, 2))
+        return raw_scores
+
+class Siamese_Model_Gen(nn.Module):
+    def __init__(self, Model_class,**kwargs):
+        """
+        General class enforcing a Siamese architecture.
+        The forward usually takes in a pair of graphs of shape:
+        ((bs, n_vertices, n_vertices, in_features) (bs, n_vertices, n_vertices, in_features))
+        and return a batch of node similarities (bs, n_vertices, n_vertices).
+        That was the base use, but model can be anything and return mostly anything as long as the helper is taken into account
+        """
+        super().__init__()
+        self.node_embedder = Model_class(**kwargs)
+
+    def forward(self,x):
+        """
+        Data should be given with the shape (x1,x2)
+        """
+        if isinstance(x,torch.Tensor):
+            assert x.shape[1]==2, f"Data given is not of the shape (x1,x2) => data.shape={x.shape}"
+            x = x.permute(1,0,2,3,4)
+            x1 = x[0]
+            x2 = x[1]
+        else:
+            assert len(x)==2, f"Data given is not of the shape (x1,x2) => data.shape={x.shape}"
+            x1 = x[0]
+            x2 = x[1]
         x1 = self.node_embedder(x1)
         x2 = self.node_embedder(x2)
         raw_scores = torch.matmul(x1,torch.transpose(x2, 1, 2))
