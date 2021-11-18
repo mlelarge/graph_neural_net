@@ -4,6 +4,7 @@ import torch
 
 def train_triplet(train_loader,model,optimizer,
                 helper,device,epoch,eval_score=False,print_freq=100):
+    model.to(device)
     model.train()
     helper.reset_meters('train')
     helper.reset_meters('hyperparams')
@@ -54,6 +55,7 @@ def train_triplet(train_loader,model,optimizer,
 
 
 def val_triplet(val_loader,model,helper,device,epoch,eval_score=False,print_freq=10,val_test='val'):
+    model.to(device)
     model.eval()
     helper.reset_meters(val_test)
     with torch.no_grad():
