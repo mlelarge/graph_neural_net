@@ -210,7 +210,8 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     if arch!='fgnn':
         from loaders.siamese_loaders import get_uncollate_function
         uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
-        exp_helper.criterion = lambda output, target : exp_helper.criterion(uncollate_function(output), target)
+        cur_crit = exp_helper.criterion
+        exp_helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
     
     generator = exp_helper.generator
     
@@ -309,7 +310,7 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, us
     print('Using device:', device)
 
     if use_model is None:
-        model = get_model(arch)
+        model = get_model_gen(arch)
         model.to(device)
         model = load_model(model, device)
     else:
