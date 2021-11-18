@@ -26,7 +26,7 @@ l_lbda = [2,2.5,3]
 n = 200
 
 BATCH_SIZE = 32
-MAX_EPOCHS = 100
+MAX_EPOCHS = 1
 START_LR = 1e-3
 
 seed=23983892
@@ -77,7 +77,7 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     filename = os.path.join(log_dir, filename)
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, os.path.join(log_dir, 'best-' + filename))
+        shutil.copyfile(os.path.join(log_dir,filename), os.path.join(log_dir, 'best-' + filename))
         print(f"Best Model yet : saving at {log_dir+'best-' + filename}")
 
     fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')
@@ -92,6 +92,8 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
 
 
 def train_cycle(task):
+    best_score = 0
+
     train_gen = get_generator(*task,task='train')
     train_gen.load_dataset()
     train_loader = DataLoader(train_gen, BATCH_SIZE, shuffle=True)
@@ -171,15 +173,21 @@ def main():
 
     for lbda in l_lbda:
         for nbpa,ngnn in zip(noise_bpa, noise_gnn):
-            planner.add_task(Task(lbda,nbpa,ngnn,n))
+            planner.add_task(Task(lbda,nbpa.data,ngnn.data,n))
 
-    if planner.n_tasks==0:
+    n_tasks = planner.n_tasks
+
+    if n_tasks==0:
         print("No tasks to be done, ending.")
-
-    progress_bar = tqdm.trange(planner.n_tasks)
+    
+    progress_bar = tqdm.trange(n_tasks)
+    i = 0
     for _ in progress_bar:
+        i+=1
         task = planner.next_task()
+        print(f"Starting task {i}/{n_tasks}: {task}")
         relevant_metric = one_exp(task)
+        print(f"Finished task {i}/{n_tasks}: {task}")
         task_as_dict = task._as_dict()
         task_as_dict['overlap'] = relevant_metric
         planner.add_entry(task_as_dict,save = True)
