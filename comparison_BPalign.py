@@ -74,8 +74,7 @@ def get_generator(lbda,nbpa,ngnn,n,task='train'):
 
 def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
     utils.check_dir(log_dir)
-    filename = os.path.join(log_dir, filename)
-    torch.save(state, filename)
+    torch.save(state, os.path.join(log_dir, filename))
     if is_best:
         shutil.copyfile(os.path.join(log_dir,filename), os.path.join(log_dir, 'best-' + filename))
         print(f"Best Model yet : saving at {log_dir+'best-' + filename}")
@@ -173,7 +172,7 @@ def main():
 
     for lbda in l_lbda:
         for nbpa,ngnn in zip(noise_bpa, noise_gnn):
-            planner.add_task(Task(lbda,nbpa.data,ngnn.data,n))
+            planner.add_task(Task(lbda,float(nbpa),float(ngnn),n))
 
     n_tasks = planner.n_tasks
 
@@ -188,7 +187,7 @@ def main():
         print(f"Starting task {i}/{n_tasks}: {task}")
         relevant_metric = one_exp(task)
         print(f"Finished task {i}/{n_tasks}: {task}")
-        task_as_dict = task._as_dict()
+        task_as_dict = task._asdict()
         task_as_dict['overlap'] = relevant_metric
         planner.add_entry(task_as_dict,save = True)
 
