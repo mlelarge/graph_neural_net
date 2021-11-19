@@ -31,7 +31,7 @@ MAX_EPOCHS = 100
 START_LR = 1e-3
 
 seed=23983892
-torch.seed(seed)
+torch.manual_seed(seed)
 
 DEVICE = 'cuda' if (torch.cuda.is_available()) else 'cpu'
 print('Using device:', DEVICE)
