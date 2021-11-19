@@ -104,18 +104,16 @@ def _train_function(train_loader,model,optimizer,
     l_loss = []
     l_acc = []
     model.train()
-    model.to(device)
     learning_rate = optimizer.param_groups[0]['lr']
 
-    for i, (data, target) in enumerate(train_loader):
+    for i, (data, _) in enumerate(train_loader):
 
         data = data.to(device)
-        target_deviced = target.to(device)
         output = model(data)#,input2)
         raw_scores = output.squeeze(-1)
 
-        loss = helper.criterion(raw_scores,target_deviced)
-        true_pos,n_tot = helper.eval_function(raw_scores,target_deviced)
+        loss = helper.criterion(raw_scores,None)
+        true_pos,n_tot = helper.eval_function(raw_scores,None)
         acc = true_pos/n_tot
         l_loss.append(loss.data.item())
         l_acc.append(acc)
@@ -144,22 +142,17 @@ def _val_function(val_loader,model,helper,device,epoch,print_freq=10,val_test='v
     l_loss = []
     l_acc = []
     global run
-    model.to(device)
     model.eval()
     with torch.no_grad():
-        for i, (data, target) in enumerate(val_loader):
+        for i, (data, _) in enumerate(val_loader):
             
-            if isinstance(data,Tuple):
-                data = (data[0].to(device),data[1].to(device))
-            else:
-                data = data.to(device)
-            target_deviced = target.to(device)
+            data = data.to(device)
             raw_scores = model(data)
             
-            loss = helper.criterion(raw_scores,target_deviced)
+            loss = helper.criterion(raw_scores,None)
             l_loss.append(loss.data.item())
             
-            true_pos,n_tot = helper.eval_function(raw_scores,target_deviced)
+            true_pos,n_tot = helper.eval_function(raw_scores,None)
             acc = true_pos/n_tot
             l_acc.append(acc)
 
@@ -182,7 +175,6 @@ def _val_function(val_loader,model,helper,device,epoch,print_freq=10,val_test='v
     return sum(l_acc)/len(l_acc),sum(l_loss)/len(l_loss)
 
 def train_cycle(task):
-    global run
 
     print("Starting training cycle.")
     best_score = 0
@@ -201,12 +193,13 @@ def train_cycle(task):
     print("Done")
 
     model = get_model_gen(MODEL_CONFIG)
+    model.to(DEVICE)
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
 
     optimizer = torch.optim.Adam(model.parameters(),lr=START_LR)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, **SCHEDULER_CONFIG)
 
-    exp_helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS, run=run)
+    exp_helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS)
 
     for epoch in range(MAX_EPOCHS):
         print('Current epoch: ', epoch)
@@ -241,7 +234,6 @@ def train_cycle(task):
 
 
 def test_cycle(task):
-    global run
     print("Starting test cycle...")
     model = get_model_gen(MODEL_CONFIG)
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
@@ -250,6 +242,7 @@ def test_cycle(task):
         raise FileNotFoundError("Model {} not found".format(model_full_path))
     print("Loading model... ", end='')
     model = load_model(model, DEVICE, model_full_path)
+    model.to(DEVICE)
     print("Model loaded.")
 
     test_gen = get_generator(*task,task='test')
@@ -259,7 +252,7 @@ def test_cycle(task):
     test_loader = DataLoader(test_gen, BATCH_SIZE, shuffle=True)
     print("Done")
 
-    helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS, run=run)
+    helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS)
     
     print("Starting testing.")
     relevant_metric, loss = _val_function(test_loader, model, helper, DEVICE,
