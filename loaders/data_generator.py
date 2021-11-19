@@ -246,7 +246,7 @@ class Base_Generator(torch.utils.data.Dataset):
             torch.save(self.data, path)
     
     def remove_file(self):
-        os.remove(self.path_dataset)
+        os.remove(os.path.join(self.path_dataset, self.name + '.pkl'))
     
     def create_dataset(self):
         for _ in tqdm.tqdm(range(self.num_examples)):
