@@ -150,7 +150,7 @@ def test_cycle(task):
         raise FileNotFoundError("Model {} not found".format(model_full_path))
     model = load_model(model, DEVICE, model_full_path)
 
-    test_gen = get_generator(*task,task='train')
+    test_gen = get_generator(*task,task='test')
     test_gen.load_dataset()
     test_loader = DataLoader(test_gen, BATCH_SIZE, shuffle=True)
 
