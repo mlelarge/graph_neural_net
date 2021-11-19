@@ -197,9 +197,9 @@ def main():
     for _ in progress_bar:
         i+=1
         task = planner.next_task()
-        print(f"Starting task {i}/{n_tasks}: {task}")
+        progress_bar.set_description(f"task {i}/{n_tasks}: {task}")
         relevant_metric = one_exp(task)
-        print(f"Finished task {i}/{n_tasks}: {task}")
+        progress_bar.set_description(f"Finished task {i}/{n_tasks}: {task}")
         task_as_dict = task._asdict()
         task_as_dict['overlap'] = relevant_metric
         planner.add_entry(task_as_dict,save = True)
