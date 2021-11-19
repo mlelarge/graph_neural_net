@@ -1,16 +1,20 @@
 import os
 import shutil
+from typing import Tuple
+from torch._C import _logging_set_logger
+import tqdm
+import time
 import torch
+import toolbox.utils as utils
+import neptune.new as neptune
 from torch.utils.data import DataLoader
 from commander import load_model
 from toolbox.data_handler import Planner_Multi
 from collections import namedtuple
-import tqdm
 from loaders.data_generator import QAP_Generator
 from trainer import train_triplet, val_triplet
 from toolbox.helper import QAP_Experiment
 from models import get_model_gen
-import toolbox.utils as utils
 
 
 MODEL_NAME = "fgnn-comparison-l_{}-s_{}.tar"
@@ -36,9 +40,9 @@ torch.manual_seed(seed)
 DEVICE = 'cuda' if (torch.cuda.is_available()) else 'cpu'
 print('Using device:', DEVICE)
 
-BASE_GEN_CONFIG = { 'num_examples_train': 10000,
-                'num_examples_val': 1000,
-                'num_examples_test': 1000,
+BASE_GEN_CONFIG = { 'num_examples_train': 10,
+                'num_examples_val': 10,
+                'num_examples_test': 10,
                 'generative_model': 'ErdosRenyi', # so far ErdosRenyi, Regular or BarabasiAlbert
                 'noise_model': 'ErdosRenyi',
                 'vertex_proba': 1., # Parameter of the binomial distribution of vertices
@@ -65,6 +69,9 @@ SCHEDULER_CONFIG = {
 
 Task = namedtuple('Task',['lbda','noise_bpa','noise_gnn','n'])
 
+USE_NEPTUNE = True
+global run
+run=None
 
 def get_generator(lbda,nbpa,ngnn,n,task='train'):
     exp_dict = BASE_GEN_CONFIG.copy()
@@ -91,8 +98,90 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
 
     state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
 
+def _train_function(train_loader,model,optimizer,
+                helper,device,epoch,print_freq=100):
+    global run
+    l_loss = []
+    l_acc = []
+    model.train()
+    model.to(device)
+    learning_rate = optimizer.param_groups[0]['lr']
+
+    for i, (data, target) in enumerate(train_loader):
+
+        data = data.to(device)
+        target_deviced = target.to(device)
+        output = model(data)#,input2)
+        raw_scores = output.squeeze(-1)
+
+        loss = helper.criterion(raw_scores,target_deviced)
+        acc = helper.eval_function(raw_scores,target_deviced)
+        l_loss.append(loss.data.item())
+        l_acc.append(acc)
+
+        if USE_NEPTUNE:
+            run['train/loss'].log(loss)
+            run['train/acc'].log(acc)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    
+        if i % print_freq == 0:
+            print('Epoch: [{0}][{1}/{2}]\t'
+                  'LR {lr:.2e}\t'
+                  'Loss {loss:.4f} ({losavg:.4f})\t'
+                  'acc : {acc} ({accavg})'.format(
+                   epoch, i, len(train_loader),
+                   lr=learning_rate,
+                   loss=loss, losavg = sum(l_loss)/len(l_loss),
+                   acc=acc, accavg=sum(l_acc)/len(l_acc)))
+    optimizer.zero_grad()
+
+def _val_function(val_loader,model,helper,device,epoch,print_freq=10,val_test='val'):
+    l_loss = []
+    l_acc = []
+    global run
+    model.to(device)
+    model.eval()
+    with torch.no_grad():
+        for i, (data, target) in enumerate(val_loader):
+            
+            if isinstance(data,Tuple):
+                data = (data[0].to(device),data[1].to(device))
+            else:
+                data = data.to(device)
+            target_deviced = target.to(device)
+            raw_scores = model(data)
+            
+            loss = helper.criterion(raw_scores,target_deviced)
+            l_loss.append(loss.data.item())
+            
+            acc = helper.eval_function(raw_scores,target_deviced)
+            l_acc.append()
+
+            if USE_NEPTUNE:
+                run['{val_test}/loss'].log(loss)
+                run['{val_test}/acc'].log(acc)
+
+            if i % print_freq == 0:
+                if val_test == 'val':
+                    val_test_string = "Validation"
+                else:
+                    val_test_string = "Test"
+                print('{3} set, epoch: [{0}][{1}/{2}]\t'
+                        'Loss {loss:.4f} ({losavg:.4f})\t'
+                        'Acc {acc} ({accavg})'.format(
+                        epoch, i, len(val_loader), val_test_string,
+                        loss=loss,losavg = sum(l_loss)/len(l_loss),
+                        acc = acc, accavg = sum(l_acc)/len(l_acc)))
+
+    return sum(l_acc)/len(l_acc),sum(l_loss)/len(l_loss)
 
 def train_cycle(task):
+    global run
+
     print("Starting training cycle.")
     best_score = 0
 
@@ -115,15 +204,14 @@ def train_cycle(task):
     optimizer = torch.optim.Adam(model.parameters(),lr=START_LR)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, **SCHEDULER_CONFIG)
 
-    exp_helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS)
+    exp_helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS, run=run)
 
     for epoch in range(MAX_EPOCHS):
         print('Current epoch: ', epoch)
-        train_triplet(train_loader,model,optimizer,exp_helper,DEVICE,epoch,eval_score=True,print_freq=100)
-        
+        _train_function(train_loader,model,optimizer,exp_helper,DEVICE,epoch,print_freq=100)
 
 
-        relevant_metric, loss = val_triplet(val_loader,model,exp_helper,DEVICE,epoch,eval_score=True)
+        relevant_metric, loss = _val_function(val_loader,model,exp_helper,DEVICE,epoch)
         scheduler.step(loss)
         # remember best acc and save checkpoint
         #TODO : if relevant metric is like a loss and needs to decrease, this doesn't work
@@ -151,6 +239,7 @@ def train_cycle(task):
 
 
 def test_cycle(task):
+    global run
     print("Starting test cycle...")
     model = get_model_gen(MODEL_CONFIG)
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
@@ -168,12 +257,11 @@ def test_cycle(task):
     test_loader = DataLoader(test_gen, BATCH_SIZE, shuffle=True)
     print("Done")
 
-    helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS)
+    helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS, run=run)
     
     print("Starting testing.")
-    relevant_metric, loss = val_triplet(test_loader, model, helper, DEVICE,
-                                    epoch=0, eval_score=True,
-                                    val_test='test')
+    relevant_metric, loss = _val_function(test_loader, model, helper, DEVICE,
+                                    epoch=0, val_test='test')
     if REMOVE_FILES_AFTER_EXP:
         print("Removing test files... ", end='')
         test_gen.remove_file()
@@ -183,6 +271,10 @@ def test_cycle(task):
 
 
 def one_exp(task):
+    if USE_NEPTUNE:
+        global run
+        run = neptune.init(project='mautrib/bpagnn')
+
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
     model_full_path = os.path.join(LOG_DIR, 'best-' + model_name)
     if not os.path.exists(model_full_path):
