@@ -10,8 +10,6 @@ import toolbox.utils as utils
 import math
 from toolbox.searches import mcp_beam_method
 import timeit
-import time
-import signal
 from sklearn.decomposition import PCA
 from numpy import pi,angle,cos,sin
 from numpy.random import default_rng
@@ -246,6 +244,9 @@ class Base_Generator(torch.utils.data.Dataset):
             self.create_dataset()
             print('Saving dataset at {}'.format(path))
             torch.save(self.data, path)
+    
+    def remove_file(self):
+        os.remove(self.path_dataset)
     
     def create_dataset(self):
         for _ in tqdm.tqdm(range(self.num_examples)):

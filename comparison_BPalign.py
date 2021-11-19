@@ -16,6 +16,7 @@ import toolbox.utils as utils
 MODEL_NAME = "fgnn-comparison-l_{}-s_{}.tar"
 DATA_PATH = "FGNN-BPA.csv"
 LOG_DIR = "gnnbpa"
+REMOVE_FILES_AFTER_EXP = True
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
@@ -26,7 +27,7 @@ l_lbda = [2,2.5,3]
 n = 200
 
 BATCH_SIZE = 32
-MAX_EPOCHS = 1
+MAX_EPOCHS = 100
 START_LR = 1e-3
 
 seed=23983892
@@ -34,9 +35,9 @@ seed=23983892
 DEVICE = 'cuda' if (torch.cuda.is_available()) else 'cpu'
 print('Using device:', DEVICE)
 
-BASE_GEN_CONFIG = { 'num_examples_train': 10,
-                'num_examples_val': 10,
-                'num_examples_test': 10,
+BASE_GEN_CONFIG = { 'num_examples_train': 10000,
+                'num_examples_val': 1000,
+                'num_examples_test': 1000,
                 'generative_model': 'ErdosRenyi', # so far ErdosRenyi, Regular or BarabasiAlbert
                 'noise_model': 'ErdosRenyi',
                 'vertex_proba': 1., # Parameter of the binomial distribution of vertices
@@ -134,6 +135,12 @@ def train_cycle(task):
         if exp_helper.stop_condition(cur_lr):
             print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
             break
+    if REMOVE_FILES_AFTER_EXP:
+        print("Removing train and val files... ", end='')
+        train_gen.remove_file()
+        val_gen.remove_file()
+        print("Files removed.")
+
 
 def test_cycle(task):
     model = get_model_gen(MODEL_CONFIG)
@@ -152,6 +159,11 @@ def test_cycle(task):
     relevant_metric, loss = val_triplet(test_loader, model, helper, DEVICE,
                                     epoch=0, eval_score=True,
                                     val_test='test')
+    if REMOVE_FILES_AFTER_EXP:
+        print("Removing test files... ", end='')
+        test_gen.remove_file()
+        print("Files removed.")
+
     return relevant_metric
 
 
