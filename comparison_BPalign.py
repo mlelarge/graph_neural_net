@@ -93,14 +93,21 @@ def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
 
 
 def train_cycle(task):
+    print("Starting training cycle.")
     best_score = 0
 
     train_gen = get_generator(*task,task='train')
+    print("Loading train dataset... ", end = "")
     train_gen.load_dataset()
+    print("Creating loader... ", end = "")
     train_loader = DataLoader(train_gen, BATCH_SIZE, shuffle=True)
+    print("Done")
     val_gen = get_generator(*task,task='val')
+    print("Loading val dataset... ", end = "")
     val_gen.load_dataset()
+    print("Creating loader... ", end = "")
     val_loader = DataLoader(train_gen, BATCH_SIZE, shuffle=True)
+    print("Done")
 
     model = get_model_gen(MODEL_CONFIG)
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
@@ -144,19 +151,26 @@ def train_cycle(task):
 
 
 def test_cycle(task):
+    print("Starting test cycle...")
     model = get_model_gen(MODEL_CONFIG)
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
     model_full_path = os.path.join(LOG_DIR, 'best-' + model_name)
     if not os.path.exists(model_full_path):
         raise FileNotFoundError("Model {} not found".format(model_full_path))
+    print("Loading model... ", end='')
     model = load_model(model, DEVICE, model_full_path)
+    print("Model loaded.")
 
     test_gen = get_generator(*task,task='test')
+    print("Preparing dataset... ", end="")
     test_gen.load_dataset()
+    print("Creating dataloader... ", end = "")
     test_loader = DataLoader(test_gen, BATCH_SIZE, shuffle=True)
+    print("Done")
 
     helper = QAP_Experiment('comparisonGNNBPA', HELPER_OPTIONS)
     
+    print("Starting testing.")
     relevant_metric, loss = val_triplet(test_loader, model, helper, DEVICE,
                                     epoch=0, eval_score=True,
                                     val_test='test')
@@ -191,7 +205,8 @@ def main():
 
     if n_tasks==0:
         print("No tasks to be done, ending.")
-    
+    else:
+        print(f"{n_tasks} tasks to be done.")
     progress_bar = tqdm.trange(n_tasks)
     i = 0
     for _ in progress_bar:
