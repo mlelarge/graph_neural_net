@@ -115,7 +115,8 @@ def _train_function(train_loader,model,optimizer,
         raw_scores = output.squeeze(-1)
 
         loss = helper.criterion(raw_scores,target_deviced)
-        acc = helper.eval_function(raw_scores,target_deviced)
+        true_pos,n_tot = helper.eval_function(raw_scores,target_deviced)
+        acc = true_pos/n_tot
         l_loss.append(loss.data.item())
         l_acc.append(acc)
 
@@ -158,12 +159,13 @@ def _val_function(val_loader,model,helper,device,epoch,print_freq=10,val_test='v
             loss = helper.criterion(raw_scores,target_deviced)
             l_loss.append(loss.data.item())
             
-            acc = helper.eval_function(raw_scores,target_deviced)
-            l_acc.append()
+            true_pos,n_tot = helper.eval_function(raw_scores,target_deviced)
+            acc = true_pos/n_tot
+            l_acc.append(acc)
 
             if USE_NEPTUNE:
-                run['{val_test}/loss'].log(loss)
-                run['{val_test}/acc'].log(acc)
+                run[f'{val_test}/loss'].log(loss)
+                run[f'{val_test}/acc'].log(acc)
 
             if i % print_freq == 0:
                 if val_test == 'val':
