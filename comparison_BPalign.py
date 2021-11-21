@@ -121,6 +121,7 @@ def _train_function(train_loader,model,optimizer,
         if USE_NEPTUNE:
             run['train/loss'].log(loss)
             run['train/acc'].log(acc)
+            run['lr'].log(learning_rate)
 
         optimizer.zero_grad()
         loss.backward()
@@ -275,6 +276,8 @@ def one_exp(task):
     if not os.path.exists(model_full_path):
         train_cycle(task)
     relevant_metric = test_cycle(task)
+    if USE_NEPTUNE:
+        run.stop()
     return relevant_metric
     
 
