@@ -270,6 +270,7 @@ def one_exp(task):
     if USE_NEPTUNE:
         global run
         run = neptune.init(project='mautrib/bpagnn')
+        run['task'] = task._asdict()
 
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
     model_full_path = os.path.join(LOG_DIR, 'best-' + model_name)
