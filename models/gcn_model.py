@@ -15,11 +15,14 @@ from typing import Tuple
 
 ADJ_UNIQUE_TENSOR = torch.Tensor([0.,1.])
 
+def is_adj(matrix):
+    return torch.all((matrix==0) + (matrix==1))
+
 def _connectivity_to_dgl_adj(connectivity):
     assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
     adj = connectivity[:,:,1] #Keep only the adjacency (discard node degree)
     N,_ = adj.shape
-    assert torch.all((adj==0) + (adj==1)), "This is not an adjacency matrix"
+    assert is_adj(adj), "This is not an adjacency matrix"
     mgrid = npmgrid[:N,:N].transpose(1,2,0)
     edges = mgrid[torch.where(adj==1)]
     edges = edges.T #To have the shape (2,n_edges)
@@ -50,6 +53,13 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     mask = torch.ones((N,N))
     if sparsify is not None:
         pass
+    connectivity = connectivity*mask
+    adjacency = (connectivity!=0).to(torch.float)
+    gdgl = _connectivity_to_dgl_adj(adjacency)
+    src,rst = gdgl.edges() #For now only contains node features
+    gdgl.edata["feat"] = connectivity[src,rst]
+    return gdgl
+
 
 def connectivity_to_dgl(connectivity_graph):
     """Converts a simple connectivity graph (with weights on edges if needed) to a pytorch-geometric data format"""
@@ -60,7 +70,9 @@ def connectivity_to_dgl(connectivity_graph):
         return (graph1,graph2)
     elif len(connectivity_graph.shape)==3:#We assume it's a simple dataset, thus of shape (N,N,in_features)
         assert connectivity_graph.shape[0]==connectivity_graph.shape[1]
-        return _connectivity_to_dgl_adj(connectivity_graph) #CAREFUL, THAT DOESN'T DO EDGE FEATURES WELL, ONLY CONNECTIVITY
+        if is_adj(connectivity_graph[:,:,1]):
+            return _connectivity_to_dgl_adj(connectivity_graph)
+        return _connectivity_to_dgl_edge(connectivity_graph)
 
 def data_to_dgl_format(data_object):
     return DGL_Loader.from_data_generator(data_object)
