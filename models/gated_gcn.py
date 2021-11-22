@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
-from dgl.nn import GatedConv
+from dgl.nn import GatedGraphConv
 import dgl
 
 """
@@ -12,14 +12,14 @@ import dgl
 """
 
 class GatedGCN(nn.Module):
-    def __init__(self,n_layers=20,original_features_num=1,in_features=20,out_features=20, **kwargs):
+    def __init__(self,n_layers=10,original_features_num=1,in_features=20,out_features=20, **kwargs):
         super().__init__()
-        self.conv_start = GatedConv(original_features_num, in_features, 1)
+        self.conv_start = GatedGraphConv(original_features_num, in_features, 1)
         self.layers = nn.ModuleList()
         for _ in range(n_layers-2):
-            layer = GatedConv(in_features, in_features, 1)
+            layer = GatedGraphConv(in_features, in_features, 1)
             self.layers.append(layer)
-        self.conv_final = GatedConv(in_features, out_features, 1)
+        self.conv_final = GatedGraphConv(in_features, out_features, 1)
     
     def forward(self,g):
         g = dgl.add_self_loop(g)
