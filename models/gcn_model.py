@@ -50,14 +50,14 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
     N,_,_ = connectivity.shape
     distances = connectivity[:,:,1]
-    mask = torch.ones((N,N))
+    mask = torch.ones((2,N,N))
     if sparsify is not None:
         pass
-    connectivity = connectivity*mask
+    connectivity[:,:,1] = connectivity[:,:,1]*mask
     adjacency = (connectivity!=0).to(torch.float)
     gdgl = _connectivity_to_dgl_adj(adjacency)
     src,rst = gdgl.edges() #For now only contains node features
-    gdgl.edata["feat"] = connectivity[src,rst]
+    gdgl.edata["feat"] = distances[src,rst]
     return gdgl
 
 
