@@ -24,8 +24,15 @@ def _collate_fn_dgl_qap(samples_list):
     return ((input1_batch,input2_batch),torch.empty(1))
 
 def _collate_fn_dgl_ne(samples_list):
-    input_batch = dgl.batch(samples_list)
-    return input_batch
+    bs = len(samples_list)
+    input1_list = [input1 for (input1, _) in samples_list]
+    target_list = [target for (_,target) in samples_list]
+    N,_ = target_list[0].shape
+    input_batch = dgl.batch(input1_list)
+    target_batch = torch.tensor((bs,N,N))
+    for i,target in enumerate(target_list):
+        target_batch[i] = target
+    return (input_batch,target_batch)
 
 def get_uncollate_function(N):
     def uncollate_function(dgl_out):
@@ -51,7 +58,7 @@ def _has_dgl(data):
 def siamese_loader(data, batch_size, constant_n_vertices, shuffle=True):
     assert len(data) > 0
     if _has_dgl(data):
-        if isinstance(data[0],Tuple):
+        if isinstance(data[0][0],Tuple):
             return DataLoader(data, batch_size=batch_size, shuffle=shuffle,
                                         num_workers=4, collate_fn=_collate_fn_dgl_qap)
         else:
