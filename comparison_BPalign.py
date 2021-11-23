@@ -21,13 +21,29 @@ MODEL_NAME = "fgnn-comparison-l_{}-s_{}.tar"
 DATA_PATH = "FGNN-BPA.csv"
 LOG_DIR = "gnnbpa"
 REMOVE_FILES_AFTER_EXP = True
-ONLY_TEST=False
+TRAINING = True
+TESTING  = True
+
+cur_task = ""
+if TRAINING:
+    cur_task += "training "
+if TESTING:
+    cur_task += "testing"
+if (not TRAINING) and (not TESTING):
+    print("No current task, stopping.")
+    exit()
+print(f"Current task(s) : {cur_task}")
+
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
+def round(t,dec=8):
+    return torch.round(t*(10**dec))/(10**dec)
 
 noise_bpa = torch.linspace(0.4,1,20)
+noise_bpa = round(noise_bpa,8)
 noise_gnn = 1 - noise_bpa
+noise_gnn = round(noise_bpa,8)
 l_lbda = [2,2.5,3]
 n = 200
 
@@ -276,9 +292,9 @@ def one_exp(task):
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
     model_full_path = os.path.join(LOG_DIR, 'best-' + model_name)
     if not os.path.exists(model_full_path):
-        if not ONLY_TEST:
+        if TRAINING:
             train_cycle(task)
-    if not os.path.exists(model_full_path):
+    if TESTING and os.path.exists(model_full_path):
         relevant_metric = test_cycle(task)
     else:
         print(f"Model for task {task} not found, skipping.")
