@@ -43,7 +43,7 @@ def round(t,dec=8):
 noise_bpa = torch.linspace(0.4,1,20)
 noise_bpa = round(noise_bpa,8)
 noise_gnn = 1 - noise_bpa
-noise_gnn = round(noise_bpa,8)
+noise_gnn = round(noise_gnn,8)
 l_lbda = [2,2.5,3]
 n = 200
 
