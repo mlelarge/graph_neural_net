@@ -1,3 +1,4 @@
+from typing import Tuple
 import toolbox.maskedtensor as maskedtensor
 from torch.utils.data import DataLoader
 from toolbox.utils import get_device
@@ -21,6 +22,10 @@ def _collate_fn_dgl_qap(samples_list):
     input1_batch = dgl.batch(input1_list)
     input2_batch = dgl.batch(input2_list)
     return ((input1_batch,input2_batch),torch.empty(1))
+
+def _collate_fn_dgl_ne(samples_list):
+    input_batch = dgl.batch(samples_list)
+    return input_batch
 
 def get_uncollate_function(N):
     def uncollate_function(dgl_out):
@@ -46,8 +51,12 @@ def _has_dgl(data):
 def siamese_loader(data, batch_size, constant_n_vertices, shuffle=True):
     assert len(data) > 0
     if _has_dgl(data):
-        return DataLoader(data, batch_size=batch_size, shuffle=shuffle,
+        if isinstance(data[0],Tuple):
+            return DataLoader(data, batch_size=batch_size, shuffle=shuffle,
                                         num_workers=4, collate_fn=_collate_fn_dgl_qap)
+        else:
+            return DataLoader(data, batch_size=batch_size, shuffle=shuffle,
+                                        num_workers=4, collate_fn=_collate_fn_dgl_ne)
     if constant_n_vertices:
         return DataLoader(data, batch_size=batch_size, shuffle=shuffle,
                                         num_workers=4)
@@ -59,7 +68,7 @@ def get_loader(architecture: str, data_object: any, batch_size: int, constant_n_
     arch = architecture.lower()
     if arch == 'fgnn':
         return siamese_loader(data_object, batch_size, constant_n_vertices, shuffle)
-    elif arch == 'gcn':
+    elif arch == 'gcn' or arch == 'gatedgcn':
         data_object = data_to_dgl_format(data_object)
         return siamese_loader(data_object, batch_size, constant_n_vertices, shuffle)
     else:

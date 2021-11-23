@@ -53,7 +53,7 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     mask = torch.ones((2,N,N))
     if sparsify is not None:
         pass
-    connectivity[:,:,1] = connectivity[:,:,1]*mask
+    connectivity = connectivity*mask
     adjacency = (connectivity!=0).to(torch.float)
     gdgl = _connectivity_to_dgl_adj(adjacency)
     src,rst = gdgl.edges() #For now only contains node features
