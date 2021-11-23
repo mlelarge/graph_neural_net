@@ -21,6 +21,7 @@ MODEL_NAME = "fgnn-comparison-l_{}-s_{}.tar"
 DATA_PATH = "FGNN-BPA.csv"
 LOG_DIR = "gnnbpa"
 REMOVE_FILES_AFTER_EXP = True
+ONLY_TEST=False
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
@@ -275,8 +276,12 @@ def one_exp(task):
     model_name = MODEL_NAME.format(task.lbda,task.noise_gnn)
     model_full_path = os.path.join(LOG_DIR, 'best-' + model_name)
     if not os.path.exists(model_full_path):
-        train_cycle(task)
-    relevant_metric = test_cycle(task)
+        if not ONLY_TEST:
+            train_cycle(task)
+    if not os.path.exists(model_full_path):
+        relevant_metric = test_cycle(task)
+    else:
+        print(f"Model for task {task} not found, skipping.")
     if USE_NEPTUNE:
         run.stop()
     return relevant_metric
