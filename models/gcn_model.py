@@ -50,7 +50,7 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
     N,_,_ = connectivity.shape
     distances = connectivity[:,:,1]
-    mask = torch.ones((2,N,N))
+    mask = torch.ones_like(connectivity)
     if sparsify is not None:
         pass
     connectivity = connectivity*mask
