@@ -21,7 +21,7 @@ class BaseModel(nn.Module):
         self.embed = input_embed        
 
         # First part - sequential mlp blocks
-        if not self.input_embed:
+        if not self.embed:
             last_layer_features = self.original_features_num
         else:
             last_layer_features = self.in_features
