@@ -207,7 +207,8 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
         problem = 'mcptrue'
     exp_helper = init_helper(problem)
 
-    if arch!='fgnn':
+    if arch['arch']!='fgnn':
+        print(f"Arch : {arch['arch']}")
         from loaders.siamese_loaders import get_uncollate_function
         uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
         cur_crit = exp_helper.criterion
