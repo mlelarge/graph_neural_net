@@ -1,13 +1,13 @@
 ---
-name: qap_er_bp_inc
+name: qap_simpler
 cpu: No
 root_dir: .
-problem: 'qap' #qap, tsp, hhc, tsprl, mcp, sbm
+problem: 'tsp' #qap, tsp, hhc, tsprl, mcp, sbm
 test_enabled: Yes
 
 data:
     train: # Train/Val data generation parameters
-        num_examples_train: 1000
+        num_examples_train: 20000
         num_examples_val: 1000
         n_vertices: 50
 
@@ -16,7 +16,7 @@ data:
             noise_model: ErdosRenyi
             edge_density: 0.2
             vertex_proba: 1. # Parameter of the binomial distribution of vertices
-            noise: 0.05
+            noise: 0.01
             path_dataset: dataset_qap # Path where datasets are stored
         _tsp:
             generative_model: Square01
@@ -67,29 +67,30 @@ data:
 
 
 train: # Training parameters
-    epoch: 10
-    batch_size: 32 #10
-    lr: !!float 5e-6 #5e-6
+    epoch: 100
+    batch_size: 64 #10
+    lr: !!float 1e-3 #5e-6
     scheduler_step: 2
-    scheduler_decay: 0.7
+    scheduler_decay: 0.5
     lr_stop: !!float 1e-7
     print_freq: 100
-    anew: No
+    anew: Yes
     template_model_path: './runs/qap_er_bp_inc/QAP-50_ErdosRenyi_ErdosRenyi_0.06_1.0_0.1_dataset_qap/' #'/home/mlelarge/GitHub/graph_neural_net/runs/qap_er_bp/QAP-100_ErdosRenyi_ErdosRenyi_0.03_1.0_0.1_dataset_qap'
-    model_name: model_best.pth.tar
+    model_name: fgnn-tsp-model_best.pth.tar
     #loss_reduction: mean
 
 arch: # Architecture and model
     arch: fgnn #fgnn or gcn
-    arch_load: siamese #siamese or simple
-    embedding: node #node or edge
-    num_blocks: 2
+    arch_load: simple #siamese or simple
+    embedding: edge #node or edge
+    num_blocks: 5
     original_features_num: 2
     in_features: 64
-    out_features: 64
+    out_features: 1
     depth_of_mlp: 3
+    input_embed: No
 
 observers:
     neptune:
-        enable: No
+        enable: Yes
         project: mautrib/GNN
