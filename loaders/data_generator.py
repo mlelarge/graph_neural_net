@@ -299,7 +299,7 @@ class QAP_Generator(Base_Generator):
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
         try:
-            W_noise = NOISE_FUNCTIONS[self.noise_model](W, self.noise, self.edge_density)
+            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, self.edge_density)
         except KeyError:
             raise ValueError('Noise model {} not supported'
                              .format(self.noise_model))
