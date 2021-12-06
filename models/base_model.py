@@ -17,13 +17,13 @@ class BaseModel(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.depth_of_mlp = depth_of_mlp
-        self.embedding = nn.Embedding(2,in_features)
         self.embed = input_embed        
 
         # First part - sequential mlp blocks
         if not self.embed:
             last_layer_features = self.original_features_num
         else:
+            self.embedding = nn.Embedding(2,in_features)
             last_layer_features = self.in_features
         self.reg_blocks = nn.ModuleList()
         for i in range(self.num_blocks-1):
@@ -71,7 +71,7 @@ class Simple_Node_Embedding(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.depth_of_mlp =depth_of_mlp
-        self.base_model = BaseModel(original_features_num, num_blocks, in_features,out_features, depth_of_mlp)
+        self.base_model = BaseModel(original_features_num, num_blocks, in_features,out_features, depth_of_mlp, **kwargs)
         self.suffix = ColumnMaxPooling()
 
     def forward(self, x):
@@ -93,7 +93,7 @@ class Simple_Edge_Embedding(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.depth_of_mlp =depth_of_mlp
-        self.base_model = BaseModel(original_features_num, num_blocks, in_features,in_features, depth_of_mlp)
+        self.base_model = BaseModel(original_features_num, num_blocks, in_features,in_features, depth_of_mlp, **kwargs)
         self.last_mlp = nn.Conv2d(in_features,out_features,kernel_size=1, padding=0, bias=True)
 
     def forward(self, x):
