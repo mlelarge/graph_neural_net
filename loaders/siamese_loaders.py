@@ -49,8 +49,8 @@ def get_uncollate_function(N):
             for i in range(bs):
                 final_array[i,:,:] = dgl_out[(i*N):((i+1)*N),(i*N):((i+1)*N)]
         if len(dgl_out.shape)==1: #In this case, the dgl model returns a full list of arrays
-            fake_N = dgl_out.shape[0]**2
-            bs = int(fake_N//N)
+            fake_N = dgl_out.shape[0]
+            bs = int(fake_N//(N**2))
             final_array = torch.zeros((bs,N,N))
             device = get_device(dgl_out)
             final_array = final_array.to(device)

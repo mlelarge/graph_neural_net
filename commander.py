@@ -212,7 +212,9 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
         from loaders.siamese_loaders import get_uncollate_function
         uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
         cur_crit = exp_helper.criterion
+        cur_eval = exp_helper.eval_function
         exp_helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
+        exp_helper.eval_function = lambda output, target : cur_eval(uncollate_function(output), target)
     
     generator = exp_helper.generator
     
