@@ -327,6 +327,16 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, us
     
     helper = init_helper(problem)
 
+    if arch['arch']!='fgnn':
+        print(f"Arch : {arch['arch']}")
+        from loaders.siamese_loaders import get_uncollate_function
+        uncollate_function = get_uncollate_function(test_data_dict["n_vertices"])
+        cur_crit = helper.criterion
+        cur_eval = helper.eval_function
+        helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
+        helper.eval_function = lambda output, target : cur_eval(uncollate_function(output), target)
+
+
     gene_test = helper.generator('test', test_data_dict)
     gene_test.load_dataset()
 
