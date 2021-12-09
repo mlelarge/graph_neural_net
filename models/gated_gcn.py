@@ -13,13 +13,20 @@ from toolbox.utils import get_device
 """
 
 class GatedGCN(nn.Module):
-    def __init__(self,n_layers=10,original_features_num=1,in_features=20,out_features=20, **kwargs):
+    def __init__(self,n_layers=10,original_features_num=1,in_features=20, out_features=20, depth_of_mlp=3, **kwargs):
         super().__init__()
         self.conv_start = GatedGraphConv(original_features_num, in_features, 1, 1)
         self.layers = nn.ModuleList()
         for _ in range(n_layers-2):
             layer = GatedGraphConv(in_features, in_features, 1, 1)
             self.layers.append(layer)
+        l_layers = []
+        for _ in range(depth_of_mlp-1):
+            l_layers.append(nn.Linear(in_features,in_features))
+            l_layers.append(nn.ReLU())
+        l_layers.append(nn.Linear(in_features,out_features))
+        l_layers.append(nn.ReLU())
+        self.lastmlp = nn.Sequential(*l_layers)
     
     def forward(self,g):
         g = dgl.add_self_loop(g)
@@ -30,6 +37,7 @@ class GatedGCN(nn.Module):
         for layer in self.layers:
             h = layer(g,h, e_feat)
             h = F.relu(h)
+        h = self.lastmlp(h)
         edge_sim = torch.matmul(h,h.T)
         return edge_sim.unsqueeze(0)
 
