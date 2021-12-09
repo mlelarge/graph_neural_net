@@ -151,12 +151,13 @@ def init_output_env(_config, root_dir, log_dir, path_dataset):
         json.dump(_config, f)
 
 @ex.capture
-def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, log_dir, model_path, filename='checkpoint.pth.tar'):
     utils.check_dir(log_dir)
     filename = os.path.join(log_dir, filename)
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, os.path.join(log_dir, 'model_best.pth.tar'))
+        shutil.copyfile(filename, model_path)
         print(f"Best Model yet : saving at {log_dir+'model_best.pth.tar'}")
 
     fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')
