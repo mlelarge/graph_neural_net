@@ -126,7 +126,7 @@ class GatedGCNNet(nn.Module):
         in_dim_edge = 1
         hidden_dim = in_features
         out_dim = out_features
-        n_classes = 2
+        n_classes = 1
         dropout = 0# net_params['dropout']
         n_layers = n_layers
         self.batch_norm = True #net_params['batch_norm']
@@ -141,13 +141,12 @@ class GatedGCNNet(nn.Module):
         self.MLP_layer = MLPReadout(2*out_dim, n_classes)
         
     def forward(self, g, h = None, e = None):
-        
+        g = dgl.add_self_loop(g)
         if h is None:
             h = g.ndata['feat']
         h = self.embedding_h(h.float())
         if e is None:
-            get_device(h)
-            e = torch.ones_like(e)
+            e = g.edata['feat']
         e = self.embedding_e(e.float())
         
         # convnets

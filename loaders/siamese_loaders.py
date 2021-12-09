@@ -29,20 +29,35 @@ def _collate_fn_dgl_ne(samples_list):
     target_list = [target for (_,target) in samples_list]
     N,_ = target_list[0].shape
     input_batch = dgl.batch(input1_list)
-    target_batch = torch.tensor((bs,N,N))
+    target_batch = torch.zeros((bs,N,N))
+    #print("Shape : ",target_list[0].shape)
     for i,target in enumerate(target_list):
         target_batch[i] = target
     return (input_batch,target_batch)
 
 def get_uncollate_function(N):
     def uncollate_function(dgl_out):
-        _,fake_N,_ = dgl_out.shape
-        bs = int(fake_N//N)
-        final_array = torch.zeros((bs,N,N))
-        device = get_device(dgl_out)
-        final_array = final_array.to(device)
-        for i in range(bs):
-            final_array[i,:,:] = dgl_out[0,(i*N):((i+1)*N),(i*N):((i+1)*N)]
+        #print(f'{dgl_out.shape=}')
+        if len(dgl_out.shape)==3:
+            dgl_out = dgl_out.squeeze()
+        if len(dgl_out.shape)==2:
+            fake_N,_ = dgl_out.shape
+            bs = int(fake_N//N)
+            final_array = torch.zeros((bs,N,N))
+            device = get_device(dgl_out)
+            final_array = final_array.to(device)
+            for i in range(bs):
+                final_array[i,:,:] = dgl_out[(i*N):((i+1)*N),(i*N):((i+1)*N)]
+        if len(dgl_out.shape)==1: #In this case, the dgl model returns a full list of arrays
+            fake_N = dgl_out.shape[0]**2
+            bs = int(fake_N//N)
+            final_array = torch.zeros((bs,N,N))
+            device = get_device(dgl_out)
+            final_array = final_array.to(device)
+            for i in range(bs):
+                temp_array = dgl_out[(i*(N**2)):((i+1)*(N**2))]
+                temp_array = temp_array.reshape((N,N))
+                final_array[i,:,:] = temp_array
         return final_array
     return uncollate_function
 

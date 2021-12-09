@@ -57,7 +57,8 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     adjacency = (connectivity!=0).to(torch.float)
     gdgl = _connectivity_to_dgl_adj(adjacency)
     src,rst = gdgl.edges() #For now only contains node features
-    gdgl.edata["feat"] = distances[src,rst]
+    efeats = distances[src,rst]
+    gdgl.edata["feat"] = efeats.reshape((efeats.shape[0],1))
     return gdgl
 
 

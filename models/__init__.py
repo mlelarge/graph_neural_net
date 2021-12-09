@@ -1,7 +1,7 @@
 from models.siamese_net import Siamese_Model,Siamese_Model_Gen
 from models.base_model import Simple_Node_Embedding, Simple_Edge_Embedding
 from models.gcn_model import BaseGCN
-from models.gated_gcn import GatedGCN
+from models.gated_gcn import GatedGCN, GatedGCNNet
 
 def get_model(args):
 
@@ -39,7 +39,8 @@ def get_model_gen(args):
                 'num_blocks': args['num_blocks'],
                 'in_features': args['in_features'],
                 'out_features': args['out_features'],
-                'depth_of_mlp': args['depth_of_mlp']
+                'depth_of_mlp': args['depth_of_mlp'],
+                'input_embed': args['input_embed']
     }
 
     arch = args['arch'].lower()
@@ -59,7 +60,7 @@ def get_model_gen(args):
     elif arch=='gcn':
         Model_instance = BaseGCN
     elif arch=='gatedgcn':
-        Model_instance = GatedGCN
+        Model_instance = GatedGCNNet
     else:
         raise NotImplementedError(f"{arch} architectuce not implemented")
     
