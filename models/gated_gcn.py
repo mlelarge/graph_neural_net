@@ -133,7 +133,7 @@ class GatedGCNNet(nn.Module):
         in_dim_edge = 1
         hidden_dim = in_features
         out_dim = out_features
-        n_classes = 1
+        n_classes = 2
         dropout = 0# net_params['dropout']
         n_layers = n_layers
         self.batch_norm = True #net_params['batch_norm']

@@ -35,7 +35,7 @@ def _collate_fn_dgl_ne(samples_list):
         target_batch[i] = target
     return (input_batch,target_batch)
 
-def get_uncollate_function(N):
+def get_uncollate_function(N,problem):
     def uncollate_function(dgl_out):
         #print(f'{dgl_out.shape=}')
         if len(dgl_out.shape)==3:
@@ -57,6 +57,18 @@ def get_uncollate_function(N):
             for i in range(bs):
                 final_array[i,:,:] = dgl_out[(i*(N**2)):((i+1)*(N**2))].reshape((N,N))
         return final_array
+    def _tsp_uncollate_function(dgl_out):
+        fake_N,_ = dgl_out.shape
+        assert dgl_out.shape[1]==2, f"Not a DGL answer to the TSP : {dgl_out.shape=}"
+        bs = int(fake_N//(N**2))
+        final_array = torch.zeros((bs,N,N,2))
+        device = get_device(dgl_out)
+        final_array = final_array.to(device)
+        for i in range(bs):
+            final_array[i,:,:] = dgl_out[(i*(N**2)):((i+1)*(N**2))].reshape((N,N,2))
+        return final_array.permute(0,3,1,2) #For the CrossEntropy ! 
+    if problem=='tsp':
+        return _tsp_uncollate_function 
     return uncollate_function
 
 def _has_dgl(data):

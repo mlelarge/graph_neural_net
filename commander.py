@@ -9,6 +9,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from models import get_model,get_model_gen
 from loaders.siamese_loaders import get_loader
+from toolbox.losses import tsp_loss
 from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
@@ -211,7 +212,9 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     if arch['arch']!='fgnn':
         print(f"Arch : {arch['arch']}")
         from loaders.siamese_loaders import get_uncollate_function
-        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
+        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"],problem)
+        if problem=='tsp':
+            exp_helper.criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(weight=None))
         cur_crit = exp_helper.criterion
         cur_eval = exp_helper.eval_function
         exp_helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
