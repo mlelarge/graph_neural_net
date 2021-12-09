@@ -60,7 +60,7 @@ def get_model_gen(args):
     elif arch=='gcn':
         Model_instance = BaseGCN
     elif arch=='gatedgcn':
-        Model_instance = GatedGCNNet
+        Model_instance = GatedGCN
     else:
         raise NotImplementedError(f"{arch} architectuce not implemented")
     

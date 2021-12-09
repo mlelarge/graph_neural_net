@@ -7,6 +7,9 @@
 .ipynb_checkpoints/
 dataset*/
 runs/
+interpretation/
+temp/
+.neptune/
 *.json
 *.pkl
 

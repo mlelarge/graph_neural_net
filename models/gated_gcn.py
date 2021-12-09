@@ -20,7 +20,6 @@ class GatedGCN(nn.Module):
         for _ in range(n_layers-2):
             layer = GatedGraphConv(in_features, in_features, 1, 1)
             self.layers.append(layer)
-        self.conv_final = GatedGraphConv(in_features, out_features, 1, 1)
     
     def forward(self,g):
         g = dgl.add_self_loop(g)
@@ -31,8 +30,8 @@ class GatedGCN(nn.Module):
         for layer in self.layers:
             h = layer(g,h, e_feat)
             h = F.relu(h)
-        h = self.conv_final(g, h, e_feat)
-        return h.unsqueeze(0)
+        edge_sim = torch.matmul(h,h.T)
+        return edge_sim.unsqueeze(0)
 
 class MLPReadout(nn.Module):
 

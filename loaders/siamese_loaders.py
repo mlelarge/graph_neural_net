@@ -55,9 +55,7 @@ def get_uncollate_function(N):
             device = get_device(dgl_out)
             final_array = final_array.to(device)
             for i in range(bs):
-                temp_array = dgl_out[(i*(N**2)):((i+1)*(N**2))]
-                temp_array = temp_array.reshape((N,N))
-                final_array[i,:,:] = temp_array
+                final_array[i,:,:] = dgl_out[(i*(N**2)):((i+1)*(N**2))].reshape((N,N))
         return final_array
     return uncollate_function
 
