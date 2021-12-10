@@ -229,9 +229,9 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     gene_val.load_dataset()
     
     train_loader = get_loader(arch['arch'],gene_train, train['batch_size'],
-                                  gene_train.constant_n_vertices)
+                                  gene_train.constant_n_vertices,problem=problem)
     val_loader = get_loader(arch['arch'],gene_val, train['batch_size'],
-                                gene_val.constant_n_vertices)
+                                gene_val.constant_n_vertices,problem=problem)
     
     model = get_model_gen(arch)
     optimizer, scheduler = get_optimizer(train,model)
@@ -345,7 +345,7 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, us
     gene_test.load_dataset()
 
     test_loader = get_loader(arch['arch'],gene_test, train['batch_size'],
-                                 gene_test.constant_n_vertices)
+                                 gene_test.constant_n_vertices,problem=problem)
     
     relevant_metric, loss = trainer.val_triplet(test_loader, model, helper, device,
                                     epoch=0, eval_score=True,
