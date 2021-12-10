@@ -5,7 +5,7 @@ from torch.functional import Tensor
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import networkx as nx
-from numpy import indices as npindices
+from numpy import indices as npindices, argpartition as npargpartition
 import dgl
 from dgl.nn import GraphConv
 from numpy import mgrid as npmgrid
@@ -52,7 +52,13 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     distances = connectivity[:,:,1]
     mask = torch.ones_like(connectivity)
     if sparsify is not None:
-        pass
+        mask = torch.zeros_like(connectivity)
+        assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
+        knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1]
+        for i in range(N):
+            for j in knns[i]:
+                if i!=j:
+                    mask[i,j] = mask[j,i] = 1
     connectivity = connectivity*mask
     adjacency = (connectivity!=0).to(torch.float)
     gdgl = _connectivity_to_dgl_adj(adjacency)
