@@ -118,7 +118,7 @@ def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=None):
 
 def connectivity_to_dgl_tsp(tsp_generator: TSP_Generator):
     loader = []
-    for (data,target),(xs,ys) in tqdm.tqdm(zip(tsp_generator.data,tsp_generator.positions)):
+    for (data,target),(xs,ys) in tqdm.tqdm(zip(tsp_generator.data,tsp_generator.positions), total = len(tsp_generator.data)):
         elt_dgl = _connectivity_to_dgl_tsp_nodecoord(data,xs,ys)
         loader.append((elt_dgl,target))
     return loader
