@@ -209,16 +209,15 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
         problem = 'mcptrue'
     exp_helper = init_helper(problem)
 
+    is_dgl = False
     if arch['arch']!='fgnn':
+        is_dgl=True
         print(f"Arch : {arch['arch']}")
         from loaders.siamese_loaders import get_uncollate_function
         uncollate_function = get_uncollate_function(train_data_dict["n_vertices"],problem)
         if problem=='tsp':
-            exp_helper.criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(weight=None))
-        cur_crit = exp_helper.criterion
-        cur_eval = exp_helper.eval_function
-        exp_helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
-        exp_helper.eval_function = lambda output, target : cur_eval(uncollate_function(output), target)
+            exp_helper._criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(weight=None))
+        
     
     generator = exp_helper.generator
     
@@ -249,11 +248,16 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     is_best = True
     for epoch in range(train['epoch']):
         print('Current epoch: ', epoch)
-        trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
+        if not is_dgl:
+            trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
+        else:
+            trainer.train_triplet_dgl(train_loader,model,optimizer,exp_helper,device,epoch,uncollate_function,eval_score=True,print_freq=train['print_freq'])
         
 
-
-        relevant_metric, loss = trainer.val_triplet(val_loader,model,exp_helper,device,epoch,eval_score=True)
+        if not is_dgl:
+            relevant_metric, loss = trainer.val_triplet(val_loader,model,exp_helper,device,epoch,eval_score=True)
+        else:
+            relevant_metric, loss = trainer.val_triplet_dgl(val_loader,model,exp_helper,device,epoch,uncollate_function,eval_score=True)
         scheduler.step(loss)
         # remember best acc and save checkpoint
         #TODO : if relevant metric is like a loss and needs to decrease, this doesn't work

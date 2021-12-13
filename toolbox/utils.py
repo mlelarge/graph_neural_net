@@ -90,6 +90,33 @@ def list_to_tensor(liste) -> torch.Tensor:
         tensor_eq[k] = liste[k]
     return tensor_eq
 
+#Graph operations
+
+def edge_features_to_dense(graph, features):
+    N = graph.number_of_nodes()
+    t = torch.zeros((N,N))
+    edges = np.array(graph.edges()).T #Transpose for the right shape (2,n_edges)
+    t[edges] = features
+    return t
+
+def edge_features_to_dense_sym(graph,features):
+    t = edge_features_to_dense(graph,features)
+    if torch.all(t.T+t==t):
+        return t
+    elif torch.all(torch.tril(t,-1)==0):
+        return t + torch.triu(t,1).T
+    else:
+        ix,iy = torch.where(t!=0)
+        for i,j in zip(ix,iy):
+            if t[j,i]==0:
+                t[j,i] = t[i,j]
+            elif t[j,i]==t[i,j]:
+                continue
+            else:
+                raise AssertionError(f"Feature values are asymmetric, should not have used the symetric function.")
+    return t
+
+
 #QAP
 
 def perm_matrix(row,preds):

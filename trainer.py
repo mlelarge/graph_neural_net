@@ -1,6 +1,7 @@
 import time
 from typing import Tuple
 import torch
+from toolbox.utils import edge_features_to_dense,edge_features_to_dense_sym
 
 def train_triplet(train_loader,model,optimizer,
                 helper,device,epoch,eval_score=False,print_freq=100):
@@ -93,7 +94,110 @@ def val_triplet(val_loader,model,helper,device,epoch,eval_score=False,print_freq
     relevant_metric = helper.get_relevant_metric(val_test)
     return relevant_metric.avg, los.avg
 
+def train_triplet_dgl(train_loader,model,optimizer,
+                helper,device,epoch,uncollate_function, sym_problem=True, eval_score=False,print_freq=100):
+    model.to(device)
+    model.train()
+    helper.reset_meters('train')
+    helper.reset_meters('hyperparams')
+    learning_rate = optimizer.param_groups[0]['lr']
+    helper.update_value_meter('hyperparams', 'learning_rate', learning_rate)
+    end = time.time()
+    batch_size = train_loader.batch_size
 
+    for i, (data, target) in enumerate(train_loader):
+        # measure data loading time
+        helper.update_meter('train', 'data_time', time.time() - end, n=batch_size)
+        
+        if isinstance(data,Tuple):
+            data = (data[0].to(device),data[1].to(device))
+        else:
+            data = data.to(device)
+        target_deviced = target.to(device)
+        raw_scores = model(data)
+        raw_scores = raw_scores.squeeze(-1)
+        raw_scores_unc = uncollate_function(raw_scores)
+        if not isinstance(data,Tuple):
+            if sym_problem:
+                raw_scores_dense = edge_features_to_dense_sym(data, raw_scores_unc)
+            else:
+                raw_scores_dense = edge_features_to_dense(data,raw_scores_unc)
+        else:
+            raw_scores_dense = raw_scores_unc
+        loss = helper.criterion(raw_scores_dense,target_deviced)
+        helper.update_meter('train', 'loss', loss.data.item(), n=1)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        helper.update_meter('train', 'batch_time', time.time() - end, n=batch_size)
+        end = time.time()
+
+    
+        if (i+1) % print_freq == 0:
+            if eval_score:
+                values = helper.eval_function(uncollate_function(raw_scores),target_deviced)
+                helper.update_eval('train', values)
+            print('Epoch: [{0}][{1}/{2}]\t'
+                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                  'LR {lr:.2e}\t'
+                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                  '{helper_str}'.format(
+                   epoch, i, len(train_loader), batch_time=helper.get_meter('train', 'batch_time'),
+                   data_time=helper.get_meter('train', 'data_time'), lr=learning_rate,
+                   loss=helper.get_meter('train', 'loss'), helper_str=helper.get_eval_str('train')))
+    
+            helper.log_meters('train', n=epoch)
+    helper.log_meters('hyperparams', n=epoch)
+
+def val_triplet_dgl(val_loader,model,helper,device,epoch,uncollate_function,sym_problem=True,eval_score=False,print_freq=10,val_test='val'):
+    model.to(device)
+    model.eval()
+    helper.reset_meters(val_test)
+    with torch.no_grad():
+        for i, (data, target) in enumerate(val_loader):
+            if isinstance(data,Tuple):
+                data = (data[0].to(device),data[1].to(device))
+            else:
+                data = data.to(device)
+            target_deviced = target.to(device)
+            raw_scores = model(data)
+            raw_scores = raw_scores.squeeze(-1)
+            raw_scores_unc = uncollate_function(raw_scores)
+            if not isinstance(data,Tuple):
+                if sym_problem:
+                    raw_scores_dense = edge_features_to_dense_sym(data, raw_scores_unc)
+                else:
+                    raw_scores_dense = edge_features_to_dense(data,raw_scores_unc)
+            else:
+                raw_scores_dense = raw_scores_unc
+            loss = helper.criterion(raw_scores_dense,target_deviced)
+            helper.update_meter(val_test, 'loss', loss.data.item(), n=1)
+    
+            if eval_score:
+                values = helper.eval_function(uncollate_function(raw_scores),target_deviced)
+                helper.update_eval(val_test,values)
+            if i % print_freq == 0:
+                los = helper.get_meter(val_test, 'loss')
+                if val_test == 'val':
+                    print('Validation set, epoch: [{0}][{1}/{2}]\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        '{helper_str}'.format(
+                        epoch, i, len(val_loader), loss=helper.get_meter(val_test, 'loss'),
+                        helper_str = helper.get_eval_str(val_test)))
+                else:
+                    print('Test set, epoch: [{0}][{1}/{2}]\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        '{helper_str}'.format(
+                        epoch, i, len(val_loader), loss=helper.get_meter(val_test, 'loss'),
+                        helper_str = helper.get_eval_str(val_test)))
+
+        helper.log_meters(val_test, n=epoch)
+    relevant_metric = helper.get_relevant_metric(val_test)
+    return relevant_metric.avg, los.avg
 
 def train_simple(train_loader,model,optimizer,
                 helper,device,epoch,eval_score=False,print_freq=100):
