@@ -92,15 +92,15 @@ def list_to_tensor(liste) -> torch.Tensor:
 
 #Graph operations
 
-def edge_features_to_dense(graph, features):
+def edge_features_to_dense(graph, features, device='cpu'):
     N = graph.number_of_nodes()
-    t = torch.zeros((N,N))
+    t = torch.zeros((N,N)).to(device)
     edges = np.array(graph.edges()).T #Transpose for the right shape (2,n_edges)
     t[edges] = features
     return t
 
-def edge_features_to_dense_sym(graph,features):
-    t = edge_features_to_dense(graph,features)
+def edge_features_to_dense_sym(graph,features,device='cpu'):
+    t = edge_features_to_dense(graph,features,device)
     if torch.all(t.T+t==t):
         return t
     elif torch.all(torch.tril(t,-1)==0):
