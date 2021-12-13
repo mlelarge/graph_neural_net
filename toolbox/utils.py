@@ -101,7 +101,8 @@ def edge_features_to_dense_tensor(graph, features, device='cpu'):
         resqueeze = True
     n_feats = features.shape[1]
     t = torch.zeros((N,N,n_feats)).to(device)
-    adj = torch.tensor(nx_to_numpy_array(graph.to_networkx())).to(device)#edges = np.array(graph.edges().cpu()).T #Transpose for the right shape (2,n_edges)
+    #adj = torch.tensor(nx_to_numpy_array(graph.to_networkx())).to(device)#edges = np.array(graph.edges().cpu()).T #Transpose for the right shape (2,n_edges)
+    adj = graph.adj(ctx=device).to_dense()
     ix,iy = torch.where(adj==1)
     t[ix,iy] = features
     if resqueeze:
