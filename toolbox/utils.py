@@ -116,7 +116,7 @@ def edge_features_to_dense_sym_tensor(graph,features,device='cpu'):
     
     N = graph.number_of_nodes()
     tril = torch.tril(torch.ones((N,N)),-1)
-    tril = tril.unsqueeze(-1) #For the multiplication, we need to add the dimension
+    tril = tril.unsqueeze(-1).to(device) #For the multiplication, we need to add the dimension
     if torch.all(t*tril==0): #Only zeros in the lower triangle features
         return t + t.transpose(0,1) * tril #Here we remove the diagonal with '* tril'
     
