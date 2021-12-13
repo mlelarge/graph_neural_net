@@ -72,7 +72,7 @@ def get_uncollate_function(N,problem):
         bs = fake_N//N
         final_array = torch.zeros((bs,N,N,n_features))
         device = get_device(dgl_out)
-        final_array.to(device)
+        final_array = final_array.to(device)
         for i in range(bs):
             final_array[i,:,:] = dgl_out[(i*N):((i+1)*N),(i*N):((i+1)*N)]
         return final_array.permute(0,3,1,2) # For the CrossEntropy, we need the classes dimension in second
