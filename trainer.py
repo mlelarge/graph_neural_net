@@ -119,11 +119,11 @@ def train_triplet_dgl(train_loader,model,optimizer,
         if not isinstance(data,Tuple):
             if sym_problem:
                 try:
-                    raw_scores = edge_features_to_dense_sym_tensor(data, raw_scores)
+                    raw_scores = edge_features_to_dense_sym_tensor(data, raw_scores, device)
                 except AssertionError: #Catch if the matrix is not symmetric
-                    raw_scores = edge_features_to_dense_tensor(data, raw_scores)
+                    raw_scores = edge_features_to_dense_tensor(data, raw_scores, device)
             else:
-                raw_scores = edge_features_to_dense_tensor(data,raw_scores)
+                raw_scores = edge_features_to_dense_tensor(data,raw_scores, device)
         raw_scores = uncollate_function(raw_scores)
         loss = helper.criterion(raw_scores,target_deviced)
         helper.update_meter('train', 'loss', loss.data.item(), n=1)
@@ -170,11 +170,11 @@ def val_triplet_dgl(val_loader,model,helper,device,epoch,uncollate_function,sym_
             if not isinstance(data,Tuple):
                 if sym_problem:
                     try:
-                        raw_scores = edge_features_to_dense_sym_tensor(data, raw_scores)
+                        raw_scores = edge_features_to_dense_sym_tensor(data, raw_scores, device)
                     except AssertionError: #Catch if the matrix is not symmetric
-                        raw_scores = edge_features_to_dense_tensor(data, raw_scores)
+                        raw_scores = edge_features_to_dense_tensor(data, raw_scores, device)
                 else:
-                    raw_scores = edge_features_to_dense_tensor(data,raw_scores)
+                    raw_scores = edge_features_to_dense_tensor(data,raw_scores, device)
             raw_scores = uncollate_function(raw_scores)
             loss = helper.criterion(raw_scores,target_deviced)
             helper.update_meter(val_test, 'loss', loss.data.item(), n=1)
