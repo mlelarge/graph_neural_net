@@ -22,6 +22,7 @@ data:
             generative_model: Square01
             distance_used: EUC_2D
             path_dataset: dataset_tsp #TSP #dataset_tsp # Path where datasets are stored
+            sparsify: 25 #Only works for not fgnns. Put to None if you don't want sparsifying
         _hhc:
             generative_model: Gauss
             cycle_param: 0
@@ -39,7 +40,7 @@ data:
             path_dataset: dataset_sbm
             
     test: #Test data generation parameters
-        num_examples_test: 1000
+        num_examples_test: 10
         n_vertices: 50
         custom: No #If No, keeps the data_generation from train, just a failsafe so people consciously have to activate custom test
         
@@ -52,6 +53,7 @@ data:
         _tsp:
             generative_model: Square01
             distance_used: EUC_2D
+            sparsify: 25 #Only works for not fgnns. Put to None if you don't want sparsifying
         _hhc:
             generative_model: Gauss
             cycle_param: 0
@@ -76,17 +78,17 @@ train: # Training parameters
     print_freq: 100
     anew: Yes
     template_model_path: './runs/qap_er_bp_inc/QAP-50_ErdosRenyi_ErdosRenyi_0.06_1.0_0.1_dataset_qap/' #'/home/mlelarge/GitHub/graph_neural_net/runs/qap_er_bp/QAP-100_ErdosRenyi_ErdosRenyi_0.03_1.0_0.1_dataset_qap'
-    model_name: fgnn-tsp-model_best.pth.tar
+    model_name: gatedgcn-tsp-model_best.pth.tar
     #loss_reduction: mean
 
 arch: # Architecture and model
-    arch: fgnn #fgnn or gcn
+    arch: gatedgcn #fgnn, gcn, gatedgcn
     arch_load: simple #siamese or simple
     embedding: edge #node or edge
-    num_blocks: 5
+    num_blocks: 2
     original_features_num: 2
-    in_features: 64
-    out_features: 1
+    in_features: 96
+    out_features: 96
     depth_of_mlp: 3
     input_embed: No
 

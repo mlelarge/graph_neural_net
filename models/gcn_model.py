@@ -5,7 +5,7 @@ from torch.functional import Tensor
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import networkx as nx
-from numpy import indices as npindices, argpartition as npargpartition
+from numpy import indices as npindices, argpartition as npargpartition, array as nparray
 import dgl
 from dgl.nn import GraphConv
 from numpy import mgrid as npmgrid
@@ -92,7 +92,7 @@ def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=None):
     if sparsify is not None:
         mask = torch.zeros_like(connectivity)
         assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
-        knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1]
+        knns = npargpartition(nparray(distances), kth=sparsify, axis=-1)[:, sparsify ::-1]
         for i in range(N):
             for j in knns[i]:
                 if i!=j:
@@ -116,26 +116,26 @@ def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=None):
     return gdgl
 
 
-def connectivity_to_dgl_tsp(tsp_generator: TSP_Generator):
+def connectivity_to_dgl_tsp(tsp_generator: TSP_Generator,**kwargs):
     loader = []
     for (data,target),(xs,ys) in tqdm.tqdm(zip(tsp_generator.data,tsp_generator.positions), total = len(tsp_generator.data)):
-        elt_dgl = _connectivity_to_dgl_tsp_nodecoord(data,xs,ys)
+        elt_dgl = _connectivity_to_dgl_tsp_nodecoord(data,xs,ys,**kwargs)
         loader.append((elt_dgl,target))
     return loader
 
-def data_to_dgl_format(data_object,problem=None):
-    return DGL_Loader.from_data_generator(data_object,problem)
+def data_to_dgl_format(data_object,problem=None,**kwargs):
+    return DGL_Loader.from_data_generator(data_object,problem,**kwargs)
 
 class DGL_Loader(torch.utils.data.Dataset):
     def __init__(self):
         self.data = []
     
     @staticmethod
-    def from_data_generator(data_object, problem):
+    def from_data_generator(data_object, problem, **kwargs):
         loader = DGL_Loader()
         print("Converting data to DGL format")
         if problem=='tsp':
-            loader_iterable = connectivity_to_dgl_tsp(data_object)
+            loader_iterable = connectivity_to_dgl_tsp(data_object,**kwargs)
             loader.data = loader_iterable
         else:
             for data,target in tqdm.tqdm(data_object.data):

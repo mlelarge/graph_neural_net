@@ -230,9 +230,9 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     gene_val.load_dataset()
     
     train_loader = get_loader(arch['arch'],gene_train, train['batch_size'],
-                                  gene_train.constant_n_vertices,problem=problem)
+                                  gene_train.constant_n_vertices,problem=problem,sparsify=train_data_dict['sparsify'])
     val_loader = get_loader(arch['arch'],gene_val, train['batch_size'],
-                                gene_val.constant_n_vertices,problem=problem)
+                                gene_val.constant_n_vertices,problem=problem,sparsify=train_data_dict['sparsify'])
     
     model = get_model_gen(arch)
     optimizer, scheduler = get_optimizer(train,model)
