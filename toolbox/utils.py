@@ -7,6 +7,7 @@ import torch
 import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
+from networkx import to_numpy_array as nx_to_numpy_array
 
 # create directory if it does not exist
 def check_dir(dir_path):
@@ -100,8 +101,9 @@ def edge_features_to_dense_tensor(graph, features, device='cpu'):
         resqueeze = True
     n_feats = features.shape[1]
     t = torch.zeros((N,N,n_feats)).to(device)
-    edges = np.array(graph.edges()).T #Transpose for the right shape (2,n_edges)
-    t[edges] = features
+    adj = torch.tensor(nx_to_numpy_array(graph))#edges = np.array(graph.edges().cpu()).T #Transpose for the right shape (2,n_edges)
+    ix,iy = torch.where(adj==1)
+    t[ix,iy] = features
     if resqueeze:
         t.squeeze(-1)
     return t
