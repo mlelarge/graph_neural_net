@@ -1,7 +1,7 @@
 import time
 from typing import Tuple
 import torch
-from toolbox.utils import edge_features_to_dense,edge_features_to_dense_sym
+from toolbox.utils import edge_features_to_dense_tensor,edge_features_to_dense_sym_tensor
 
 def train_triplet(train_loader,model,optimizer,
                 helper,device,epoch,eval_score=False,print_freq=100):
@@ -116,15 +116,16 @@ def train_triplet_dgl(train_loader,model,optimizer,
         target_deviced = target.to(device)
         raw_scores = model(data)
         raw_scores = raw_scores.squeeze(-1)
-        raw_scores_unc = uncollate_function(raw_scores)
         if not isinstance(data,Tuple):
             if sym_problem:
-                raw_scores_dense = edge_features_to_dense_sym(data, raw_scores_unc)
+                try:
+                    raw_scores = edge_features_to_dense_sym_tensor(data, raw_scores)
+                except AssertionError: #Catch if the matrix is not symmetric
+                    raw_scores = edge_features_to_dense_tensor(data, raw_scores)
             else:
-                raw_scores_dense = edge_features_to_dense(data,raw_scores_unc)
-        else:
-            raw_scores_dense = raw_scores_unc
-        loss = helper.criterion(raw_scores_dense,target_deviced)
+                raw_scores = edge_features_to_dense_tensor(data,raw_scores)
+        raw_scores = uncollate_function(raw_scores)
+        loss = helper.criterion(raw_scores,target_deviced)
         helper.update_meter('train', 'loss', loss.data.item(), n=1)
         
         optimizer.zero_grad()
@@ -138,7 +139,7 @@ def train_triplet_dgl(train_loader,model,optimizer,
     
         if (i+1) % print_freq == 0:
             if eval_score:
-                values = helper.eval_function(uncollate_function(raw_scores),target_deviced)
+                values = helper.eval_function(raw_scores,target_deviced)
                 helper.update_eval('train', values)
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -166,19 +167,20 @@ def val_triplet_dgl(val_loader,model,helper,device,epoch,uncollate_function,sym_
             target_deviced = target.to(device)
             raw_scores = model(data)
             raw_scores = raw_scores.squeeze(-1)
-            raw_scores_unc = uncollate_function(raw_scores)
             if not isinstance(data,Tuple):
                 if sym_problem:
-                    raw_scores_dense = edge_features_to_dense_sym(data, raw_scores_unc)
+                    try:
+                        raw_scores = edge_features_to_dense_sym_tensor(data, raw_scores)
+                    except AssertionError: #Catch if the matrix is not symmetric
+                        raw_scores = edge_features_to_dense_tensor(data, raw_scores)
                 else:
-                    raw_scores_dense = edge_features_to_dense(data,raw_scores_unc)
-            else:
-                raw_scores_dense = raw_scores_unc
-            loss = helper.criterion(raw_scores_dense,target_deviced)
+                    raw_scores = edge_features_to_dense_tensor(data,raw_scores)
+            raw_scores = uncollate_function(raw_scores)
+            loss = helper.criterion(raw_scores,target_deviced)
             helper.update_meter(val_test, 'loss', loss.data.item(), n=1)
     
             if eval_score:
-                values = helper.eval_function(uncollate_function(raw_scores),target_deviced)
+                values = helper.eval_function(raw_scores,target_deviced)
                 helper.update_eval(val_test,values)
             if i % print_freq == 0:
                 los = helper.get_meter(val_test, 'loss')

@@ -197,7 +197,7 @@ class GatedGCNNet(nn.Module):
         self.MLP_layer = MLPReadout(2*out_dim, n_classes)
         
     def forward(self, g, h = None, e = None):
-        g = dgl.add_self_loop(g)
+        
         if h is None:
             h = g.ndata['feat']
         h = self.embedding_h(h.float())

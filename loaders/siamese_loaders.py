@@ -6,6 +6,7 @@ from models.gcn_model import data_to_dgl_format,DGL_Loader
 import dgl
 import torch
 from collections.abc import Iterable
+from math import sqrt
 
 def collate_fn(samples_list):
     input1_list = [input1 for input1, _ in samples_list]
@@ -57,16 +58,24 @@ def get_uncollate_function(N,problem):
             for i in range(bs):
                 final_array[i,:,:] = dgl_out[(i*(N**2)):((i+1)*(N**2))].reshape((N,N))
         return final_array
-    def _tsp_uncollate_function(dgl_out):
+    def _tsp_uncollate_function_old(dgl_out):
         fake_N,_ = dgl_out.shape
         assert dgl_out.shape[1]==2, f"Not a DGL answer to the TSP : {dgl_out.shape=}"
-        bs = int(fake_N//(N**2))
         final_array = torch.zeros((bs,N,N,2))
         device = get_device(dgl_out)
         final_array = final_array.to(device)
         for i in range(bs):
             final_array[i,:,:] = dgl_out[(i*(N**2)):((i+1)*(N**2))].reshape((N,N,2))
         return final_array.permute(0,3,1,2) #For the CrossEntropy ! 
+    def _tsp_uncollate_function(dgl_out):
+        fake_N,fake_N,n_features = dgl_out.shape
+        bs = fake_N//N
+        final_array = torch.zeros((bs,N,N,n_features))
+        device = get_device(dgl_out)
+        final_array.to(device)
+        for i in range(bs):
+            final_array[i,:,:] = dgl_out[(i*N):((i+1)*N),(i*N):((i+1)*N)]
+        return final_array.permute(0,3,1,2) # For the CrossEntropy, we need the classes dimension in second
     if problem=='tsp':
         return _tsp_uncollate_function 
     return uncollate_function

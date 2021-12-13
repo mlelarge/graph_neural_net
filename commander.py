@@ -212,10 +212,12 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     is_dgl = False
     if arch['arch']!='fgnn':
         is_dgl=True
+        symmetric_problem=True
         print(f"Arch : {arch['arch']}")
         from loaders.siamese_loaders import get_uncollate_function
         uncollate_function = get_uncollate_function(train_data_dict["n_vertices"],problem)
         if problem=='tsp':
+            symmetric_problem=False
             exp_helper._criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(weight=None))
         
     
@@ -251,7 +253,8 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
         if not is_dgl:
             trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
         else:
-            trainer.train_triplet_dgl(train_loader,model,optimizer,exp_helper,device,epoch,uncollate_function,eval_score=True,print_freq=train['print_freq'])
+            trainer.train_triplet_dgl(train_loader,model,optimizer,exp_helper,device,epoch,uncollate_function,
+                                        sym_problem=symmetric_problem,eval_score=True,print_freq=train['print_freq'])
         
 
         if not is_dgl:
