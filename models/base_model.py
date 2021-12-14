@@ -17,7 +17,7 @@ class BaseModel(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.depth_of_mlp = depth_of_mlp
-        self.embed = input_embed        
+        self.embed = input_embed
 
         # First part - sequential mlp blocks
         if not self.embed:

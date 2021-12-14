@@ -56,11 +56,11 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     if sparsify is not None:
         mask = torch.zeros_like(connectivity)
         assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
-        knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1]
-        for i in range(N):
-            for j in knns[i]:
-                if i!=j:
-                    mask[i,j] = mask[j,i] = 1
+        knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
+        range_tensor = torch.tensor(range(N)).unsqueeze(-1)
+        mask[range_tensor,knns,1] = 1
+        mask[:,:,1] = mask[:,:,1]*(1-torch.eye(N)) #Remove the self value
+        mask[:,:,0] = sparsify*torch.eye(N)
     connectivity = connectivity*mask
     adjacency = (connectivity!=0).to(torch.float)
     gdgl = _connectivity_to_dgl_adj(adjacency)
@@ -92,11 +92,11 @@ def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=None):
     if sparsify is not None:
         mask = torch.zeros_like(connectivity)
         assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
-        knns = npargpartition(nparray(distances), kth=sparsify, axis=-1)[:, sparsify ::-1]
-        for i in range(N):
-            for j in knns[i]:
-                if i!=j:
-                    mask[i,j] = mask[j,i] = 1
+        knns = npargpartition(nparray(distances), kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
+        range_tensor = torch.tensor(range(N)).unsqueeze(-1)
+        mask[range_tensor,knns,1] = 1
+        mask[:,:,1] = mask[:,:,1]*(1-torch.eye(N)) #Remove the self value
+        mask[:,:,0] = sparsify*torch.eye(N)
     connectivity = connectivity*mask
     adj = (connectivity[:,:,1]!=0).to(torch.float)
     if torch.all(adj.T + adj == 2*adj): #In case of a symmetric problem, just use a symmetric graph
