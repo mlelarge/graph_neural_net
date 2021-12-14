@@ -179,14 +179,14 @@ class GatedGCNNet(nn.Module):
     def __init__(self, n_layers=4,original_features_num=1,in_features=20,out_features=20, **kwargs):
         super().__init__()
         in_dim = original_features_num
-        in_dim_edge = 1
+        in_dim_edge = 1 #Only distances
         hidden_dim = in_features
         out_dim = out_features
-        n_classes = 2
-        dropout = 0# net_params['dropout']
+        n_classes = 2 #According to benchmarkinggnns
+        dropout = 0 
         n_layers = n_layers
         self.batch_norm = True #net_params['batch_norm']
-        self.residual = False
+        self.residual = True
         self.n_classes = n_classes
         
         self.embedding_h = nn.Linear(in_dim, hidden_dim)
