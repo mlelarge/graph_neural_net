@@ -45,7 +45,7 @@ def _dgl_adj_to_connectivity(dglgraph):
     connectivity[indices, indices, 0] = degrees
     return connectivity
 
-def _connectivity_to_dgl_edge(connectivity,sparsify=None):
+def _connectivity_to_dgl_edge(connectivity,sparsify=False):
     """Converts a connectivity tensor to a dgl graph with edge and node features.
     if 'sparsify' is specified, it should be an integer : the number of closest nodes to keep
     """
@@ -53,7 +53,7 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=None):
     N,_,_ = connectivity.shape
     distances = connectivity[:,:,1]
     mask = torch.ones_like(connectivity)
-    if sparsify is not None:
+    if sparsify:
         mask = torch.zeros_like(connectivity)
         assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
         knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
@@ -83,13 +83,13 @@ def connectivity_to_dgl(connectivity_graph):
             return _connectivity_to_dgl_adj(connectivity_graph)
         return _connectivity_to_dgl_edge(connectivity_graph)
 
-def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=None):
+def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=False):
     """Prepares the dgl for tsp with node features being the node coordinates"""
     assert len(connectivity.shape)==3,"Should have a shape of N,N,2"
     N,_,_ = connectivity.shape
     distances = connectivity[:,:,1]
     mask = torch.ones_like(connectivity)
-    if sparsify is not None:
+    if sparsify:
         mask = torch.zeros_like(connectivity)
         assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
         knns = npargpartition(nparray(distances), kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
