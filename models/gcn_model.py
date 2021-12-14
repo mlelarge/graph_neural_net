@@ -99,7 +99,8 @@ def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=None):
                     mask[i,j] = mask[j,i] = 1
     connectivity = connectivity*mask
     adj = (connectivity[:,:,1]!=0).to(torch.float)
-    
+    if torch.all(adj.T + adj == 2*adj): #In case of a symmetric problem, just use a symmetric graph
+        adj = torch.triu(adj)
     
     mgrid = npmgrid[:N,:N].transpose(1,2,0)
     edges = mgrid[torch.where(adj==1)]
