@@ -218,7 +218,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
         uncollate_function = get_uncollate_function(train_data_dict["n_vertices"],problem)
         if problem=='tsp':
             symmetric_problem=False
-            exp_helper._criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(weight=None))
+            exp_helper._criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(reduction='none',weight=None), normalize = torch.nn.Softmax(dim=-1))
         
     
     generator = exp_helper.generator
