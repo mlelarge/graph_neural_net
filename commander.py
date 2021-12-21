@@ -248,38 +248,42 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     model.to(device)
 
     is_best = True
-    for epoch in range(train['epoch']):
-        print('Current epoch: ', epoch)
-        if not is_dgl:
-            trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
-        else:
-            trainer.train_triplet_dgl(train_loader,model,optimizer,exp_helper,device,epoch,uncollate_function,
-                                        sym_problem=symmetric_problem,eval_score=True,print_freq=train['print_freq'])
-        
+    try:
+        for epoch in range(train['epoch']):
+            print('Current epoch: ', epoch)
+            if not is_dgl:
+                trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
+            else:
+                trainer.train_triplet_dgl(train_loader,model,optimizer,exp_helper,device,epoch,uncollate_function,
+                                            sym_problem=symmetric_problem,eval_score=True,print_freq=train['print_freq'])
+            
 
-        if not is_dgl:
-            relevant_metric, loss = trainer.val_triplet(val_loader,model,exp_helper,device,epoch,eval_score=True)
-        else:
-            relevant_metric, loss = trainer.val_triplet_dgl(val_loader,model,exp_helper,device,epoch,uncollate_function,eval_score=True)
-        scheduler.step(loss)
-        # remember best acc and save checkpoint
-        #TODO : if relevant metric is like a loss and needs to decrease, this doesn't work
-        is_best = (relevant_metric > best_score)
-        best_score = max(relevant_metric, best_score)
-        if True == is_best:
-            best_epoch = epoch
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'state_dict': model.state_dict(),
-            'best_score': best_score,
-            'best_epoch': best_epoch,
-            'exp_logger': exp_helper.get_logger(),
-            }, is_best)
+            if not is_dgl:
+                relevant_metric, loss = trainer.val_triplet(val_loader,model,exp_helper,device,epoch,eval_score=True)
+            else:
+                relevant_metric, loss = trainer.val_triplet_dgl(val_loader,model,exp_helper,device,epoch,uncollate_function,eval_score=True)
+            scheduler.step(loss)
+            # remember best acc and save checkpoint
+            #TODO : if relevant metric is like a loss and needs to decrease, this doesn't work
+            is_best = (relevant_metric > best_score)
+            best_score = max(relevant_metric, best_score)
+            if True == is_best:
+                best_epoch = epoch
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': model.state_dict(),
+                'best_score': best_score,
+                'best_epoch': best_epoch,
+                'exp_logger': exp_helper.get_logger(),
+                }, is_best)
 
-        cur_lr = utils.get_lr(optimizer)
-        if exp_helper.stop_condition(cur_lr):
-            print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
-            break
+            cur_lr = utils.get_lr(optimizer)
+            if exp_helper.stop_condition(cur_lr):
+                print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+                break
+    except KeyboardInterrupt:
+        print('-' * 89)
+        print('Exiting from training early because of KeyboardInterrupt')
     if test_enabled:
         eval(use_model=model)
 
