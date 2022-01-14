@@ -5,7 +5,7 @@ from torch.functional import Tensor
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import networkx as nx
-from numpy import indices as npindices
+from numpy import indices as npindices, argpartition as npargpartition, array as nparray
 import dgl
 from dgl.nn import GraphConv
 from numpy import mgrid as npmgrid
@@ -13,13 +13,18 @@ import tqdm
 
 from typing import Tuple
 
+from loaders.data_generator import TSP_Generator
+
 ADJ_UNIQUE_TENSOR = torch.Tensor([0.,1.])
+
+def is_adj(matrix):
+    return torch.all((matrix==0) + (matrix==1))
 
 def _connectivity_to_dgl_adj(connectivity):
     assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
     adj = connectivity[:,:,1] #Keep only the adjacency (discard node degree)
     N,_ = adj.shape
-    assert torch.all((adj==0) + (adj==1)), "This is not an adjacency matrix"
+    assert is_adj(adj), "This is not an adjacency matrix"
     mgrid = npmgrid[:N,:N].transpose(1,2,0)
     edges = mgrid[torch.where(adj==1)]
     edges = edges.T #To have the shape (2,n_edges)
@@ -40,16 +45,30 @@ def _dgl_adj_to_connectivity(dglgraph):
     connectivity[indices, indices, 0] = degrees
     return connectivity
 
-def _connectivity_to_dgl_edge(connectivity,sparsify=None):
+def _connectivity_to_dgl_edge(connectivity,sparsify=False):
     """Converts a connectivity tensor to a dgl graph with edge and node features.
     if 'sparsify' is specified, it should be an integer : the number of closest nodes to keep
     """
     assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
     N,_,_ = connectivity.shape
     distances = connectivity[:,:,1]
-    mask = torch.ones((N,N))
-    if sparsify is not None:
-        pass
+    mask = torch.ones_like(connectivity)
+    if sparsify:
+        mask = torch.zeros_like(connectivity)
+        assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
+        knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
+        range_tensor = torch.tensor(range(N)).unsqueeze(-1)
+        mask[range_tensor,knns,1] = 1
+        mask[:,:,1] = mask[:,:,1]*(1-torch.eye(N)) #Remove the self value
+        mask[:,:,0] = sparsify*torch.eye(N)
+    connectivity = connectivity*mask
+    adjacency = (connectivity!=0).to(torch.float)
+    gdgl = _connectivity_to_dgl_adj(adjacency)
+    src,rst = gdgl.edges() #For now only contains node features
+    efeats = distances[src,rst]
+    gdgl.edata["feat"] = efeats.reshape((efeats.shape[0],1))
+    return gdgl
+
 
 def connectivity_to_dgl(connectivity_graph):
     """Converts a simple connectivity graph (with weights on edges if needed) to a pytorch-geometric data format"""
@@ -60,22 +79,69 @@ def connectivity_to_dgl(connectivity_graph):
         return (graph1,graph2)
     elif len(connectivity_graph.shape)==3:#We assume it's a simple dataset, thus of shape (N,N,in_features)
         assert connectivity_graph.shape[0]==connectivity_graph.shape[1]
-        return _connectivity_to_dgl_adj(connectivity_graph) #CAREFUL, THAT DOESN'T DO EDGE FEATURES WELL, ONLY CONNECTIVITY
+        if is_adj(connectivity_graph[:,:,1]):
+            return _connectivity_to_dgl_adj(connectivity_graph)
+        return _connectivity_to_dgl_edge(connectivity_graph)
 
-def data_to_dgl_format(data_object):
-    return DGL_Loader.from_data_generator(data_object)
+def _connectivity_to_dgl_tsp_nodecoord(connectivity,xs,ys, sparsify=False):
+    """Prepares the dgl for tsp with node features being the node coordinates"""
+    assert len(connectivity.shape)==3,"Should have a shape of N,N,2"
+    N,_,_ = connectivity.shape
+    distances = connectivity[:,:,1]
+    mask = torch.ones_like(connectivity)
+    if sparsify:
+        mask = torch.zeros_like(connectivity)
+        assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
+        knns = npargpartition(nparray(distances), kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
+        range_tensor = torch.tensor(range(N)).unsqueeze(-1)
+        mask[range_tensor,knns,1] = 1
+        mask[:,:,1] = mask[:,:,1]*(1-torch.eye(N)) #Remove the self value
+        mask[:,:,0] = sparsify*torch.eye(N)
+    connectivity = connectivity*mask
+    adj = (connectivity[:,:,1]!=0).to(torch.float)
+    if torch.all(adj.T + adj == 2*adj): #In case of a symmetric problem, just use a symmetric graph
+        adj = torch.triu(adj)
+    
+    mgrid = npmgrid[:N,:N].transpose(1,2,0)
+    edges = mgrid[torch.where(adj==1)]
+    edges = edges.T #To have the shape (2,n_edges)
+    src,dst = [elt for elt in edges[0]], [elt for elt in edges[1]] #DGLGraphs don't like Tensors as inputs...
+    gdgl = dgl.graph((src,dst),num_nodes=N)
+    nodes_coord = [(x,y) for x,y in zip(xs,ys)]
+    node_features = torch.tensor(nodes_coord)
+    gdgl.ndata['feat'] = node_features #Keep only degree
+
+    src,rst = gdgl.edges() #For now only contains node features
+    efeats = distances[src,rst]
+    gdgl.edata["feat"] = efeats.reshape((efeats.shape[0],1))
+    return gdgl
+
+
+def connectivity_to_dgl_tsp(tsp_generator: TSP_Generator,**kwargs):
+    loader = []
+    for (data,target),(xs,ys) in tqdm.tqdm(zip(tsp_generator.data,tsp_generator.positions), total = len(tsp_generator.data)):
+        elt_dgl = _connectivity_to_dgl_tsp_nodecoord(data,xs,ys,**kwargs)
+        loader.append((elt_dgl,target))
+    return loader
+
+def data_to_dgl_format(data_object,problem=None,**kwargs):
+    return DGL_Loader.from_data_generator(data_object,problem,**kwargs)
 
 class DGL_Loader(torch.utils.data.Dataset):
     def __init__(self):
         self.data = []
     
     @staticmethod
-    def from_data_generator(data_object):
+    def from_data_generator(data_object, problem, **kwargs):
         loader = DGL_Loader()
         print("Converting data to DGL format")
-        for data,target in tqdm.tqdm(data_object.data):
-            elt_dgl = connectivity_to_dgl(data)
-            loader.data.append((elt_dgl,target))
+        if problem=='tsp':
+            loader_iterable = connectivity_to_dgl_tsp(data_object,**kwargs)
+            loader.data = loader_iterable
+        else:
+            for data,target in tqdm.tqdm(data_object.data):
+                elt_dgl = connectivity_to_dgl(data)
+                loader.data.append((elt_dgl,target))
         print("Conversion ended.")
         return loader
     

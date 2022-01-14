@@ -10,8 +10,6 @@ import toolbox.utils as utils
 import math
 from toolbox.searches import mcp_beam_method
 import timeit
-import time
-import signal
 from sklearn.decomposition import PCA
 from numpy import pi,angle,cos,sin
 from numpy.random import default_rng
@@ -75,7 +73,7 @@ def noise(name):
     return decorator
 
 @noise("ErdosRenyi")
-def noise_erdos_renyi(W, noise, edge_density):
+def noise_erdos_renyi(g, W, noise, edge_density):
     n_vertices = len(W)
     pe1 = noise
     pe2 = (edge_density*noise)/(1-edge_density)
@@ -106,7 +104,7 @@ def noise_edge_swap(g, W, noise, edge_density): #Permet de garder la regularite
     g_noise = g.copy()
     edges_iter = list(itertools.chain(iter(g.edges), ((v, u) for (u, v) in g.edges)))
     for u,v in edges_iter:
-        if random.random() < noise:
+        if random.random() < noise:             
             for s, t in edges_iter:
                 if random.random() < noise and is_swappable(g_noise, u, v, s, t):
                     do_swap(g_noise, u, v, s, t)
@@ -247,6 +245,9 @@ class Base_Generator(torch.utils.data.Dataset):
             print('Saving dataset at {}'.format(path))
             torch.save(self.data, path)
     
+    def remove_file(self):
+        os.remove(os.path.join(self.path_dataset, self.name + '.pkl'))
+    
     def create_dataset(self):
         for _ in tqdm.tqdm(range(self.num_examples)):
             example = self.compute_example()
@@ -298,7 +299,7 @@ class QAP_Generator(Base_Generator):
             raise ValueError('Generative model {} not supported'
                              .format(self.generative_model))
         try:
-            W_noise = NOISE_FUNCTIONS[self.noise_model](W, self.noise, self.edge_density)
+            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, self.edge_density)
         except KeyError:
             raise ValueError('Noise model {} not supported'
                              .format(self.noise_model))

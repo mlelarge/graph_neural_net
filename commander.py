@@ -9,6 +9,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from models import get_model,get_model_gen
 from loaders.siamese_loaders import get_loader
+from toolbox.losses import tsp_loss
 from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
@@ -151,12 +152,13 @@ def init_output_env(_config, root_dir, log_dir, path_dataset):
         json.dump(_config, f)
 
 @ex.capture
-def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, log_dir, model_path, filename='checkpoint.pth.tar'):
     utils.check_dir(log_dir)
     filename = os.path.join(log_dir, filename)
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, os.path.join(log_dir, 'model_best.pth.tar'))
+        shutil.copyfile(filename, model_path)
         print(f"Best Model yet : saving at {log_dir+'model_best.pth.tar'}")
 
     fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')
@@ -207,10 +209,17 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
         problem = 'mcptrue'
     exp_helper = init_helper(problem)
 
-    if arch!='fgnn':
+    is_dgl = False
+    if arch['arch']!='fgnn':
+        is_dgl=True
+        symmetric_problem=True
+        print(f"Arch : {arch['arch']}")
         from loaders.siamese_loaders import get_uncollate_function
-        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"])
-        exp_helper.criterion = lambda output, target : exp_helper.criterion(uncollate_function(output), target)
+        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"],problem)
+        if problem=='tsp':
+            symmetric_problem=False
+            exp_helper._criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(reduction='none',weight=None), normalize = torch.nn.Softmax(dim=-1))
+        
     
     generator = exp_helper.generator
     
@@ -221,9 +230,9 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     gene_val.load_dataset()
     
     train_loader = get_loader(arch['arch'],gene_train, train['batch_size'],
-                                  gene_train.constant_n_vertices)
+                                  gene_train.constant_n_vertices,problem=problem,sparsify=train_data_dict['sparsify'])
     val_loader = get_loader(arch['arch'],gene_val, train['batch_size'],
-                                gene_val.constant_n_vertices)
+                                gene_val.constant_n_vertices,problem=problem,sparsify=train_data_dict['sparsify'])
     
     model = get_model_gen(arch)
     optimizer, scheduler = get_optimizer(train,model)
@@ -239,32 +248,42 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     model.to(device)
 
     is_best = True
-    for epoch in range(train['epoch']):
-        print('Current epoch: ', epoch)
-        trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
-        
+    try:
+        for epoch in range(train['epoch']):
+            print('Current epoch: ', epoch)
+            if not is_dgl:
+                trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
+            else:
+                trainer.train_triplet_dgl(train_loader,model,optimizer,exp_helper,device,epoch,uncollate_function,
+                                            sym_problem=symmetric_problem,eval_score=True,print_freq=train['print_freq'])
+            
 
+            if not is_dgl:
+                relevant_metric, loss = trainer.val_triplet(val_loader,model,exp_helper,device,epoch,eval_score=True)
+            else:
+                relevant_metric, loss = trainer.val_triplet_dgl(val_loader,model,exp_helper,device,epoch,uncollate_function,eval_score=True)
+            scheduler.step(loss)
+            # remember best acc and save checkpoint
+            #TODO : if relevant metric is like a loss and needs to decrease, this doesn't work
+            is_best = (relevant_metric > best_score)
+            best_score = max(relevant_metric, best_score)
+            if True == is_best:
+                best_epoch = epoch
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': model.state_dict(),
+                'best_score': best_score,
+                'best_epoch': best_epoch,
+                'exp_logger': exp_helper.get_logger(),
+                }, is_best)
 
-        relevant_metric, loss = trainer.val_triplet(val_loader,model,exp_helper,device,epoch,eval_score=True)
-        scheduler.step(loss)
-        # remember best acc and save checkpoint
-        #TODO : if relevant metric is like a loss and needs to decrease, this doesn't work
-        is_best = (relevant_metric > best_score)
-        best_score = max(relevant_metric, best_score)
-        if True == is_best:
-            best_epoch = epoch
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'state_dict': model.state_dict(),
-            'best_score': best_score,
-            'best_epoch': best_epoch,
-            'exp_logger': exp_helper.get_logger(),
-            }, is_best)
-
-        cur_lr = utils.get_lr(optimizer)
-        if exp_helper.stop_condition(cur_lr):
-            print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
-            break
+            cur_lr = utils.get_lr(optimizer)
+            if exp_helper.stop_condition(cur_lr):
+                print(f"Learning rate ({cur_lr}) under stopping threshold, ending training.")
+                break
+    except KeyboardInterrupt:
+        print('-' * 89)
+        print('Exiting from training early because of KeyboardInterrupt')
     if test_enabled:
         eval(use_model=model)
 
@@ -309,7 +328,7 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, us
     print('Using device:', device)
 
     if use_model is None:
-        model = get_model(arch)
+        model = get_model_gen(arch)
         model.to(device)
         model = load_model(model, device)
     else:
@@ -323,11 +342,21 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, us
     
     helper = init_helper(problem)
 
+    if arch['arch']!='fgnn':
+        print(f"Arch : {arch['arch']}")
+        from loaders.siamese_loaders import get_uncollate_function
+        uncollate_function = get_uncollate_function(test_data_dict["n_vertices"])
+        cur_crit = helper.criterion
+        cur_eval = helper.eval_function
+        helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
+        helper.eval_function = lambda output, target : cur_eval(uncollate_function(output), target)
+
+
     gene_test = helper.generator('test', test_data_dict)
     gene_test.load_dataset()
 
     test_loader = get_loader(arch['arch'],gene_test, train['batch_size'],
-                                 gene_test.constant_n_vertices)
+                                 gene_test.constant_n_vertices,problem=problem)
     
     relevant_metric, loss = trainer.val_triplet(test_loader, model, helper, device,
                                     epoch=0, eval_score=True,

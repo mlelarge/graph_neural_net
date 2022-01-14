@@ -54,11 +54,6 @@ class DataHandler():
                 break
         return exists
     
-    def to_do(self, column_name, value):
-        exists = self.exists(column_name,value) #Checks if a corresponding line exists
-        # The second part checks if this (these ? It doesn't check there is only one line) line contains a missing value
-        return (not exists) or self.data.loc[self.data[column_name]==value].isnull().values.any()
-    
     def add_entry(self, line : dict, save=True) -> None:
         self.new_columns(line.keys())
         if not self.line_exists(line):
@@ -75,11 +70,41 @@ class DataHandler():
                 for key in line.keys():
                     self.data.loc[self.data[value_key]==value, key] = line[key]
 
-
-
 Task = namedtuple('Task',['column_name','value'])
 
 class Planner(DataHandler):
+    def __init__(self, filepath, Task_Type=Task) -> None:
+        super().__init__(filepath)
+        self.tasks = deque()
+        self.Task_Type = Task_Type
+    
+    @property
+    def n_tasks(self):
+        return len(self.tasks)
+    
+    def add_task(self, task)->None:
+        if self.to_do(task):
+            self.tasks.append(self.Task_Type(*task))
+    
+    def add_tasks(self, tasks) -> None:
+        """tasks should be a list of tuples (column_name, value)"""
+        for task in tasks:
+            self.add_task(*task)
+
+    def has_tasks(self):
+        return len(self.tasks)!=0
+
+    def next_task(self):
+        if len(self.tasks)==0:
+            return ()
+        return self.tasks.pop()
+        
+    def to_do(self, column_name, value):
+        exists = self.exists(column_name,value) #Checks if a corresponding line exists
+        # The second part checks if this (these ? It doesn't check there is only one line) line contains a missing value
+        return (not exists) or self.data.loc[self.data[column_name]==value].isnull().values.any()
+
+class Planner_Multi(DataHandler):
     def __init__(self, filepath) -> None:
         super().__init__(filepath)
         self.tasks = deque()
@@ -88,14 +113,18 @@ class Planner(DataHandler):
     def n_tasks(self):
         return len(self.tasks)
     
+    def to_do(self, task):
+        task_dict = task._asdict()
+        return (not self.line_exists(task_dict))
+    
     def add_task(self, task)->None:
-        if self.to_do(*task):
-            self.tasks.append(Task(*task))
+        if self.to_do(task):
+            self.tasks.append(task)
     
     def add_tasks(self, tasks) -> None:
         """tasks should be a list of tuples (column_name, value)"""
         for task in tasks:
-            self.add_task(*task)
+            self.add_task(task)
 
     def has_tasks(self):
         return len(self.tasks)!=0

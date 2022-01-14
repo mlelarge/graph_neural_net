@@ -4,7 +4,7 @@ from models.layers import RegularBlock, ColumnMaxPooling
 
 
 class BaseModel(nn.Module):
-    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp, **kwargs):
+    def __init__(self, original_features_num, num_blocks, in_features,out_features, depth_of_mlp, input_embed=False, **kwargs):
         """
         take a batch of graphs (bs, n_vertices, n_vertices, in_features)
         and return a batch of graphs with new features
@@ -17,16 +17,19 @@ class BaseModel(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.depth_of_mlp = depth_of_mlp
-        self.embedding = nn.Embedding(2,in_features)
-        
+        self.embed = input_embed
+
         # First part - sequential mlp blocks
-        #last_layer_features = self.original_features_num
-        last_layer_features = self.in_features
+        if not self.embed:
+            last_layer_features = self.original_features_num
+        else:
+            self.embedding = nn.Embedding(2,in_features)
+            last_layer_features = self.in_features
         self.reg_blocks = nn.ModuleList()
         for i in range(self.num_blocks-1):
             mlp_block = RegularBlock(last_layer_features, in_features, self.depth_of_mlp, name=f'block_{i}')
             self.reg_blocks.append(mlp_block)
-            #last_layer_features = in_features
+            last_layer_features = in_features
         mlp_block = RegularBlock(in_features,out_features,depth_of_mlp,name=f'block_{self.num_blocks-1}')
         self.reg_blocks.append(mlp_block)
 
@@ -36,8 +39,8 @@ class BaseModel(nn.Module):
             print("expected input feature {} and got {}".format(self.original_features_num,x.shape[3]))
             return
         #x = x.permute(0, 3, 1, 2)
-        
-        x = self.embedding(x[:,:,:,1].long())
+        if self.embed:
+            x = self.embedding(x[:,:,:,1].long())
         x = x.permute(0, 3, 1, 2)
         #print(x.shape)
         #expects x.shape = (bs, n_features, n_vertices, n_vertices)
@@ -68,7 +71,7 @@ class Simple_Node_Embedding(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.depth_of_mlp =depth_of_mlp
-        self.base_model = BaseModel(original_features_num, num_blocks, in_features,out_features, depth_of_mlp)
+        self.base_model = BaseModel(original_features_num, num_blocks, in_features,out_features, depth_of_mlp, **kwargs)
         self.suffix = ColumnMaxPooling()
 
     def forward(self, x):
@@ -90,7 +93,7 @@ class Simple_Edge_Embedding(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.depth_of_mlp =depth_of_mlp
-        self.base_model = BaseModel(original_features_num, num_blocks, in_features,in_features, depth_of_mlp)
+        self.base_model = BaseModel(original_features_num, num_blocks, in_features,in_features, depth_of_mlp, **kwargs)
         self.last_mlp = nn.Conv2d(in_features,out_features,kernel_size=1, padding=0, bias=True)
 
     def forward(self, x):
