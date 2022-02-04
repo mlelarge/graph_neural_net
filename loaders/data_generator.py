@@ -7,24 +7,93 @@ from numpy import diag_indices
 import torch
 import torch.utils
 import toolbox.utils as utils
-import math
-from toolbox.searches import mcp_beam_method
-import timeit
+#from toolbox.searches import mcp_beam_method
 from sklearn.decomposition import PCA
-from numpy import pi,angle,cos,sin
+#from numpy import pi,angle,cos,sin
 from numpy.random import default_rng
 import tqdm
+from numpy import mgrid as npmgrid
+import dgl
+from numpy import indices as npindices, argpartition as npargpartition, array as nparray
 
-try:
-    from concorde.tsp import TSPSolver
-except ModuleNotFoundError:
-    print("Trying to continue without pyconcorde as it is not installed. TSP data generation will fail.")
+#try:
+#    from concorde.tsp import TSPSolver
+#except ModuleNotFoundError:
+#    print("Trying to continue without pyconcorde as it is not installed. TSP data generation will fail.")
 
 rng = default_rng(41)
 
 GENERATOR_FUNCTIONS = {}
-GENERATOR_FUNCTIONS_TSP = {}
-GENERATOR_FUNCTIONS_HHC = {}
+# GENERATOR_FUNCTIONS_TSP = {}
+# GENERATOR_FUNCTIONS_HHC = {}
+ADJ_UNIQUE_TENSOR = torch.Tensor([0.,1.])
+
+def is_adj(matrix):
+    return torch.all((matrix==0) + (matrix==1))
+
+def _connectivity_to_dgl_adj(connectivity):
+    assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
+    adj = connectivity[:,:,1] #Keep only the adjacency (discard node degree)
+    N,_ = adj.shape
+    assert is_adj(adj), "This is not an adjacency matrix"
+    mgrid = npmgrid[:N,:N].transpose(1,2,0)
+    edges = mgrid[torch.where(adj==1)]
+    edges = edges.T #To have the shape (2,n_edges)
+    src,dst = [elt for elt in edges[0]], [elt for elt in edges[1]] #DGLGraphs don't like Tensors as inputs...
+    gdgl = dgl.graph((src,dst),num_nodes=N)
+    gdgl.ndata['feat'] = connectivity[:,:,0].diagonal().reshape((N,1)) #Keep only degree
+    return gdgl
+
+def _dgl_adj_to_connectivity(dglgraph):
+    N = len(dglgraph.nodes())
+    connectivity = torch.zeros((N,N,2))
+    edges = dglgraph.edges()
+    for i in range(dglgraph.num_edges()):
+        connectivity[edges[0][i],edges[1][i],1] = 1
+    degrees = connectivity[:,:,1].sum(1)
+    indices = torch.arange(N)
+    print(degrees.shape)
+    connectivity[indices, indices, 0] = degrees
+    return connectivity
+
+def _connectivity_to_dgl_edge(connectivity,sparsify=False):
+    """Converts a connectivity tensor to a dgl graph with edge and node features.
+    if 'sparsify' is specified, it should be an integer : the number of closest nodes to keep
+    """
+    assert len(connectivity.shape)==3, "Should have a shape of N,N,2"
+    N,_,_ = connectivity.shape
+    distances = connectivity[:,:,1]
+    mask = torch.ones_like(connectivity)
+    if sparsify:
+        mask = torch.zeros_like(connectivity)
+        assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
+        knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
+        range_tensor = torch.tensor(range(N)).unsqueeze(-1)
+        mask[range_tensor,knns,1] = 1
+        mask[:,:,1] = mask[:,:,1]*(1-torch.eye(N)) #Remove the self value
+        mask[:,:,0] = sparsify*torch.eye(N)
+    connectivity = connectivity*mask
+    adjacency = (connectivity!=0).to(torch.float)
+    gdgl = _connectivity_to_dgl_adj(adjacency)
+    src,rst = gdgl.edges() #For now only contains node features
+    efeats = distances[src,rst]
+    gdgl.edata["feat"] = efeats.reshape((efeats.shape[0],1))
+    return gdgl
+
+
+def connectivity_to_dgl(connectivity_graph):
+    """Converts a simple connectivity graph (with weights on edges if needed) to a pytorch-geometric data format"""
+    if len(connectivity_graph.shape)==4:#We assume it's a siamese dataset, thus of shape (2,N,N,in_features)
+        assert connectivity_graph.shape[0]==2
+        assert connectivity_graph.shape[1]==connectivity_graph.shape[2]
+        graph1,graph2 = connectivity_to_dgl(connectivity_graph[0]), connectivity_to_dgl(connectivity_graph[1])
+        return (graph1,graph2)
+    elif len(connectivity_graph.shape)==3:#We assume it's a simple dataset, thus of shape (N,N,in_features)
+        assert connectivity_graph.shape[0]==connectivity_graph.shape[1]
+        if is_adj(connectivity_graph[:,:,1]):
+            return _connectivity_to_dgl_adj(connectivity_graph)
+        return _connectivity_to_dgl_edge(connectivity_graph)
+
 
 class TimeOutException(Exception):
     pass
@@ -120,138 +189,57 @@ def adjacency_matrix_to_tensor_representation(W):
     B[indices, indices, 0] = degrees
     return B
 
-##TSP Generation functions
-
-def dist_from_pos(pos):
-    N = len(pos)
-    W_dist = torch.zeros((N,N))
-    for i in range(0,N-1):
-        for j in range(i+1,N):
-            curr_dist = math.sqrt( (pos[i][0]-pos[j][0])**2 + (pos[i][1]-pos[j][1])**2)
-            W_dist[i,j] = curr_dist
-            W_dist[j,i] = curr_dist
-    return W_dist
-
-def generates_TSP(name):
-    """ Register a generator function for a graph distribution """
-    def decorator(func):
-        GENERATOR_FUNCTIONS_TSP[name] = func
-        return func
-    return decorator
-
-@generates_TSP("GaussNormal")
-def generate_gauss_normal_netx(N):
-    """ Generate random graph with points"""
-    pos = {i: (random.gauss(0, 1), random.gauss(0, 1)) for i in range(N)} #Define the positions of the points
-    W_dist = dist_from_pos(pos)
-    g = networkx.random_geometric_graph(N,0,pos=pos)
-    g.add_edges_from(networkx.complete_graph(N).edges)
-    return g, torch.as_tensor(W_dist, dtype=torch.float)
-
-@generates_TSP("Square01")
-def generate_square_netx(N):
-    pos = {i: (random.random(), random.random()) for i in range(N)} #Define the positions of the points
-    W_dist = dist_from_pos(pos)
-    g = networkx.random_geometric_graph(N,0,pos=pos)
-    g.add_edges_from(networkx.complete_graph(N).edges)
-    return g, torch.as_tensor(W_dist, dtype=torch.float)
-
-def distance_matrix_tensor_representation(W):
-    """ Create a tensor B[:,:,1] = W and B[i,i,0] = deg(i)"""
-    W_adjacency = torch.sign(W)
-    degrees = W_adjacency.sum(1)
-    B = torch.zeros((len(W), len(W), 2))
-    B[:, :, 1] = W
-    indices = torch.arange(len(W))
-    B[indices, indices, 0] = degrees
-    return B
-
-def normalize_tsp(xs,ys):
-    """ 'Normalizes' points positions by moving they in a way where the principal component of the point cloud is directed vertically"""
-    X = [(x,y) for x,y in zip(xs,ys)]
-    pca = PCA(n_components=1)
-    pca.fit(X)
-    pc = pca.components_[0]
-    rot_angle = pi/2 - angle(pc[0]+1j*pc[1])
-    x_rot = [ x*cos(rot_angle) - y*sin(rot_angle) for x,y in X ]
-    y_rot = [ x*sin(rot_angle) + y*cos(rot_angle) for x,y in X ]
-    return x_rot,y_rot
-
-#HHC Generation functions
-
-def generates_HHC(name):
-    """Registers a generator function for HHC problem """
-    def decorator(func):
-        GENERATOR_FUNCTIONS_HHC[name] = func
-        return func
-    return decorator
-
-@generates_HHC('Gauss')
-def generate_gauss_hhc(n,lam,mu):
-    """ Using gaussian distribution for the HHC. The information limit is $\mu^2 \ge 4log(n)$ for lambda=0"""
-    W_weights = rng.normal(loc=mu,scale=1,size=(n,n)) #Outside of the cycle
-    diag = rng.normal(loc=lam,scale=1,size=n) #HHC cycle distribution 
-    for i in range(n):
-        W_weights[i,(i+1)%n] = diag[i]
-    W_weights/=W_weights.std()
-    W_weights-=W_weights.mean()
-    return W_weights
-
-@generates_HHC('UniformMean')
-def generate_uniform(n,lam,mu):
-    """ Using uniform distribution for the HHC, with a moved mean """
-    W_weights = rng.uniform(size=(n,n))+mu
-    diag = rng.uniform(size=n)+lam
-    for i in range(n):
-        W_weights[i,(i+1)%n] = diag[i]
-    W_weights/=W_weights.std()
-    W_weights-=W_weights.mean()
-    return W_weights
-
-@generates_HHC('Poisson')
-def generate_poisson_hhc(n,lam,mu):
-    raise NotImplementedError
-
-def weight_matrix_to_tensor_representation(W):
-    """ Create a tensor B[:,:,1] = W and B[i,i,0] = deg(i)"""
-    degrees = W.sum(1)
-    B = torch.zeros((len(W), len(W), 2), dtype=torch.float)
-    B[:, :, 1] = W
-    indices = torch.arange(len(W))
-    B[indices, indices, 0] = degrees
-    return B
-
 class Base_Generator(torch.utils.data.Dataset):
     def __init__(self, name, path_dataset, num_examples):
         self.path_dataset = path_dataset
         self.name = name
         self.num_examples = num_examples
 
-    def load_dataset(self):
+    def load_dataset(self, use_dgl= False):
         """
         Look for required dataset in files and create it if
         it does not exist
         """
         filename = self.name + '.pkl'
+        filename_dgl = self.name + '_dgl.pkl'
         path = os.path.join(self.path_dataset, filename)
+        path_dgl = os.path.join(self.path_dataset, filename_dgl)
         if os.path.exists(path):
-            print('Reading dataset at {}'.format(path))
-            data = torch.load(path)
+            if use_dgl:
+                print('Reading dataset at {}'.format(path_dgl))
+                data = torch.load(path_dgl)
+            else:
+                print('Reading dataset at {}'.format(path))
+                data = torch.load(path)
             self.data = list(data)
         else:
             print('Creating dataset at {}'.format(path))
-            self.data = []
-            self.create_dataset()
+            l_data = self.create_dataset()
             print('Saving dataset at {}'.format(path))
-            torch.save(self.data, path)
+            torch.save(l_data, path)
+            print('Creating dataset at {}'.format(path_dgl))
+            print("Converting data to DGL format")
+            l_data_dgl = []
+            for data,target in tqdm.tqdm(l_data):
+                elt_dgl = connectivity_to_dgl(data)
+                l_data_dgl.append((elt_dgl,target))
+            print("Conversion ended.")
+            print('Saving dataset at {}'.format(path_dgl))
+            torch.save(l_data_dgl, path_dgl)
+            if use_dgl:
+                self.data = l_data_dgl
+            else:
+                self.data = l_data
     
     def remove_file(self):
         os.remove(os.path.join(self.path_dataset, self.name + '.pkl'))
     
     def create_dataset(self):
+        l_data = []
         for _ in tqdm.tqdm(range(self.num_examples)):
             example = self.compute_example()
-            self.data.append(example)
+            l_data.append(example)
+        return l_data
 
     def __getitem__(self, i):
         """ Fetch sample at index i """
@@ -265,7 +253,7 @@ class QAP_Generator(Base_Generator):
     """
     Build a numpy dataset of pairs of (Graph, noisy Graph)
     """
-    def __init__(self, name, args):
+    def __init__(self, name, args, path_dataset):
         self.generative_model = args['generative_model']
         self.noise_model = args['noise_model']
         self.edge_density = args['edge_density']
@@ -278,8 +266,7 @@ class QAP_Generator(Base_Generator):
                                                      num_examples,
                                                      n_vertices, vertex_proba,
                                                      self.noise, self.edge_density)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
+        path_dataset = os.path.join(path_dataset, subfolder_name)
         super().__init__(name, path_dataset, num_examples)
         self.data = []
         self.constant_n_vertices = (vertex_proba == 1.)
@@ -308,610 +295,63 @@ class QAP_Generator(Base_Generator):
         data = torch.cat((B.unsqueeze(0),B_noise.unsqueeze(0)))
         return (data,torch.empty(0)) #Empty tensor used as dummy data
 
-class TSP_Generator(Base_Generator):
-    """
-    Traveling Salesman Problem Generator.
-    Uses the pyconcorde wrapper : see https://github.com/jvkersch/pyconcorde (thanks a lot)
-    """
-    def __init__(self, name, args, coeff=1e8):
-        self.generative_model = args['generative_model']
-        self.distance = args['distance_used']
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'TSP_{}_{}_{}_{}'.format(self.generative_model, 
-                                                     self.distance,
-                                                     num_examples,
-                                                     self.n_vertices)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
+
+# class QAP_PP_Generator(Base_Generator):
+#     """
+#     Build a numpy dataset of pairs of (Graph, noisy Graph), aimed at preprocessing
+#     """
+#     def __init__(self, name, args):
+#         self.generative_model = args['generative_model']
+#         self.noise_model = args['noise_model']
+#         self.edge_density = args['edge_density']
+#         self.noise = args['noise']
+#         self.repeat = args['repeat']
+#         num_examples = args['num_examples_' + name]
+#         n_vertices = args['n_vertices']
+#         vertex_proba = args['vertex_proba']
+#         subfolder_name = 'QAPPP_{}_{}_{}_{}_{}_{}_{}'.format(self.generative_model,
+#                                                      self.noise_model,
+#                                                      num_examples,
+#                                                      n_vertices, vertex_proba,
+#                                                      self.noise, self.edge_density)
+#         path_dataset = os.path.join(args['path_dataset'],
+#                                          subfolder_name)
+#         super().__init__(name, path_dataset, num_examples)
+#         self.data = []
+#         self.constant_n_vertices = (vertex_proba == 1.)
+#         self.n_vertices_sampler = torch.distributions.Binomial(n_vertices, vertex_proba)
         
         
-        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
-        self.constant_n_vertices = True
-        self.coeff = coeff
-        self.positions = []
-    
-    def load_dataset(self):
-        """
-        Look for required dataset in files and create it if
-        it does not exist
-        """
-        filename = self.name + '.pkl'
-        path = os.path.join(self.path_dataset, filename)
-        if os.path.exists(path):
-            print('Reading dataset at {}'.format(path))
-            data,pos = torch.load(path)
-            self.data = list(data)
-            self.positions = list(pos)
-        else:
-            print('Creating dataset.')
-            self.data = []
-            self.create_dataset()
-            print('Saving dataset at {}'.format(path))
-            torch.save((self.data,self.positions), path)
+#         utils.check_dir(self.path_dataset)
 
-    def compute_example(self):
-        """
-        Compute pairs (Adjacency, Optimal Tour)
-        """
-        try:
-            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
-        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
+#     def create_dataset(self): #Here, there could be multiple examples, depending on 'self.repeat'
+#         for _ in tqdm.tqdm(range(self.num_examples)):
+#             examples = self.compute_example()
+#             for example in examples:
+#                 if len(self.data)<self.num_examples:
+#                     self.data.append(example)
 
-        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
-        solution = problem.solve(verbose=False)
-        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
-
-        B = distance_matrix_tensor_representation(W)
-        
-        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
-        prec = solution.tour[-1]
-        for i in range(self.n_vertices):
-            curr = solution.tour[i]
-            SOL[curr,prec] = 1
-            SOL[prec,curr] = 1
-            prec = curr
-        
-        self.positions.append((xs,ys))
-        return (B, SOL)
-
-class TSP_normpos_Generator(Base_Generator):
-    """
-    Traveling Salesman Problem Generator.
-    Uses the pyconcorde wrapper : see https://github.com/jvkersch/pyconcorde (thanks a lot)
-    This one uses just the positions as data instead of distances
-    """
-    def __init__(self, name, args, coeff=1e8):
-        self.generative_model = args['generative_model']
-        self.distance = args['distance_used']
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'TSP_normedxy_{}_{}_{}_{}'.format(self.generative_model, 
-                                                     self.distance,
-                                                     num_examples,
-                                                     self.n_vertices)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        
-        
-        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
-        self.constant_n_vertices = True
-        self.coeff = coeff
-        self.positions = []
-    
-    def load_dataset(self):
-        """
-        Look for required dataset in files and create it if
-        it does not exist
-        """
-        filename = self.name + '.pkl'
-        path = os.path.join(self.path_dataset, filename)
-        if os.path.exists(path):
-            print('Reading dataset at {}'.format(path))
-            data,pos = torch.load(path)
-            self.data = list(data)
-            self.positions = list(pos)
-        else:
-            print('Creating dataset.')
-            self.data = []
-            self.create_dataset()
-            print('Saving dataset at {}'.format(path))
-            torch.save((self.data,self.positions), path)
-
-    def compute_example(self):
-        """
-        Compute pairs (Adjacency, Optimal Tour)
-        """
-        try:
-            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
-        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
-        xs,ys = normalize_tsp(xs,ys)
-        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
-        solution = problem.solve(verbose=False)
-        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
-
-        B = torch.zeros((self.n_vertices,self.n_vertices,2))
-        
-        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
-        prec = solution.tour[-1]
-        for i in range(self.n_vertices):
-            curr = solution.tour[i]
-            SOL[curr,prec] = 1
-            SOL[prec,curr] = 1
-            prec = curr
-
-            B[i,i,0] = xs[i]
-            B[i,i,1] = ys[i]
-        
-        self.positions.append((xs,ys))
-        return (B, SOL)
-
-class TSP_custom_Generator(Base_Generator):
-    """
-    This class just has the 'custom_example' method. It is useful for testing a model on custom examples.
-    """
-    def __init__(self, name, args, coeff=1e8):
-        self.distance = args['distance_used']
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'TSP_custom_{}_{}'.format(self.distance,
-                                                     self.n_vertices)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples=1)
-        self.data = []
-        
-        
-        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
-        self.constant_n_vertices = True
-        self.coeff = coeff
-        self.positions = []
-    
-    def custom_example(self,xs,ys):
-        n = len(xs)
-        pos = {i: (xs[i], ys[i]) for i in range(n)} #Define the positions of the points
-        W_dist = dist_from_pos(pos)
-        g = networkx.random_geometric_graph(n,0,pos=pos)
-        g.add_edges_from(networkx.complete_graph(n).edges)
-        W = torch.as_tensor(W_dist, dtype=torch.float)
-
-        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
-        solution = problem.solve(verbose=False)
-        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
-
-        B = distance_matrix_tensor_representation(W)
-        
-        SOL = torch.zeros((n,n),dtype=torch.float)
-        prec = solution.tour[-1]
-        for i in range(n):
-            curr = solution.tour[i]
-            SOL[curr,prec] = 1
-            SOL[prec,curr] = 1
-            prec = curr
-        
-        self.positions.append((xs,ys))
-        self.data.append((B,SOL))
-
-class TSP_RL_Generator(Base_Generator):
-    """
-    Build a numpy dataset of pairs of (Graph, noisy Graph)
-    """
-    def __init__(self, name, args, coeff=1e8):
-        self.generative_model = args['generative_model']
-        self.distance = args['distance_used']
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'TSP_RL_{}_{}_{}_{}'.format(self.generative_model, 
-                                                     self.distance,
-                                                     num_examples,
-                                                     self.n_vertices)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        
-        
-        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
-        self.constant_n_vertices = True
-        self.coeff = coeff
-        self.positions = []
-
-    def compute_example(self):
-        """
-        Compute pairs (Adjacency, Optimal Tour)
-        """
-        try:
-            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
-        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
-
-        W += 1000*torch.eye(self.n_vertices) #~to adding infinity on the edges from a node to itself
-
-        B = distance_matrix_tensor_representation(W)
-        
-        self.positions.append((xs,ys))
-        return (B, W) # Keep the distance matrix W in the target for the loss to be computed
-
-class TSP_Distance_Generator(Base_Generator):
-    """
-    Traveling Salesman Problem Generator.
-    Uses the pyconcorde wrapper : see https://github.com/jvkersch/pyconcorde (thanks a lot)
-    This version uses a vertex distance matrix as the target instead of an adjacency matrix
-    """
-    def __init__(self, name, args, coeff=1e8):
-        self.generative_model = args['generative_model']
-        self.distance = args['distance_used']
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'TSP_DIST_{}_{}_{}_{}'.format(self.generative_model, 
-                                                     self.distance,
-                                                     num_examples,
-                                                     self.n_vertices)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        
-        
-        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
-        self.constant_n_vertices = True
-        self.coeff = coeff
-        self.positions = []
-    
-    def load_dataset(self):
-        """
-        Look for required dataset in files and create it if
-        it does not exist
-        """
-        filename = self.name + '.pkl'
-        path = os.path.join(self.path_dataset, filename)
-        if os.path.exists(path):
-            print('Reading dataset at {}'.format(path))
-            data,pos = torch.load(path)
-            self.data = list(data)
-            self.positions = list(pos)
-        else:
-            print('Creating dataset.')
-            self.data = []
-            self.create_dataset()
-            print('Saving dataset at {}'.format(path))
-            torch.save((self.data,self.positions), path)
-
-    def compute_example(self):
-        """
-        Compute pairs (Adjacency, Optimal Tour)
-        """
-        try:
-            g, W = GENERATOR_FUNCTIONS_TSP[self.generative_model](self.n_vertices)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        xs = [g.nodes[node]['pos'][0] for node in g.nodes]
-        ys = [g.nodes[node]['pos'][1] for node in g.nodes]
-
-        problem = TSPSolver.from_data([self.coeff*elt for elt in xs],[self.coeff*elt for elt in ys],self.distance) #1e8 because Concorde truncates the distance to the nearest integer
-        solution = problem.solve(verbose=False)
-        assert solution.success, f"Couldn't find solution! \n x =  {xs} \n y = {ys} \n {solution}"
-
-        tour = torch.Tensor(solution.tour)
-        W_perm = utils.permute_adjacency(W,tour)
-
-        B = distance_matrix_tensor_representation(W_perm)
-        
-        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
-        distance = torch.cat((torch.arange(self.n_vertices/2),torch.arange(self.n_vertices//2,0,-1))) #Will return a dtype=float, care
-        distance /= self.n_vertices  #To have values between 0 and 1, for normalization
-        for i in range(SOL.shape[0]): #For each vertex
-            SOL[i,:] = distance.roll(i) #Create the distance matrix
-        
-        self.positions.append((xs,ys))
-        return (B, SOL)
-
-class HHCTSP_Generator(Base_Generator):
-    """
-    Hidden Hamilton Cycle Generator, finds the solution for 
-    See article : https://arxiv.org/abs/1804.05436
-    """
-    def __init__(self, name, args, coeff=1e6):
-        self.generative_model = args['generative_model']
-        self.cycle_param = args['cycle_param']
-        self.fill_param  = args['fill_param']
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'HHCTSP_{}_{}_{}_{}_{}'.format(self.generative_model, 
-                                                     self.cycle_param,
-                                                     self.fill_param,
-                                                     num_examples,
-                                                     self.n_vertices)
-        path_dataset = os.path.join(args['path_dataset'],subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        
-        
-        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
-        self.constant_n_vertices = True
-        self.coeff = coeff
-    
-    def load_dataset(self):
-        """
-        Look for required dataset in files and create it if
-        it does not exist
-        """
-        filename = self.name + '.pkl'
-        path = os.path.join(self.path_dataset, filename)
-        if os.path.exists(path):
-            print('Reading dataset at {}'.format(path))
-            data = torch.load(path)
-            self.data = list(data)
-        else:
-            print('Creating dataset.')
-            self.data = []
-            self.create_dataset()
-            print('Saving dataset at {}'.format(path))
-            torch.save(self.data, path)
-    
-    def compute_example(self):
-        try:
-            W = GENERATOR_FUNCTIONS_HHC[self.generative_model](self.n_vertices,self.cycle_param,self.fill_param)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        
-        W = torch.tensor(W,dtype=torch.float)
-
-        W_concorde = (W.detach()*self.coeff).to(int).numpy()
-        W_concorde -= W_concorde.min()
-        W_concorde[diag_indices(self.n_vertices)] =1e8
-        
-        problem = TSPSolver.from_data_explicit(W_concorde)
-        solution = problem.solve(verbose=False)
-        assert solution.success, f"Couldn't find solution! \n W={W_concorde} \n {solution}"
-        
-        B = weight_matrix_to_tensor_representation(W)
-
-        SOL = torch.zeros((self.n_vertices,self.n_vertices),dtype=torch.float)
-        prec = solution.tour[-1]
-        for i in range(self.n_vertices):
-            curr = solution.tour[i]
-            SOL[curr,prec] = 1
-            SOL[prec,curr] = 1
-            prec = curr
-        
-        return (B,SOL)
-
-class HHC_Generator(Base_Generator):
-    """
-    Hidden Hamilton Cycle Generator
-    See article : https://arxiv.org/abs/1804.05436
-    """
-    def __init__(self, name, args):
-        self.generative_model = args['generative_model']
-        self.cycle_param = args['cycle_param']
-        self.fill_param  = args['fill_param']
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'HHC_{}_{}_{}_{}_{}'.format(self.generative_model, 
-                                                     self.cycle_param,
-                                                     self.fill_param,
-                                                     num_examples,
-                                                     self.n_vertices)
-        path_dataset = os.path.join(args['path_dataset'],subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        
-        
-        utils.check_dir(self.path_dataset)#utils.check_dir(self.path_dataset)
-        self.constant_n_vertices = True
-    
-    def load_dataset(self):
-        """
-        Look for required dataset in files and create it if
-        it does not exist
-        """
-        filename = self.name + '.pkl'
-        path = os.path.join(self.path_dataset, filename)
-        if os.path.exists(path):
-            print('Reading dataset at {}'.format(path))
-            data = torch.load(path)
-            self.data = list(data)
-        else:
-            print('Creating dataset.')
-            self.data = []
-            self.create_dataset()
-            print('Saving dataset at {}'.format(path))
-            torch.save(self.data, path)
-
-    def compute_example(self):
-        try:
-            W = GENERATOR_FUNCTIONS_HHC[self.generative_model](self.n_vertices,self.cycle_param,self.fill_param)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        
-        W = torch.tensor(W,dtype=torch.float)
-        SOL = torch.eye(self.n_vertices).roll(1,dims=-1)
-        SOL = (SOL+SOL.T)
-        #W,SOL = utils.permute_adjacency_twin(W,SOL)
-        
-        B = weight_matrix_to_tensor_representation(W)
-        return (B,SOL)
-
-class MCP_Generator(Base_Generator):
-    """
-    Generator for the Maximum Clique Problem.
-    This generator plants a clique of 'clique_size' size in the graph.
-    It is then used as a seed to find a possible bigger clique with this seed
-    """
-    def __init__(self, name, args):
-        self.edge_density = args['edge_density']
-        self.clique_size = int(args['clique_size'])
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'MCP_{}_{}_{}_{}'.format(num_examples,
-                                                           self.n_vertices, 
-                                                           self.clique_size, 
-                                                           self.edge_density)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        self.constant_n_vertices = True
-        utils.check_dir(self.path_dataset)
-
-    def compute_example(self):
-        """
-        
-        """
-        try:
-            g, W = GENERATOR_FUNCTIONS["ErdosRenyi"](self.edge_density, self.n_vertices)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        W, K = self.add_clique(W,self.clique_size)
-        B = adjacency_matrix_to_tensor_representation(W)
-
-
-        k_size = len(torch.where(K.sum(dim=-1)!=0)[0])
-        seed = utils.mcp_adj_to_ind(K)
-        K2 = mcp_beam_method(B,K,seeds=seed,add_singles=False) #Finds a probably better solution with beam search in the form of a list of indices
-        k2_size = len(K2)
-        if k2_size>k_size:
-            K = utils.mcp_ind_to_adj(K2,self.n_vertices)
-        return (B, K)
-        
-    @classmethod
-    def add_clique_base(cls,W,k):
-        K = torch.zeros((len(W),len(W)))
-        K[:k,:k] = torch.ones((k,k)) - torch.eye(k)
-        W[:k,:k] = torch.ones((k,k)) - torch.eye(k)
-        return W, K
-
-    @classmethod
-    def add_clique(cls,W,k):
-        K = torch.zeros((len(W),len(W)))
-        indices = random.sample(range(len(W)),k)
-        l_indices = [(id_i,id_j) for id_i in indices for id_j in indices if id_i!=id_j] #Makes all the pairs of indices where we put the clique (get rid of diagonal terms)
-        t_ind = torch.tensor(l_indices)
-        K[t_ind[:,0],t_ind[:,1]] = 1
-        W[t_ind[:,0],t_ind[:,1]] = 1
-        return W,K
-
-class MCP_True_Generator(Base_Generator):
-    """
-    Generator for the Maximum Clique Pb, which doesn't plant a clique
-    """
-    def __init__(self, name, args):
-        self.edge_density = args['edge_density']
-        self.clique_size = args['clique_size']
-        num_examples = args['num_examples_' + name]
-        self.n_vertices = args['n_vertices']
-        subfolder_name = 'MCP_true_{}_{}_{}_{}'.format(num_examples,
-                                                           self.n_vertices, 
-                                                           self.clique_size, 
-                                                           self.edge_density)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        self.constant_n_vertices = True
-        utils.check_dir(self.path_dataset)
-
-    def compute_example(self):
-        """
-        
-        """
-        try:
-            g, W = GENERATOR_FUNCTIONS["ErdosRenyi"](self.edge_density, self.n_vertices)
-        except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
-        
-        mc = max_clique(g)
-        l_indices = [(id_i,id_j) for id_i in mc for id_j in mc if id_i!=id_j]
-        t_ind = torch.tensor(l_indices)
-        K = torch.zeros_like(W)
-        K[t_ind[:,0],t_ind[:,1]] = 1
-
-        B = adjacency_matrix_to_tensor_representation(W)
-        return (B, K)
-
-class SBM_Generator(Base_Generator):
-    def __init__(self, name, args):
-        self.n_vertices = args['n_vertices']
-        self.p_inter = args['p_inter']
-        self.p_outer = args['p_outer']
-        self.pi_real = self.p_inter/self.n_vertices
-        self.po_real = self.p_outer/self.n_vertices
-        self.alpha = args['alpha']
-        num_examples = args['num_examples_' + name]
-        subfolder_name = 'SBM_{}_{}_{}_{}_{}'.format(num_examples,
-                                                           self.n_vertices,
-                                                           self.alpha, 
-                                                           self.p_inter,
-                                                           self.p_outer)
-        path_dataset = os.path.join(args['path_dataset'],
-                                         subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
-        self.data = []
-        self.constant_n_vertices = True
-        utils.check_dir(self.path_dataset)
-    
-    def compute_example(self):
-        """
-        Computes the pair (data,target). Data is the adjacency matrix. For target, there are 2 interpretations :
-         - if used with similarity : K_{ij} is 1 if node i and j are from the same group
-         - if used with edge probas: K_{ij} is 1 if it's an intra-edge (so i and j from the same group)
-        """
-        n = self.n_vertices
-        n_sub_a = n//2
-        n_sub_b = n - n_sub_a # In case n_vertices is odd
-
-
-        ga = torch.empty((n_sub_a,n_sub_a)).uniform_()
-        ga = (ga<(self.pi_real)).to(torch.float)
-        gb = torch.empty((n_sub_b,n_sub_b)).uniform_()
-        gb = (gb<(self.pi_real)).to(torch.float)
-        ga = utils.symmetrize_matrix(ga)
-        gb = utils.symmetrize_matrix(gb)
-
-        glink = (torch.empty((n_sub_a,n_sub_b)).uniform_()<self.po_real).to(torch.float)
-        
-        adj = torch.zeros((self.n_vertices,self.n_vertices))
-
-        adj[:n_sub_a,:n_sub_a] = ga.detach().clone()
-        adj[:n_sub_a,n_sub_a:] = glink.detach().clone()
-        adj[n_sub_a:,:n_sub_a] = glink.T.detach().clone()
-        adj[n_sub_a:,n_sub_a:] = gb.detach().clone()
-
-
-        K = torch.zeros((n,n))
-        K[:n_sub_a,:n_sub_a] = 1
-        K[n_sub_a:,n_sub_a:] = 1
-        #K,adj = utils.permute_adjacency_twin(K,adj)
-        B = adjacency_matrix_to_tensor_representation(adj)
-        return (B, K) 
-
-
-if __name__=="__main__":
-    #data_args = {"edge_density_a":0.3,"edge_density_b":0.2, "num_examples_train":5,"path_dataset":"dataset_sbm","n_vertices":10}
-    #data_args = {"edge_density":0.7,"planted":True,'clique_size':11,"num_examples_train":1000,"path_dataset":"dataset_test","n_vertices":50}
-    #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":13, 'distance_used':'EUC_2D','generative_model':'Square01'}
-    #data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":10,'generative_model':'Gauss','cycle_param':0,'fill_param':0}
-    data_args = {"num_examples_train":10,"path_dataset":"dataset_test","n_vertices":50,'generative_model':'UniformMean','cycle_param':0,'fill_param':0}
-    g = HHCTSP_Generator("train",data_args)
-    timeit.timeit(g.load_dataset,number=1)
-
+#     def compute_example(self):
+#         """
+#         Compute pairs (Adjacency, noisy Adjacency)
+#         """
+#         n_vertices = int(self.n_vertices_sampler.sample().item())
+#         try:
+#             g, W = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, n_vertices)
+#         except KeyError:
+#             raise ValueError('Generative model {} not supported'
+#                              .format(self.generative_model))
+#         data_list = []
+#         try:
+#             for _ in range(self.repeat):
+#                 current_noise = random.random()*self.noise
+#                 W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, current_noise, self.edge_density)
+#                 B = adjacency_matrix_to_tensor_representation(W)
+#                 B_noise = adjacency_matrix_to_tensor_representation(W_noise)
+#                 data = torch.cat((B.unsqueeze(0),B_noise.unsqueeze(0)))
+#                 example = (data,torch.empty(0))
+#                 data_list.append(example) #Empty tensor used as dummy data
+#         except KeyError:
+#             raise ValueError('Noise model {} not supported'
+#                              .format(self.noise_model))
+#         return data_list 

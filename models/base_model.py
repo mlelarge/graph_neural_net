@@ -47,6 +47,7 @@ class BaseModel(nn.Module):
         #x.shape = (bs, n_features, n_vertices, _)
         #z = torch.zeros((bs,self.in_features,n_vertices,n_vertices))
         for block in self.reg_blocks:
+            #x = x + block(x)
             x = block(x)
         #for i, block in enumerate(self.reg_blocks):
         #    res = block(x)

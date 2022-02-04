@@ -30,22 +30,22 @@ import toolbox.utils as utils
 def get_helper(problem):
     if problem=='qap':
         return QAP_Experiment
-    elif problem=='tsp':
-        return TSP_Experiment
-    elif problem=='tsprl':
-        return TSP_RL_Experiment
-    elif problem=='tspd':
-        return TSP_Distance_Experiment
-    elif problem=='tsppos':
-        return TSP_Position_Experiment
-    elif problem=='hhc':
-        return HHC_Experiment
-    elif problem=='mcp':
-        return MCP_Experiment
-    elif problem=='mcptrue':
-        return MCP_True_Experiment
-    elif problem=='sbm':
-        return SBM_Edge_Experiment
+    # elif problem=='tsp':
+    #     return TSP_Experiment
+    # elif problem=='tsprl':
+    #     return TSP_RL_Experiment
+    # elif problem=='tspd':
+    #     return TSP_Distance_Experiment
+    # elif problem=='tsppos':
+    #     return TSP_Position_Experiment
+    # elif problem=='hhc':
+    #     return HHC_Experiment
+    # elif problem=='mcp':
+    #     return MCP_Experiment
+    # elif problem=='mcptrue':
+    #     return MCP_True_Experiment
+    # elif problem=='sbm':
+    #     return SBM_Edge_Experiment
     else:
         raise NotImplementedError(f"Problem {problem} not implemented.")
 
@@ -203,87 +203,87 @@ class QAP_Experiment(Experiment_Helper):
         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
         super().__init__('qap', name, options=options, run=run)
 
-class TSP_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
-        self.generator = dg.TSP_Generator
-        self._criterion = losses.tsp_loss(loss=loss, normalize=normalize)
-        self.eval_function = lambda raw_scores,target: metrics.compute_f1(raw_scores, target, k_best=2)
+# class TSP_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
+#         self.generator = dg.TSP_Generator
+#         self._criterion = losses.tsp_loss(loss=loss, normalize=normalize)
+#         self.eval_function = lambda raw_scores,target: metrics.compute_f1(raw_scores, target, k_best=2)
         
-        self.metric = 'f1' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super().__init__('tsp', name, options=options, run=run)
+#         self.metric = 'f1' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super().__init__('tsp', name, options=options, run=run)
 
-class TSP_RL_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, normalize = Softmax(dim=-1)) -> None:
-        self.generator = dg.TSP_RL_Generator
-        self._criterion = losses.tsp_rl_loss(normalize=normalize)
-        self.eval_function = metrics.tsp_rl_loss
+# class TSP_RL_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, normalize = Softmax(dim=-1)) -> None:
+#         self.generator = dg.TSP_RL_Generator
+#         self._criterion = losses.tsp_rl_loss(normalize=normalize)
+#         self.eval_function = metrics.tsp_rl_loss
         
-        self.metric = 'loss' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super().__init__('tsp', name, options=options, run=run)
+#         self.metric = 'loss' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super().__init__('tsp', name, options=options, run=run)
 
-class TSP_Distance_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize = Sigmoid) -> None:
-        self.generator = dg.TSP_Distance_Generator
-        self._criterion = losses.tspd_loss(loss=loss, normalize=normalize)
-        self.eval_function = metrics.tspd_dumb
+# class TSP_Distance_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize = Sigmoid) -> None:
+#         self.generator = dg.TSP_Distance_Generator
+#         self._criterion = losses.tspd_loss(loss=loss, normalize=normalize)
+#         self.eval_function = metrics.tspd_dumb
         
-        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super().__init__('tsp', name, options=options, run=run)
+#         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super().__init__('tsp', name, options=options, run=run)
 
-class TSP_Position_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
-        self.generator = dg.TSP_normpos_Generator
-        self._criterion = losses.tsp_loss(loss=loss, normalize=normalize)
-        self.eval_function = lambda raw_scores,target: metrics.compute_f1(raw_scores, target, k_best=2)
+# class TSP_Position_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
+#         self.generator = dg.TSP_normpos_Generator
+#         self._criterion = losses.tsp_loss(loss=loss, normalize=normalize)
+#         self.eval_function = lambda raw_scores,target: metrics.compute_f1(raw_scores, target, k_best=2)
         
-        self.metric = 'f1' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super().__init__('tsp', name, options=options, run=run)
+#         self.metric = 'f1' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super().__init__('tsp', name, options=options, run=run)
 
-class HHC_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
-        self.generator = dg.HHC_Generator
-        self._criterion = losses.hhc_loss(loss=loss, normalize=normalize)
-        self.eval_function = metrics.accuracy_hhc
+# class HHC_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize = Sigmoid) -> None:
+#         self.generator = dg.HHC_Generator
+#         self._criterion = losses.hhc_loss(loss=loss, normalize=normalize)
+#         self.eval_function = metrics.accuracy_hhc
         
-        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super().__init__('hhc', name, options=options, run=run)
+#         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super().__init__('hhc', name, options=options, run=run)
 
-class MCP_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
-        self.generator = dg.MCP_Generator
-        self._criterion = losses.mcp_loss(loss=loss, normalize=normalize)
-        self.eval_function = metrics.accuracy_mcp
+# class MCP_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
+#         self.generator = dg.MCP_Generator
+#         self._criterion = losses.mcp_loss(loss=loss, normalize=normalize)
+#         self.eval_function = metrics.accuracy_mcp
         
-        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super(MCP_Experiment,self).__init__('mcp', name, options=options, run=run)
+#         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super(MCP_Experiment,self).__init__('mcp', name, options=options, run=run)
 
-class MCP_True_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
-        self.generator = dg.MCP_True_Generator
-        self._criterion = losses.mcp_loss(loss=loss, normalize=normalize)
-        self.eval_function = metrics.accuracy_mcp
+# class MCP_True_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
+#         self.generator = dg.MCP_True_Generator
+#         self._criterion = losses.mcp_loss(loss=loss, normalize=normalize)
+#         self.eval_function = metrics.accuracy_mcp
         
-        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super(MCP_True_Experiment,self).__init__('mcp', name, options=options, run=run)
+#         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super(MCP_True_Experiment,self).__init__('mcp', name, options=options, run=run)
 
-class SBM_Edge_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
+# class SBM_Edge_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=BCELoss(reduction='none'), normalize=Sigmoid) -> None:
         
-        self.generator = dg.SBM_Generator
-        self._criterion = losses.sbm_edge_loss(loss=loss, normalize=normalize)
-        self.eval_function = metrics.accuracy_sbm_two_categories_edge
+#         self.generator = dg.SBM_Generator
+#         self._criterion = losses.sbm_edge_loss(loss=loss, normalize=normalize)
+#         self.eval_function = metrics.accuracy_sbm_two_categories_edge
         
-        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super().__init__('sbm', name, options=options, run=run)
+#         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super().__init__('sbm', name, options=options, run=run)
 
-class SBM_Node_Experiment(Experiment_Helper):
-    def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize=Sigmoid) -> None:
+# class SBM_Node_Experiment(Experiment_Helper):
+#     def __init__(self, name, options=dict(), run=None, loss=MSELoss(reduction='none'), normalize=Sigmoid) -> None:
         
-        self.generator = dg.SBM_Generator
-        self._criterion = losses.sbm_node_loss(loss=loss,normalize = normalize)
-        self.eval_function = metrics.accuracy_sbm_two_categories
+#         self.generator = dg.SBM_Generator
+#         self._criterion = losses.sbm_node_loss(loss=loss,normalize = normalize)
+#         self.eval_function = metrics.accuracy_sbm_two_categories
         
-        self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
-        super().__init__('sbm', name, options=options, run=run)
+#         self.metric = 'acc' #Will be used in super() to compute the relevant metric meter, printer function and update_eval for the logger function
+#         super().__init__('sbm', name, options=options, run=run)
 
 

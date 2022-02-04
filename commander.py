@@ -7,101 +7,64 @@ import yaml
 
 import torch
 import torch.backends.cudnn as cudnn
-from models import get_model,get_model_gen
+from models import get_model_gen
 from loaders.siamese_loaders import get_loader
-from toolbox.losses import tsp_loss
 from toolbox.optimizer import get_optimizer
 import toolbox.utils as utils
 import trainer as trainer
 from toolbox.helper import get_helper
+from datetime import datetime
+from pathlib import Path
 
 from sacred import SETTINGS
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
+ROOT_DIR = Path.home()
+QAP_DIR = os.path.join(ROOT_DIR,'experiments/qap/')
+DATA_QAP_DIR = os.path.join(QAP_DIR,'data/')
+
 ### BEGIN Sacred setup
 ex = Experiment()
 
-#ex.add_config('default_config.yaml')
+ex.add_config('default_config.yaml')
 
-@ex.config
-def create_config():
-    with open("default_config.yaml") as f:
-        config = yaml.load(f,Loader=yaml.FullLoader)
-    del f
-    pbm = config['problem']
-    pbm = utils.reduce_name(pbm)
-    pbm_key='_'+pbm
-    config = utils.clean_config(config,pbm_key)
-    ex.add_config(config)
+@ex.config_hook
+def check_paths_qap(config, command_name, logger):
+    """
+    add to the configuration:
+        'path_log' = root/experiments/qap/name_expe/
+            (arch_gnn)_(numb_locks)_(generative_model)_(n_vertices)_(edge_density)/date_time
+        'date_time' 
+        ['data']['path_dataset'] = root/experiments/qap/data
+    save the new configuration at path_log/config.json
+    """ 
+    assert config['problem'] == 'qap', f"paths only defined for QAP"
+    assert config['use_dgl'] and config['arch']['arch_gnn'] in ['gcn', 'gatedgcn'], f"use dgl for this architecture"
+    now = datetime.now() # current date and time
+    date_time = now.strftime("%m-%d-%y-%H-%M")
+    dic = {'date_time' : date_time}
+    #expe_runs_qap = os.path.join(QAP_DIR,config['name'],'runs/')
+    l_name = [config['arch']['arch_gnn'], config['arch']['num_blocks'],
+        config['data']['train']['generative_model'], config['data']['train']['n_vertices'],
+        config['data']['train']['edge_density']]
+    name = "_".join([str(e) for e in l_name])
+    name = os.path.join(name, str(date_time))
+    path_log = os.path.join(QAP_DIR,config['name'], name)
+    utils.check_dir(path_log)
+    dic['path_log'] = path_log
 
+    utils.check_dir(DATA_QAP_DIR)
+    dic['data'] = {'path_dataset' : DATA_QAP_DIR}
+    
+    #print(path_log)
+    config.update(dic)
+    with open(os.path.join(path_log, 'config.json'), 'w') as f:
+        json.dump(config, f)
+    return config
 
 @ex.config_hook
 def set_experiment_name(config, command_name, logger):
     ex.path = config['name']
-    return config
-
-@ex.config_hook
-def update_paths(config, command_name, logger):
-    pbm = config['problem']
-    pbm = utils.reduce_name(pbm)
-
-    pbm_key = "_"+pbm
-    l_params = [config['data']['train']['n_vertices']]
-    l_params += [value for _,value in (config['data']['train'][pbm_key]).items()]
-    config_str = "_".join([str(item) for item in l_params])
-    final_model_name = config['train']['model_name']
-    log_dir = '{}/runs/{}/{}-{}/'.format(config['root_dir'], config['name'],
-                                         config['problem'].upper(),
-                                         config_str)
-    config.update(  log_dir=log_dir, #End log_dir
-                    path_dataset=config['data']['train'][pbm_key]['path_dataset'],
-                    model_path = os.path.join(log_dir, final_model_name) if config['train']['anew']  else os.path.join(config['train']['template_model_path']),
-                    output_filename = 'test.json'
-    )
-    return config
-
-@ex.config_hook
-def create_data_dict(config, command_name, logger):
-    """
-    Creates the parameter dictionaries for the data generation
-    """
-    problem = config['problem']
-    problem = utils.reduce_name(problem)
-    problem_key = "_" + problem
-    train_config = config['data']['train']
-    test_config = config['data']['test']
-    custom_test = config['test_enabled'] and config['data']['test']['custom']
-    assert problem_key in list(train_config.keys())
-    train_data_dict = dict()
-    test_data_dict = dict()
-    for key,value in train_config.items():
-        if key[0]!='_': #Don't add the problem data yet
-            train_data_dict[key] = value
-            if not custom_test:
-                test_data_dict[key] = value
-            else:
-                try:
-                    test_data_dict[key] = test_config[key]
-                except KeyError: #In case the key doesn't exist in the custom test data, add it from the train anyways
-                    test_data_dict[key] = value
-        elif key==problem_key:#Add problem data
-            for pb_key,pb_value in train_config[key].items():
-                train_data_dict[pb_key] = pb_value
-                if not custom_test:
-                    test_data_dict[pb_key] = pb_value
-                else:
-                    try:
-                        test_data_dict[pb_key] = test_config[key][pb_key]
-                    except KeyError:
-                        test_data_dict[pb_key] = pb_value
-
-    
-    test_data_dict['num_examples_test'] = test_config['num_examples_test'] #Special case of the numer of examples
-
-    config.update(
-        test_data_dict=test_data_dict,
-        train_data_dict=train_data_dict
-    )
     return config
 
 @ex.config_hook
@@ -111,7 +74,6 @@ def init_observers(config, command_name, logger):
     if neptune['enable']:
         from neptunecontrib.monitoring.sacred import NeptuneObserver
         ex.observers.append(NeptuneObserver(project_name=neptune['project']+problem.upper()))
-
     return config
 
 @ex.post_run_hook
@@ -129,63 +91,15 @@ def clean_observer(observers):
 ### END Sacred setup
 
 ### Training
+
 @ex.capture
-def init_helper(problem, name, _config, _run, type='train'):
+def init_helper(problem, name, _config, _run):
     exp_helper_object = get_helper(problem)
     exp_helper = exp_helper_object(name, _config, run=_run)
     return exp_helper
  
-@ex.capture
-def setup_env(cpu):
-    # Randomness is already controlled by Sacred
-    # See https://sacred.readthedocs.io/en/stable/randomness.html
-    if not cpu:
-        cudnn.benchmark = True
-
-# create necessary folders and config files
-@ex.capture
-def init_output_env(_config, root_dir, log_dir, path_dataset):
-    utils.check_dir(os.path.join(root_dir,'runs'))
-    utils.check_dir(log_dir)
-    utils.check_dir(path_dataset)
-    with open(os.path.join(log_dir, 'config.json'), 'w') as f:
-        json.dump(_config, f)
-
-@ex.capture
-def save_checkpoint(state, is_best, log_dir, model_path, filename='checkpoint.pth.tar'):
-    utils.check_dir(log_dir)
-    filename = os.path.join(log_dir, filename)
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, os.path.join(log_dir, 'model_best.pth.tar'))
-        shutil.copyfile(filename, model_path)
-        print(f"Best Model yet : saving at {log_dir+'model_best.pth.tar'}")
-
-    fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')
-    torch.save(state, fn.format(state['epoch']))
-
-    if (state['epoch'] - 1 ) % 5 != 0:
-      #remove intermediate saved models, e.g. non-modulo 5 ones
-      if os.path.exists(fn.format(state['epoch'] - 1 )):
-          os.remove(fn.format(state['epoch'] - 1 ))
-
-    state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
-
-
-
-@ex.capture
-def load_model(model, device, model_path):
-    """ Load model. Note that the model_path argument is captured """
-    if os.path.exists(model_path):
-        print("Reading model from ", model_path)
-        checkpoint = torch.load(model_path, map_location=torch.device(device))
-        model.load_state_dict(checkpoint['state_dict'])
-        return model
-    else:
-        raise RuntimeError('Model does not exist!')
-
 @ex.command
-def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
+def train(cpu, train, problem, arch, test_enabled, path_log, use_dgl, data):
 
     """ Main func.
     """
@@ -199,40 +113,30 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     print('Using device:', device)
 
     # init random seeds 
-    setup_env()
-    print("Models saved in ", log_dir)
-
-    init_output_env()
+    utils.setup_env(cpu)
     
-
-    if problem == 'mcp' and not train_data_dict['planted']:
-        problem = 'mcptrue'
+    print("Models saved in ", path_log)
     exp_helper = init_helper(problem)
-
-    is_dgl = False
-    if arch['arch']!='fgnn':
-        is_dgl=True
+    
+    # rawscores need to be adapted for dgl
+    if use_dgl:
         symmetric_problem=True
-        print(f"Arch : {arch['arch']}")
+        print(f"Arch : {arch['arch_gnn']}")
         from loaders.siamese_loaders import get_uncollate_function
-        uncollate_function = get_uncollate_function(train_data_dict["n_vertices"],problem)
-        if problem=='tsp':
-            symmetric_problem=False
-            exp_helper._criterion = tsp_loss(loss=torch.nn.CrossEntropyLoss(reduction='none',weight=None), normalize = torch.nn.Softmax(dim=-1))
+        uncollate_function = get_uncollate_function(data['train']['n_vertices'],problem)
         
     
     generator = exp_helper.generator
-    
-    gene_train = generator('train', train_data_dict)
-    gene_train.load_dataset()
-
-    gene_val = generator('val', train_data_dict)
-    gene_val.load_dataset()
-    
-    train_loader = get_loader(arch['arch'],gene_train, train['batch_size'],
-                                  gene_train.constant_n_vertices,problem=problem,sparsify=train_data_dict['sparsify'])
-    val_loader = get_loader(arch['arch'],gene_val, train['batch_size'],
-                                gene_val.constant_n_vertices,problem=problem,sparsify=train_data_dict['sparsify'])
+    gene_train = generator('train', data['train'], data['path_dataset'])
+    gene_train.load_dataset(use_dgl)
+    gene_val = generator('val', data['train'], data['path_dataset'])
+    gene_val.load_dataset(use_dgl)
+    train_loader = get_loader(use_dgl,gene_train, train['batch_size'],
+                                  gene_train.constant_n_vertices,problem=problem,
+                                  sparsify=data['train']['sparsify'])
+    val_loader = get_loader(use_dgl,gene_val, train['batch_size'],
+                                gene_val.constant_n_vertices,problem=problem,
+                                sparsify=data['train']['sparsify'])
     
     model = get_model_gen(arch)
     optimizer, scheduler = get_optimizer(train,model)
@@ -240,7 +144,7 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
 
     if not train['anew']:
         try:
-            load_model(model,device)
+            utils.load_model(model,device,train['start_model'])
             print("Model found, using it.")
         except RuntimeError:
             print("Model not existing. Starting from scratch.")
@@ -251,31 +155,30 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
     try:
         for epoch in range(train['epoch']):
             print('Current epoch: ', epoch)
-            if not is_dgl:
+            if not use_dgl:
                 trainer.train_triplet(train_loader,model,optimizer,exp_helper,device,epoch,eval_score=True,print_freq=train['print_freq'])
             else:
                 trainer.train_triplet_dgl(train_loader,model,optimizer,exp_helper,device,epoch,uncollate_function,
                                             sym_problem=symmetric_problem,eval_score=True,print_freq=train['print_freq'])
             
 
-            if not is_dgl:
+            if not use_dgl:
                 relevant_metric, loss = trainer.val_triplet(val_loader,model,exp_helper,device,epoch,eval_score=True)
             else:
                 relevant_metric, loss = trainer.val_triplet_dgl(val_loader,model,exp_helper,device,epoch,uncollate_function,eval_score=True)
             scheduler.step(loss)
             # remember best acc and save checkpoint
-            #TODO : if relevant metric is like a loss and needs to decrease, this doesn't work
             is_best = (relevant_metric > best_score)
             best_score = max(relevant_metric, best_score)
             if True == is_best:
                 best_epoch = epoch
-            save_checkpoint({
+            utils.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
                 'best_score': best_score,
                 'best_epoch': best_epoch,
                 'exp_logger': exp_helper.get_logger(),
-                }, is_best)
+                }, is_best,path_log)
 
             cur_lr = utils.get_lr(optimizer)
             if exp_helper.stop_condition(cur_lr):
@@ -288,39 +191,8 @@ def train(cpu, train, problem, train_data_dict, arch, test_enabled, log_dir):
         eval(use_model=model)
 
 
-@ex.capture
-def create_key(problem, test_data_dict, _config):
-    problem = utils.reduce_name(problem)
-    relevant_keys = _config['data']['test'][f'_{problem}'].keys()
-    relevant_params = '_'.join( [ str(test_data_dict[key]) for key in relevant_keys ] )
-
-    problem = problem.upper()
-    template = 'model_data_{}-{}_{}_{}'
-
-
-    key=template.format(problem,
-                        test_data_dict["num_examples_test"],
-                        test_data_dict['n_vertices'],
-                        relevant_params)
-    return key
-
-def save_to_json(jsonkey, loss, relevant_metric_dict, filename):
-
-    if os.path.exists(filename):
-        with open(filename, "r") as jsonFile:
-            data = json.load(jsonFile)
-    else:
-        data = {}
-
-    data[jsonkey] = {'loss':loss}
-
-    for dkey, value in relevant_metric_dict.items():
-        data[jsonkey][dkey] = value
-    with open(filename, 'w') as jsonFile:
-        json.dump(data, jsonFile)
-
 @ex.command
-def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, use_model=None):
+def eval(cpu, train, arch, data, use_dgl, problem, use_model=None):
     print("Heading to evaluation.")
 
     use_cuda = not cpu and torch.cuda.is_available()
@@ -330,43 +202,36 @@ def eval(cpu, test_data_dict, train, arch, log_dir, output_filename, problem, us
     if use_model is None:
         model = get_model_gen(arch)
         model.to(device)
-        model = load_model(model, device)
+        model = utils.load_model(model, device, train['start_model'])
     else:
         model = use_model
-
-
-    if problem == 'tsprl': #In case we're on RL TSP, we want to compare with a normal TSP at the end
-        problem = 'tsp'
-    elif problem == 'mcp' and not test_data_dict['planted']:
-        problem = 'mcptrue'
     
     helper = init_helper(problem)
 
-    if arch['arch']!='fgnn':
-        print(f"Arch : {arch['arch']}")
+    if use_dgl:
+        print(f"Arch : {arch['arch_gnn']}")
         from loaders.siamese_loaders import get_uncollate_function
-        uncollate_function = get_uncollate_function(test_data_dict["n_vertices"])
+        uncollate_function = get_uncollate_function(data['test']['n_vertices'],problem)
         cur_crit = helper.criterion
         cur_eval = helper.eval_function
         helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
         helper.eval_function = lambda output, target : cur_eval(uncollate_function(output), target)
 
 
-    gene_test = helper.generator('test', test_data_dict)
-    gene_test.load_dataset()
-
-    test_loader = get_loader(arch['arch'],gene_test, train['batch_size'],
+    gene_test = helper.generator('test', data['test'], data['path_dataset'])
+    gene_test.load_dataset(use_dgl)
+    test_loader = get_loader(use_dgl,gene_test, train['batch_size'],
                                  gene_test.constant_n_vertices,problem=problem)
     
     relevant_metric, loss = trainer.val_triplet(test_loader, model, helper, device,
                                     epoch=0, eval_score=True,
                                     val_test='test')
     
-    key = create_key()
-    filename_test = os.path.join(log_dir,  output_filename)
-    print('Saving result at: ',filename_test)
-    metric_to_save = helper.get_relevant_metric_with_name('test')
-    save_to_json(key, loss, metric_to_save, filename_test)
+    #key = create_key()
+    #filename_test = os.path.join(log_dir,  output_filename)
+    #print('Saving result at: ',filename_test)
+    #metric_to_save = helper.get_relevant_metric_with_name('test')
+    #utils.save_to_json(key, loss, metric_to_save, filename_test)
 
 @ex.automain
 def main():

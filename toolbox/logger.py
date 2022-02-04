@@ -4,7 +4,7 @@ import copy
 import os
 from collections import defaultdict
 import toolbox.utils as utils
-from loaders.data_generator import QAP_Generator, SBM_Generator,TSP_Generator,MCP_Generator
+from loaders.data_generator import QAP_Generator #, SBM_Generator,TSP_Generator,MCP_Generator
 import toolbox.metrics as metrics
 import toolbox.losses as losses
 from torch.nn import BCELoss

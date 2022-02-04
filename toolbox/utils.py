@@ -1,4 +1,5 @@
 import os
+import shutil
 import json
 from typing import Tuple
 from matplotlib.pyplot import isinteractive
@@ -9,6 +10,7 @@ from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 from networkx import to_numpy_array as nx_to_numpy_array
 import dgl as dgl
+import torch.backends.cudnn as cudnn
 
 # create directory if it does not exist
 def check_dir(dir_path):
@@ -23,6 +25,54 @@ def check_file(file_path):
         with open(file_path,'w') as f:
             pass
 
+def setup_env(cpu):
+    # Randomness is already controlled by Sacred
+    # See https://sacred.readthedocs.io/en/stable/randomness.html
+    if not cpu:
+        cudnn.benchmark = True
+
+def save_checkpoint(state, is_best, log_dir, filename='checkpoint.pth.tar'):
+    #check_dir(log_dir)
+    filename = os.path.join(log_dir, filename)
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, os.path.join(log_dir, 'model_best.pth.tar'))
+        #shutil.copyfile(filename, model_path)
+        print(f"Best Model yet : saving at {log_dir+'model_best.pth.tar'}")
+
+    fn = os.path.join(log_dir, 'checkpoint_epoch{}.pth.tar')
+    torch.save(state, fn.format(state['epoch']))
+
+    if (state['epoch'] - 1 ) % 5 != 0:
+      #remove intermediate saved models, e.g. non-modulo 5 ones
+      if os.path.exists(fn.format(state['epoch'] - 1 )):
+          os.remove(fn.format(state['epoch'] - 1 ))
+
+    state['exp_logger'].to_json(log_dir=log_dir,filename='logger.json')
+
+# move in utils
+def load_model(model, device, model_path):
+    """ Load model. Note that the model_path argument is captured """
+    if os.path.exists(model_path):
+        print("Reading model from ", model_path)
+        checkpoint = torch.load(model_path, map_location=torch.device(device))
+        model.load_state_dict(checkpoint['state_dict'])
+        return model
+    else:
+        raise RuntimeError('Model does not exist!')
+
+def save_to_json(jsonkey, loss, relevant_metric_dict, filename):
+    if os.path.exists(filename):
+        with open(filename, "r") as jsonFile:
+            data = json.load(jsonFile)
+    else:
+        data = {}
+    data[jsonkey] = {'loss':loss}
+    for dkey, value in relevant_metric_dict.items():
+        data[jsonkey][dkey] = value
+    with open(filename, 'w') as jsonFile:
+        json.dump(data, jsonFile)
+
 # from https://stackoverflow.com/questions/50916422/python-typeerror-object-of-type-int64-is-not-json-serializable/50916741
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -35,31 +85,31 @@ class NpEncoder(json.JSONEncoder):
         else:
             return super(NpEncoder, self).default(obj)
 
-def is_pbm_key(chars):
-    """
-    Recognizes problem keys of the form '_*' (Ex: '_mcp','_tsp')
-    """
-    return isinstance(chars,str) and chars[0]=='_'
+#def is_pbm_key(chars):
+#    """
+#    Recognizes problem keys of the form '_*' (Ex: '_mcp','_tsp')
+#    """
+#    return isinstance(chars,str) and chars[0]=='_'
 
-def clean_config(config,pbm_key):
-    if not isinstance(config,dict):
-        return config
-    new_config = {}
-    for k,v in config.items():
-        if not(is_pbm_key(k)) or k==pbm_key:
-            new_config[k] = clean_config(v,pbm_key)
-    return new_config
+# def clean_config(config,pbm_key):
+#     if not isinstance(config,dict):
+#         return config
+#     new_config = {}
+#     for k,v in config.items():
+#         if not(is_pbm_key(k)) or k==pbm_key:
+#             new_config[k] = clean_config(v,pbm_key)
+#     return new_config
 
-def clean_config_inplace(config,pbm_key):
-    assert isinstance(config,dict), "Trying to clean something that is not a dictionary!"
-    keys_to_delete = []
-    for k,v in config.items():
-        if is_pbm_key(k) and k!=pbm_key:
-            keys_to_delete.append(k)
-        elif isinstance(v,dict):
-            clean_config_inplace(v,pbm_key)
-    for k in keys_to_delete:
-        config.pop(k)
+# def clean_config_inplace(config,pbm_key):
+#     assert isinstance(config,dict), "Trying to clean something that is not a dictionary!"
+#     keys_to_delete = []
+#     for k,v in config.items():
+#         if is_pbm_key(k) and k!=pbm_key:
+#             keys_to_delete.append(k)
+#         elif isinstance(v,dict):
+#             clean_config_inplace(v,pbm_key)
+#     for k in keys_to_delete:
+#         config.pop(k)
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
@@ -284,6 +334,7 @@ def mcp_ind_to_adj(ind,n)->torch.Tensor:
 
 #TSP
 
+# Why that?
 def reduce_name(pbmkey):
     if pbmkey[:3]=='tsp':
         pbmkey='tsp'

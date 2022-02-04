@@ -174,15 +174,15 @@ class GatedGCNLayerIsotropic(nn.Module):
                                              self.in_channels,
                                              self.out_channels)
 
-class GatedGCNNet(nn.Module):
+class GatedGCNNet_Edge(nn.Module):
     
     def __init__(self, n_layers=4,original_features_num=1,in_features=20,out_features=20, **kwargs):
         super().__init__()
         in_dim = original_features_num
         in_dim_edge = 1 #Only distances
         hidden_dim = in_features
-        out_dim = out_features
-        n_classes = 2 #According to benchmarkinggnns
+        out_dim = in_features
+        n_classes = out_features
         dropout = 0 
         n_layers = n_layers
         self.batch_norm = True #net_params['batch_norm']
@@ -202,7 +202,10 @@ class GatedGCNNet(nn.Module):
             h = g.ndata['feat']
         h = self.embedding_h(h.float())
         if e is None:
-            e = g.edata['feat']
+            if 'feat' in g.edata:
+                e = g.edata['feat']
+            else:
+                e = torch.ones((g.number_of_edges(),1)).to('cuda')
         e = self.embedding_e(e.float())
         
         # convnets
@@ -217,6 +220,56 @@ class GatedGCNNet(nn.Module):
         g.apply_edges(_edge_feat)
 
         return g.edata['e']
+    
+    def loss(self, pred, label):
+        criterion = nn.CrossEntropyLoss(weight=None)
+        loss = criterion(pred, label)
+
+        return loss
+
+class GatedGCNNet_Node(nn.Module):
+    
+    def __init__(self, n_layers=8 #12
+                ,original_features_num=1,in_features=20,out_features=20, **kwargs):
+        super().__init__()
+        in_dim = original_features_num
+        in_dim_edge = 1 #Only distances
+        hidden_dim = in_features
+        out_dim = in_features
+        n_classes = out_features
+        dropout = 0 
+        n_layers = n_layers
+        self.batch_norm = True #net_params['batch_norm']
+        self.residual = True
+        self.n_classes = n_classes
+        
+        self.embedding_h = nn.Linear(in_dim, hidden_dim)
+        self.embedding_e = nn.Linear(in_dim_edge, hidden_dim)
+        self.layers = nn.ModuleList([ GatedGCNLayerIsotropic(hidden_dim, hidden_dim, dropout,
+                                                      self.batch_norm, self.residual) for _ in range(n_layers-1) ]) 
+        self.layers.append(GatedGCNLayer(hidden_dim, out_dim, dropout, self.batch_norm, self.residual))
+        self.MLP_layer = MLPReadout(out_dim, n_classes)
+        
+    def forward(self, g, h = None, e = None):
+        
+        if h is None:
+            h = g.ndata['feat']
+        h = self.embedding_h(h.float())
+        if e is None:
+            if 'feat' in g.edata:
+                e = g.edata['feat']
+            else:
+                e = torch.ones((g.number_of_edges(),1)).to('cuda')
+        e = self.embedding_e(e.float())
+        
+        # res gated convnets
+        for conv in self.layers:
+            h, e = conv(g, h, e)
+
+        # output
+        h_out = self.MLP_layer(h)
+
+        return h_out
     
     def loss(self, pred, label):
         criterion = nn.CrossEntropyLoss(weight=None)
