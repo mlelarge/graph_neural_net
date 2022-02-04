@@ -39,7 +39,7 @@ def check_paths_qap(config, command_name, logger):
     save the new configuration at path_log/config.json
     """ 
     assert config['problem'] == 'qap', f"paths only defined for QAP"
-    assert config['use_dgl'] and config['arch']['arch_gnn'] in ['gcn', 'gatedgcn'], f"use dgl for this architecture"
+    assert config['use_dgl'] or config['arch']['arch_gnn'] not in ['gcn', 'gatedgcn'], f"use dgl for this architecture"
     now = datetime.now() # current date and time
     date_time = now.strftime("%m-%d-%y-%H-%M")
     dic = {'date_time' : date_time}
