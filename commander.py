@@ -1,9 +1,9 @@
 import os
-import shutil
+#import shutil
 import json
 from sacred import Experiment
 from sacred.config import config_scope
-import yaml
+#import yaml
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -20,7 +20,7 @@ from sacred import SETTINGS
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 ROOT_DIR = Path.home()
-QAP_DIR = os.path.join(ROOT_DIR,'experiments/qap/')
+QAP_DIR = os.path.join(ROOT_DIR,'experiments-gnn/qap/')
 DATA_QAP_DIR = os.path.join(QAP_DIR,'data/')
 
 ### BEGIN Sacred setup

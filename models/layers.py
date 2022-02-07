@@ -18,19 +18,19 @@ class RegularBlock(nn.Module):
         self.mlp2 = MlpBlock(in_features, out_features, depth_of_mlp)
         self.mlp3 = MlpBlock(in_features+out_features, out_features,depth_of_mlp)
         self.last_layer = nn.Conv2d(out_features,out_features,kernel_size=1, padding=0, bias=True)
-        self.bn_mult = nn.BatchNorm2d(out_features)
-        self.bn_out = nn.BatchNorm2d(out_features)
+        #self.bn_mult = nn.BatchNorm2d(out_features)
+        #self.bn_out = nn.BatchNorm2d(out_features)
 
     def forward(self, inputs):
         mlp1 = self.mlp1(inputs)
         mlp2 = self.mlp2(inputs)
         mult = torch.matmul(mlp1, mlp2)
-        mult = self.bn_mult(mult)
+        #mult = self.bn_mult(mult)
         # Temporary workaround to pytorch issue
         out = dispatch_cat((inputs, mult), dim=1)
         out = self.mlp3(out)
         out = self.last_layer(out)
-        return self.bn_out(out)
+        return out #self.bn_out(out)
 
 
 class MlpBlock(nn.Module):
