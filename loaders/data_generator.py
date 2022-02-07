@@ -66,7 +66,7 @@ def _connectivity_to_dgl_edge(connectivity,sparsify=False):
     mask = torch.ones_like(connectivity)
     if sparsify:
         mask = torch.zeros_like(connectivity)
-        assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify=}"
+        assert isinstance(sparsify,int), f"Sparsify not recognized. Should be int (number of closest neighbors), got {sparsify}"
         knns = npargpartition(distances, kth=sparsify, axis=-1)[:, sparsify ::-1].copy()
         range_tensor = torch.tensor(range(N)).unsqueeze(-1)
         mask[range_tensor,knns,1] = 1
