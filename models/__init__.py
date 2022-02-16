@@ -1,5 +1,5 @@
 from models.siamese_net import Siamese_Model,Siamese_Model_Gen
-from models.base_model import Simple_Node_Embedding, Simple_Edge_Embedding
+from models.base_model import Simple_Node_Embedding, Simple_Edge_Embedding, RS_Node_Embedding
 from models.gcn_model import BaseGCN
 from models.gated_gcn import GatedGCN, GatedGCNNet_Edge, GatedGCNNet_Node
 
@@ -32,7 +32,7 @@ from models.gated_gcn import GatedGCN, GatedGCNNet_Edge, GatedGCNNet_Node
 #     return model
 
 def get_model(args):
-    # used in the jupyter notebook
+    # used in the jupyter notebook (old config!)
     model_instance = _get_model_instance(args['arch'])
 
     print('Fetching model %s - %s ' % (args['arch'], args['model_name']))
@@ -68,7 +68,9 @@ def get_model_gen(args):
     elif arch_load=='siamese':
         loader_function = Siamese_Model_Gen
  
-    fgnn_embedding_dict = {'node': Simple_Node_Embedding, 'edge': Simple_Edge_Embedding}
+    fgnn_embedding_dict = {'node': Simple_Node_Embedding, 
+        'rs_node': RS_Node_Embedding,
+        'edge': Simple_Edge_Embedding}
     gatedgcn_embedding_dict = {'node': GatedGCNNet_Node, 'edge': GatedGCNNet_Edge}
 
     if arch=='fgnn':

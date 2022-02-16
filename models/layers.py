@@ -13,24 +13,20 @@ class RegularBlock(nn.Module):
     def __init__(self, in_features, out_features, depth_of_mlp,name=""):
         super().__init__()
         self.name=name
-
         self.mlp1 = MlpBlock(in_features, out_features, depth_of_mlp)
         self.mlp2 = MlpBlock(in_features, out_features, depth_of_mlp)
         self.mlp3 = MlpBlock(in_features+out_features, out_features,depth_of_mlp)
         self.last_layer = nn.Conv2d(out_features,out_features,kernel_size=1, padding=0, bias=True)
-        #self.bn_mult = nn.BatchNorm2d(out_features)
-        #self.bn_out = nn.BatchNorm2d(out_features)
 
     def forward(self, inputs):
         mlp1 = self.mlp1(inputs)
         mlp2 = self.mlp2(inputs)
         mult = torch.matmul(mlp1, mlp2)
-        #mult = self.bn_mult(mult)
         # Temporary workaround to pytorch issue
         out = dispatch_cat((inputs, mult), dim=1)
         out = self.mlp3(out)
         out = self.last_layer(out)
-        return out #self.bn_out(out)
+        return out 
 
 
 class MlpBlock(nn.Module):
@@ -79,10 +75,60 @@ def _init_weights(layer):
     """
     nn.init.xavier_uniform_(layer.weight)
     # nn.init.xavier_normal_(layer.weight)
-    #if layer.bias is not None:
-    #    nn.init.zeros_(layer.bias)
+    if layer.bias is not None:
+        nn.init.zeros_(layer.bias)
 
 ##### END OF CODE FROM github.com/hadarser/ProvablyPowerfulGraphNetworks_torch #####
+
+class MlpBlock_Real(nn.Module):
+    """
+    Block of MLP layers with activation function after each (1x1 conv layers) except last one
+    """
+    def __init__(self, in_features, out_features, depth_of_mlp, activation_fn = F.relu):
+        super().__init__()
+        self.activation = activation_fn
+        self.depth_mlp = depth_of_mlp
+        self.convs = nn.ModuleList()
+        for _ in range(depth_of_mlp):
+            self.convs.append(nn.Conv2d(in_features, out_features, kernel_size=1, padding=0, bias=True))
+            _init_weights(self.convs[-1])
+            in_features = out_features
+
+    def forward(self, inputs):
+        out = inputs
+        for conv_layer in self.convs[:-1]:
+            out = self.activation(conv_layer(out))
+        return self.convs[-1](out)
+
+class Scaled_Block(nn.Module):
+    """
+    Imputs: N x input_depth x n_vertices x n_vertices
+    Take the input through 2 parallel MLP routes, multiply the result 
+    and pass the concatenation of this result with the input through a MLP
+    with no activation for the last layer.
+    """
+    def __init__(self, in_features, out_features, depth_of_mlp,name=""):
+        super().__init__()
+        self.name=name
+
+        self.mlp1 = MlpBlock_Real(in_features, out_features, depth_of_mlp)
+        self.mlp2 = MlpBlock_Real(in_features, out_features, depth_of_mlp)
+        self.mlp3 = MlpBlock_Real(in_features+out_features, out_features,depth_of_mlp)
+        self.last_layer = nn.Conv2d(out_features,out_features,kernel_size=1, padding=0, bias=True)
+        self.gn_mult = nn.InstanceNorm2d(out_features,track_running_stats=False)
+        self.gn_out = nn.InstanceNorm2d(out_features,track_running_stats=False)
+
+    def forward(self, inputs):
+        mlp1 = self.mlp1(inputs)
+        mlp2 = self.mlp2(inputs)
+        mult = torch.matmul(mlp1, mlp2)
+        mult = self.gn_mult(mult)
+        # Temporary workaround to pytorch issue
+        out = dispatch_cat((inputs, mult), dim=1)
+        out = self.mlp3(out)
+        out = self.last_layer(out)
+        return self.gn_out(out)
+
 
 class MlpBlock1d(nn.Module):
     """
