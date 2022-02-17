@@ -103,38 +103,22 @@ Dependencies are listed in `requirements.txt`. To install, run
 ```
 pip install -r requirements.txt
 ```
-For the TSP problem, it is required to install [pyconcorde](https://github.com/jvkersch/pyconcorde).
+DGL is not included in the `requirements.txt`, please follow the [dgl specific instructions](https://www.dgl.ai/pages/start.html)
 
-
-It is also needed to compile the `cpp_code/mcp_solver.cpp` (it uses C++ standard 14).
-```
-g++ -o "mcp_solver.exe" cpp_code/mcp_solver.cpp
-```
-
-
-## Dependencies
-Dependencies are listed in `requirements.txt`. To install, run
-```
-pip install -r requirements.txt
-```
 ## Training 
 Run the main file ```commander.py``` with the command ```train```
 ```
 python train commander.py
 ```
-To change options, use [Sacred](https://github.com/IDSIA/sacred) command-line interface and see ```default.yaml``` for the configuration structure. For instance,
+To change options, use [Sacred](https://github.com/IDSIA/sacred) command-line interface and see ```default_config.yaml``` for the configuration structure. For instance,
 ```
 python commander.py train with cpu=No data.generative_model=Regular train.epoch=10 
 ```
-You can also copy ```default.yaml``` and modify the configuration parameters there. Loading the configuration in ```other.yaml``` (or ```other.json```) can be done with
-```
-python commander.py train with other.yaml
-```
+You can also copy ```default_config.yaml``` and modify the configuration parameters there. 
+
 See [Sacred documentation](http://sacred.readthedocs.org/) for an exhaustive reference. 
 
 To save logs to [Neptune](https://neptune.ai/), you need to provide your own API key via the dedicated environment variable.
-
-The model is regularly saved in the folder `runs`.
 
 ## Evaluating
 
@@ -151,10 +135,3 @@ python commander.py eval with /path/to/config model_path=/path/to/model.pth.tar
 
 will retrieve the trained model and evaluated it on a test dataset. More options are available in `eval.py`.
 
-## Data generation for planted against NP problems
-
-All the parameters are stored in the `article_config.yaml` file. The experiments presented in the article are named `hhc`, `mcp` and `sbm`. To generate the data for the different problems, the `experiment` field must be changed to one of these values. Then just run :
-```
-python3 article_commander.py
-```
-The data will be generated in a subfolder `exps/[experiment_name]`.
