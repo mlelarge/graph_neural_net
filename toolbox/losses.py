@@ -16,9 +16,10 @@ class triplet_loss(nn.Module):
         else:
             raise ValueError('Unknown loss_reduction parameters {}'.format(loss_reduction))
 
-    def forward(self, raw_scores, target_dummy):#Keep target for modularity, target should be an empty tensor, but it's not used anyways
+# !!! to be checked: only working with graphs same size ?!!!
+    def forward(self, raw_scores):
         """
-        outputs is the output of siamese network (bs,n_vertices,n_vertices)
+        raw_scores is the output of siamese network (bs,n_vertices,n_vertices)
         """
         device = get_device(raw_scores)
         loss = 0

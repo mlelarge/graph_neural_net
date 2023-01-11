@@ -115,7 +115,7 @@ def accuracy_linear_assignment(rawscores, dummy_target, labels=None, aggregate_s
     else:
         return all_acc
 
-def accuracy_max(weights,dummy_target, labels=None, aggregate_score=True):
+def accuracy_max(weights, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """

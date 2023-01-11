@@ -9,8 +9,16 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 from networkx import to_numpy_array as nx_to_numpy_array
-import dgl as dgl
+#import dgl as dgl
 import torch.backends.cudnn as cudnn
+
+def load_json(json_file):
+    # Load the JSON file into a variable
+    with open(json_file) as f:
+        json_data = json.load(f)
+
+    # Return the data as a dictionary
+    return json_data
 
 # create directory if it does not exist
 def check_dir(dir_path):
@@ -119,7 +127,7 @@ def list_to_tensor(liste) -> torch.Tensor:
 
 #Graph operations
 
-def edge_features_to_dense_tensor(graph, features, device='cpu'):
+""" def edge_features_to_dense_tensor(graph, features, device='cpu'):
     N = graph.number_of_nodes()
     resqueeze = False
     if len(features.shape)==1:
@@ -208,7 +216,7 @@ def temp_sym(t):
             else:
                 raise AssertionError(f"Feature values are asymmetric, should not have used the symetric function.")
     return t
-
+ """
 #QAP
 
 def perm_matrix(row,preds):
