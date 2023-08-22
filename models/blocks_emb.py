@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import namedtuple, defaultdict
 from models.utils import *
-from models.layers import MlpBlock_Real, ColumnMaxPooling, ColumnSumPooling, MlpBlock_vec, AttentionBlock_vec, Concat, Identity, Permute, Matmul, Matmul_zerodiag, Add, GraphAttentionLayer, GraphNorm, Diag
+from models.layers import MlpBlock_Real, ColumnMaxPooling, ColumnSumPooling, MlpBlock_vec, AttentionBlock_vec, Concat, Identity, Permute, Matmul, Matmul_zerodiag, Add, GraphAttentionLayer, GraphNorm, Diag, Rec_block, Recall_block, Seed
 
 
 def block_emb(in_features, out_features, depth_of_mlp, constant_n_vertices=True):
@@ -107,7 +107,7 @@ def base_model(original_features_num, num_blocks, in_features,out_features, dept
 
 def node_embedding(original_features_num, num_blocks, in_features,out_features, depth_of_mlp,
      block=block, constant_n_vertices=True, **kwargs):
-    d = {'in': Identity()}
+    d = {'in': Identity()}#{'in': Seed()} ##
     d['bm'] = base_model(original_features_num, num_blocks, in_features,out_features, depth_of_mlp, block, constant_n_vertices=constant_n_vertices)
     d['suffix'] = ColumnMaxPooling()
     return d
@@ -121,13 +121,32 @@ def node_embedding_full(original_features_num, num_blocks, in_features,out_featu
     d['suffix'] = ColumnMaxPooling()
     return d
 
-def base_model_block(original_features_num, num_blocks, out_features, depth_of_mlp, num_heads,
-        block_init = block, block_inside=block_inside, constant_n_vertices=True):
-    d = {'in': Identity()}
+#def base_model_block(original_features_num, num_blocks, out_features, depth_of_mlp, num_heads,
+#        block_init = block, block_inside=block_inside, constant_n_vertices=True):
+#    d = {'in': Identity()}
+#    #last_layer_features = original_features_num
+#    d['block1'] = block_init(original_features_num, out_features, depth_of_mlp, constant_n_vertices=constant_n_vertices)
+#    for i in range(1,num_blocks):
+#        d['block'+str(i+1)] = block_inside(out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices, num_heads=num_heads)
+#    return d
+
+def base_model_block(original_features_num, num_blocks, out_features, depth_of_mlp, num_heads=1,
+        block_init = block_emb, block_inside=block, constant_n_vertices=True):
+    d = {'in': GraphNorm(original_features_num)}
     #last_layer_features = original_features_num
     d['block1'] = block_init(original_features_num, out_features, depth_of_mlp, constant_n_vertices=constant_n_vertices)
-    for i in range(1,num_blocks):
-        d['block'+str(i+1)] = block_inside(out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices, num_heads=num_heads)
+    #d['gn1'] = (GraphNorm(out_features), ['block1/mlp3'])
+    d['cat1'] = (Concat(), ['in', 'block1/mlp3'])
+    #d['cat1'] = (Concat(), ['in', 'gn1'])
+    d['block2'] = block_inside(original_features_num+out_features,out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices)
+    #d['gn2'] = (GraphNorm(out_features), ['block2/mlp3'])
+    #d['block3'] = block_init(2*out_features, out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices)
+    for i in range(2,num_blocks):
+        d['cat'+str(i)] = (Concat(), ['in', 'block'+str(i)+'/mlp3'])
+        #d['cat'+str(i)] = (Concat(), ['in', 'gn'+str(i)])
+        d['block'+str(i+1)] = block_inside(original_features_num+out_features, out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices)
+        #d['block'+str(i+1)] = block_inside(original_features_num+out_features,out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices)
+        #d['gn'+str(i+1)] = (GraphNorm(out_features), ['block'+str(i+1)+'/mlp3'])
     return d
 
 def node_embedding_block(original_features_num, num_blocks, out_features, depth_of_mlp, num_heads,
@@ -169,6 +188,16 @@ def base_model_recall(original_features_num, num_blocks, out_features, depth_of_
         #d['gn'+str(i+1)] = (GraphNorm(out_features), ['block'+str(i+1)+'/mlp3'])
     return d
 
+def base_model_recall_layer(original_features_num, num_blocks, out_features, depth_of_mlp, num_heads=1,
+        block_init = block_emb, block_inside=block, constant_n_vertices=True):
+    d = {'in': GraphNorm(original_features_num)}
+    d['block1'] = block_init(original_features_num, out_features, depth_of_mlp, constant_n_vertices=constant_n_vertices)
+    #d['cat1'] = (Concat(), ['in', 'block1/mlp3'])
+    d['blockrec'] = (Recall_block(block_inside(original_features_num+out_features,out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices), num_blocks), ['in', 'block1/mlp3'])
+    #d['gn2'] = (GraphNorm(out_features), ['block2/mlp3'])
+    #d['block3'] = block_init(2*out_features, out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices)
+    return d
+
 def base_model_recall_nogn(original_features_num, num_blocks, out_features, depth_of_mlp, num_heads,
         block_init = block, block_inside=block_inside, constant_n_vertices=True):
     d = {'in': GraphNorm(original_features_num)}
@@ -205,6 +234,24 @@ def node_embedding_rec(original_features_num, num_blocks, out_features, depth_of
     d = {'in': Identity()}
     d['bm'] = base_model_recall(original_features_num=original_features_num, num_blocks=num_blocks, out_features=out_features, 
                     depth_of_mlp=depth_of_mlp, block_init =block_init, block_inside=block_inside,constant_n_vertices=constant_n_vertices, num_heads=num_heads)
+    d['suffix'] = ColumnMaxPooling()
+    return d
+
+def node_embedding_rec2(original_features_num, num_blocks, out_features, depth_of_mlp, num_heads=1,
+        block_init = block_emb, block_inside=block, constant_n_vertices=True,  **kwargs):
+    d = {'in': Identity()}
+    d['bm'] = base_model_recall(original_features_num=original_features_num, num_blocks=num_blocks, out_features=out_features, 
+                    depth_of_mlp=depth_of_mlp, block_init =block_init, block_inside=block_inside,constant_n_vertices=constant_n_vertices, num_heads=num_heads)
+    d['out1'] = Identity()
+    #d['suffix1'] = ColumnMaxPooling()
+    d['skip'] = (Identity(), ['in'])
+    #d['graph2'] = block_emb(original_features_num, out_features, depth_of_mlp=depth_of_mlp, constant_n_vertices=constant_n_vertices)
+    #d['ne_diag'] = (Diag(), ['suffix1'])
+    #d['in2'] = (Add(), ['ne_diag', 'graph2/mlp3'])
+    d['bm2'] = base_model_recall(original_features_num=original_features_num, num_blocks=num_blocks, out_features=out_features, 
+                    depth_of_mlp=depth_of_mlp, block_init =block_init, block_inside=block_inside,constant_n_vertices=constant_n_vertices, num_heads=num_heads)
+    d['out2'] = Identity()
+    d['cat_all'] = (Concat(), ['out1' , 'out2'])
     d['suffix'] = ColumnMaxPooling()
     return d
 

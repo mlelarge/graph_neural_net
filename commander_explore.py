@@ -123,6 +123,80 @@ def train(config):
 
     return trainer
 
+""" class ScheduleCallback(pl.Callback):
+    def __init__(self, max_epochs=8):
+        self.max_epochs = max_epochs
+    def on_train_epoch_end(self, trainer, pl_module):
+        pl_module.scalar = utils.schedule(trainer.current_epoch)
+        pl_module.log("training_epoch_scalar", pl_module.scalar)
+     """    
+def tune(config):
+    """ Main func.
+    """
+    cpu = config['cpu']
+    #train, 
+    problem =config['problem']
+    config_arch = config['arch'] 
+    #test_enabled, 
+    path_log = config['path_log']
+    data = config['data']
+    max_epochs = config['train']['epochs']
+    batch_size = config['train']['batch_size']
+    config_optim = config['train']
+    log_freq = config_optim['log_freq']
+
+    print("Heading to Tuning.")
+    global best_score, best_epoch
+    best_score, best_epoch = -1, -1
+    print("Current problem : ", problem)
+
+    use_cuda = not cpu and torch.cuda.is_available()
+    device = 'cuda' if use_cuda else 'cpu'
+    print('Using device:', device)
+
+    # init random seeds 
+    utils.setup_env(cpu)
+    
+    print("Models saved in ", path_log)
+    #exp_helper = init_helper(problem) 
+    model_pl = get_siamese_model_test(data['test']['path_model'])
+
+    generator = dg.QAP_Generator
+    #generator = dg.QAP_spectralGenerator
+    gene_train = generator('train', data['train'], data['path_dataset'])
+    gene_train.load_dataset()
+    gene_val = generator('val', data['train'], data['path_dataset'])
+    gene_val.load_dataset()
+    train_loader = siamese_loader(gene_train, batch_size,
+                                  gene_train.constant_n_vertices)
+    val_loader = siamese_loader(gene_val, batch_size,
+                                gene_val.constant_n_vertices, shuffle=False)
+    
+    
+    #optimizer, scheduler = get_optimizer(train,model)
+    #print("Model #parameters : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
+
+    """ if not train['anew']:
+        try:
+            utils.load_model(model,device,train['start_model'])
+            print("Model found, using it.")
+        except RuntimeError:
+            print("Model not existing. Starting from scratch.")
+ """
+    #model.to(device)
+    # train model
+    if config['observers']['wandb']:
+        logger = WandbLogger(project=f"{config['problem']}_{config['name']}", log_model="all", save_dir=path_log)
+        logger.experiment.config.update(config)
+        lr_monitor = LearningRateMonitor(logging_interval='epoch')
+        #sc_cb = ScheduleCallback()
+        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,logger=logger,log_every_n_steps=log_freq,callbacks=[lr_monitor,],precision=16)
+    else:
+        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,log_every_n_steps=log_freq,precision=16)
+    trainer.fit(model_pl, train_loader, val_loader)
+
+    return trainer
+
     """ is_best = True
     try:
         for epoch in range(train['epoch']):
@@ -173,7 +247,7 @@ def test(config):
     #path_log = config['path_log']
     data = config['data']
     #max_epochs = config['train']['epochs']
-    batch_size = config['train']['batch_size']
+    batch_size = 1#config['train']['batch_size']
     #config_optim = config['train']
     #log_freq = config_optim['log_freq']
 
@@ -269,7 +343,7 @@ def test(config):
 #@ex.automain
 def main():
     parser = argparse.ArgumentParser(description='Main file for creating experiments.')
-    parser.add_argument('command', metavar='c', choices=['train','test'],
+    parser.add_argument('command', metavar='c', choices=['train','test', 'tune'],
                     help='Command to execute : train or test')
     parser.add_argument('--n_vertices', type=int, default=0)
     parser.add_argument('--noise', type=float, default=0)
@@ -281,9 +355,15 @@ def main():
     if args.command=='train':
         training=True
         default_test = False
-    elif args.command=='test':#not implemented yet !!! generator pb with name!
+        tuning = False
+    elif args.command=='test':
         training=False
-        default_test=True
+        default_test = True
+        tuning = False
+    elif args.command=='tune':
+        training=False
+        default_test=False
+        tuning = True
 
     config = get_config()
     if args.n_vertices != 0:
@@ -318,6 +398,8 @@ def main():
         trainer = train(config)
     if default_test: #or config['test_enabled']:
         res_test = test(config)
+    if tuning:
+        trainer = tune(config)
 
 if __name__=="__main__":
     pl.seed_everything(3787, workers=True)

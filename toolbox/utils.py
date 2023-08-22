@@ -2,7 +2,7 @@ import os
 import shutil
 import json
 from typing import Tuple
-from matplotlib.pyplot import isinteractive
+#from matplotlib.pyplot import isinteractive
 from numpy.lib.arraysetops import isin
 import torch
 import numpy as np
@@ -11,6 +11,9 @@ from scipy.optimize import linear_sum_assignment
 from networkx import to_numpy_array as nx_to_numpy_array
 #import dgl as dgl
 import torch.backends.cudnn as cudnn
+
+def schedule(k, max_epochs=8):
+    return max(max_epochs-k,0)/max_epochs #torch.tensor(max(max_epochs-k,0)/max_epochs, dtype=torch.float)
 
 def load_json(json_file):
     # Load the JSON file into a variable

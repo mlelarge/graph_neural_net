@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import math
 from collections import namedtuple
 from torch.nn.parameter import Parameter
+from models.utils import *
 
 # class GraphNorm(nn.Module):
 #     def __init__(self, features=0, constant_n_vertices=True, eps =1e-05):
@@ -14,6 +15,34 @@ from torch.nn.parameter import Parameter
     
 #     def forward(self, b):
 #         return normalize(b, self.constant_n_vertices, self.eps)
+
+class Rec_block(nn.Module):
+    def __init__(self, block, n_iter):
+        super().__init__()
+        self.block_dic  = {'input': (None, []) , 'block': block, 'output' : Identity()}
+        self.n_iter = n_iter
+        self.net = Network(self.block_dic)
+
+    def forward(self, x):
+        x_input = {'input': x}
+        for i in range(self.n_iter):
+            x = self.net(x_input)
+            x_input = {'input': x['output']}
+        return x['output']
+
+class Recall_block(nn.Module):
+    def __init__(self, block, n_iter):
+        super().__init__()
+        self.block_dic  = {'input': (None, []) , 'block': block, 'output' : Identity()}
+        self.n_iter = n_iter
+        self.net = Network(self.block_dic)
+
+    def forward(self, x0, x1):
+        x_input = {'input': torch.cat((x0,x1), dim=1)}
+        for i in range(self.n_iter):
+            x = self.net(x_input)
+            x_input = {'input': torch.cat((x0,x['output']), dim=1)}
+        return x['output']
 
 class GraphNorm(nn.Module):
     def __init__(self, features, constant_n_vertices=True, elementwise_affine=True, eps =1e-05,device=None, dtype=None):
@@ -50,6 +79,32 @@ def normalize(b, constant_n_vertices=True, eps =1e-05):
         n = torch.sum(b.mask_dict['N'], dim=1).align_as(vars)
     return (b-means)/(2*torch.sqrt(n*(vars+eps)))
 
+import numpy as np
+
+class MlpBlock_Node(nn.Module):
+    """
+    Block of MLP layers with activation function after each (1x1 conv layers) except last one
+    """
+    def __init__(self, in_features, out_features, depth_of_mlp, activation_fn = F.relu, constant_n_vertices=True):
+        super().__init__()
+        self.activation = activation_fn
+        self.depth_mlp = depth_of_mlp
+        self.cst_vertices = constant_n_vertices
+        self.convs = nn.ModuleList()
+        for _ in range(depth_of_mlp):
+            self.convs.append(nn.Conv1d(in_features, out_features, kernel_size=1, padding=0, bias=True))
+            _init_weights(self.convs[-1])
+            in_features = out_features
+        self.gn = GraphNorm(out_features, constant_n_vertices=constant_n_vertices)
+        #self.gn = nn.InstanceNorm2d(out_features, affine=False)
+
+    def forward(self, inputs):
+        n = inputs.size(-1)
+        out = inputs
+        for conv_layer in self.convs[:-1]:
+            out = self.activation(conv_layer(out))
+        return self.gn(self.convs[-1](out))#normalize(self.convs[-1](out), constant_n_vertices=self.cst_vertices)
+
 
 class MlpBlock_Real(nn.Module):
     """
@@ -66,8 +121,10 @@ class MlpBlock_Real(nn.Module):
             _init_weights(self.convs[-1])
             in_features = out_features
         self.gn = GraphNorm(out_features, constant_n_vertices=constant_n_vertices)
+        #self.gn = nn.InstanceNorm2d(out_features, affine=False)
 
     def forward(self, inputs):
+        n = inputs.size(-1)
         out = inputs
         for conv_layer in self.convs[:-1]:
             out = self.activation(conv_layer(out))
@@ -93,7 +150,53 @@ class Diag(nn.Module):
 
 class Identity(namedtuple('Identity', [])):
     def __call__(self, x): return x
-    
+
+""" class Seed(namedtuple('Seed', [])):
+    def __call__(self, x): 
+        n = x.size(-1)
+        bs = x.size(0)
+        device = x.device
+        x[:,1,:,:] = torch.zeros((bs,n,n))
+        indices = torch.arange(5)
+        x[:,1,indices,indices] = indices.type(torch.float).to(device)+1
+        return x """
+
+class Reshape(nn.Module):
+    def __init__(self, n_features):
+        super().__init__()
+        self.n_features = n_features
+
+    def forward(self, x):
+        n = x.size(-1)
+        bs = x.size(0)
+        device = x.device
+        y = torch.zeros((bs,self.n_features,n,n)).to(device)
+        y[:,0,:,:] = x[:,0,:,:]
+        return y
+
+class Add_diag(nn.Module):
+    def forward(self, x, p):
+        return x + torch.diag_embed(p)
+
+
+class Seed(nn.Module):
+    def forward(self, x):
+        n = x.size(-1)
+        bs = x.size(0)
+        device = x.device
+        x[:,1,:,:] = torch.zeros((bs,n,n))
+        indices = torch.arange(5)
+        x[:,1,indices,indices] = indices.type(torch.float).to(device)+1
+        return x
+
+class Scaling(nn.Module):    
+    def forward(self, x, s):
+        m = nn.Dropout(1-s)
+        #device = x.device
+        #s = s.to(device)
+        x[:,1,:,:] = m(x[:,1,:,:])
+        return x
+
 class Permute(namedtuple('Permute', [])):
     def __call__(self, x): return x.permute(0,2,1)
 

@@ -1,13 +1,8 @@
 torch>=1.5
-scipy
+numpy
 networkx
 pytest
-sacred
 PyYAML
-neptune-contrib
-psutil
-Cython
-sklearn
-tqdm
-seaborn
-pandas
+scikit-learn
+pytorch-lightning
+  

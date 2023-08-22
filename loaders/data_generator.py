@@ -51,6 +51,10 @@ def generate_barabasi_albert_netx(p, N):
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float)
 
+#@generates("RegularSeed")
+#def generate_regularseed(p,N):
+#    return None, None
+
 @generates("Regular")
 def generate_regular_graph_netx(p, N):
     """ Generate random regular graph """

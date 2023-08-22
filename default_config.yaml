@@ -1,6 +1,6 @@
 ---
 problem: qap # PB_DIR = experiments-gnn/$problem
-name: expe_new # results will be stored in PB_DIR/$name
+name: expe_norm # results will be stored in PB_DIR/$name
 cpu: No
 #root_dir: 'experiments-gnn' # not used...
 #test_enabled: Yes
@@ -13,28 +13,29 @@ data:
         num_examples_val: 1000
         n_vertices: 100
         sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
-        generative_model: Regular # so far ErdosRenyi, Regular or BarabasiAlbert
+        generative_model: Regular #Seed # so far ErdosRenyi, Regular or BarabasiAlbert
         noise_model: ErdosRenyi
-        edge_density: 0.05 #0.015 #0.025
+        edge_density: 0.05 #0.05 #0.015 #0.025
         vertex_proba: 1. # Parameter of the binomial distribution of vertices
-        noise: 0.2 #0.3 #0.32 #0.2 #0.2 0.4 0.6 0.8 0.9
+        noise: 0.1 #0.3 #0.32 #0.2 #0.2 0.4 0.6 0.8 0.9
             
     test: #Test data generation parameters not used yet...
         num_examples_test: 1000
         n_vertices: 100
-        sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
+        #sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
         #custom: No #If No, keeps the data_generation from train, just a failsafe so people consciously have to activate custom test
-        generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
+        generative_model: Regular #Seed # so far ErdosRenyi, Regular or BarabasiAlbert
         noise_model: ErdosRenyi
-        edge_density: 0.5
+        edge_density: 0.05 #0.0125
         vertex_proba: 1. # Parameter of the binomial distribution of vertices
-        noise: 0.05
-        path_model: '/home/mlelarge/experiments-gnn/qap/norm_dense/node_embedding_block_ErdosRenyi_100_0.5/12-05-22-17-34/qap_norm_dense/2gf519dg/checkpoints/epoch=9-step=6250.ckpt'
+        noise: 0.1
+        path_model: '/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_Regular_100_0.05/07-27-23-14-45/qap_expe_norm/prges07j/checkpoints/epoch=9-step=6250.ckpt'
+        #path_model: '/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_RegularSeed_100_0.05/07-25-23-11-30/qap_expe_norm/mvki2vap/checkpoints/epoch=9-step=6250.ckpt' #'/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_Regular_100_0.05/07-19-23-11-54/qap_expe_norm/qye55q7e/checkpoints/epoch=7-step=5000.ckpt' #'/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_rec_Regular_100_0.05/01-12-23-14-18/qap_expe_norm/262h3uh7/checkpoints/epoch=4-step=3125.ckpt'
 
 
 train: # Training parameters
     epochs: 10
-    batch_size:  32 #10 #8 #32 #16 #64
+    batch_size:  32 #32 #10 #8 #32 #16 #64
     lr: !!float 1e-3 #1e-3
     scheduler_step: 3
     scheduler_decay: 0.5
@@ -46,12 +47,12 @@ train: # Training parameters
 arch: # Architecture and model
     original_features_num: 2 # 2 for fgnn 1 for mgnn
     node_emb: 
-        type: node_embedding_rec
+        type: node_embedding
         block_init: block_emb
         block_inside: block
         num_blocks: 4
-        in_features: 64
-        out_features: 64
+        in_features: 32
+        out_features: 32
         depth_of_mlp: 3
         num_heads: 16
     

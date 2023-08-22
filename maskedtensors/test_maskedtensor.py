@@ -125,7 +125,8 @@ TEST_FUNCS = [
     (lambda t: t.permute(0, 3, 2, 1), 'permute'),
     (nn.Conv2d(N_FEATURES, 2*N_FEATURES, 1), 'nn.Conv2d'),
     (lambda t: ln(t.permute(0,3,2,1)), 'nn.LayerNorm'),
-    (nn.InstanceNorm2d(N_FEATURES,affine=False, track_running_stats=False), 'InstanceNorm2d'),
+    (nn.InstanceNorm2d(N_FEATURES, affine=False, track_running_stats=False), 'InstanceNorm2d'),
+    (nn.InstanceNorm2d(N_FEATURES, affine=True, track_running_stats=False), 'InstanceNorm2d_affine'),
     (lambda t: torch.diag_embed(t,dim1=-2,dim2=-1), 'torch.diag_embed'),
     (Diag(), 'Diag')
     #(MlpBlock(N_FEATURES, 2*N_FEATURES, 2), 'MlpBlock'),

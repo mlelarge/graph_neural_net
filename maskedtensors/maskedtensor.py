@@ -335,16 +335,17 @@ def torch_var(masked_tensor, keepdim = False, *args, **kwargs):
     return torch.sum(vars.tensor, dim = names, keepdim=keepdim)/sizes
 
 @implements(F.instance_norm)
-def torch_instance_norm(masked_tensor, eps=1e-05, *args, **kwargs):
+def torch_instance_norm(masked_tensor, eps=1e-05, weight=None, bias =None, *args, **kwargs):
     """ Implements instance_norm on masked tensors 
-    only works for shape (b,f,n,n) when normalization is taken on (n,n)
-    for each feature f with
-    affine=False, track_running_stats=False
+    only works for shape (b,f,n,n) when normalization is taken on (n,n) (InstanceNorm2d)
+    for each feature f with track_running_stats=False
     """
     # Unfortunately, InstanceNorm2d does not support named tensors yet
     means = torch_mean(masked_tensor, keepdim=True)
     var_s = torch_var(masked_tensor, keepdim=True)
     res_tensor = (masked_tensor.tensor - means)/torch.sqrt(var_s+eps)
+    if (weight is not None) and (bias is not None):
+        res_tensor = weight.reshape(1,weight.shape[0],1,1)*res_tensor+bias.reshape(1,bias.shape[0],1,1)
     return MaskedTensor(res_tensor, masked_tensor.mask_dict, adjust_mask=False, apply_mask=True)
 
 @implements(F.layer_norm)
