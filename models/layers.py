@@ -151,51 +151,6 @@ class Diag(nn.Module):
 class Identity(namedtuple('Identity', [])):
     def __call__(self, x): return x
 
-""" class Seed(namedtuple('Seed', [])):
-    def __call__(self, x): 
-        n = x.size(-1)
-        bs = x.size(0)
-        device = x.device
-        x[:,1,:,:] = torch.zeros((bs,n,n))
-        indices = torch.arange(5)
-        x[:,1,indices,indices] = indices.type(torch.float).to(device)+1
-        return x """
-
-class Reshape(nn.Module):
-    def __init__(self, n_features):
-        super().__init__()
-        self.n_features = n_features
-
-    def forward(self, x):
-        n = x.size(-1)
-        bs = x.size(0)
-        device = x.device
-        y = torch.zeros((bs,self.n_features,n,n)).to(device)
-        y[:,0,:,:] = x[:,0,:,:]
-        return y
-
-class Add_diag(nn.Module):
-    def forward(self, x, p):
-        return x + torch.diag_embed(p)
-
-
-class Seed(nn.Module):
-    def forward(self, x):
-        n = x.size(-1)
-        bs = x.size(0)
-        device = x.device
-        x[:,1,:,:] = torch.zeros((bs,n,n))
-        indices = torch.arange(5)
-        x[:,1,indices,indices] = indices.type(torch.float).to(device)+1
-        return x
-
-class Scaling(nn.Module):    
-    def forward(self, x, s):
-        m = nn.Dropout(1-s)
-        #device = x.device
-        #s = s.to(device)
-        x[:,1,:,:] = m(x[:,1,:,:])
-        return x
 
 class Permute(namedtuple('Permute', [])):
     def __call__(self, x): return x.permute(0,2,1)
@@ -216,7 +171,6 @@ class Matmul_zerodiag(nn.Module):
         mask_b = mask.repeat(bs,f,1,1)
         return torch.matmul(torch.mul(xs1,mask_b), torch.mul(xs2,mask_b))#torch.mul(torch.matmul(xs1, xs2), mask_b)
         #return torch.matmul(zero_diag_fun(xs1), zero_diag_fun(xs2))
-
 
 def zero_diag_fun(x):
     (bs,f,n1,n2) = x.shape

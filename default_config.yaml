@@ -11,22 +11,22 @@ data:
     train: # Train/Val data generation parameters
         num_examples_train: 20000
         num_examples_val: 1000
-        n_vertices: 100
+        n_vertices: 50
         sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
         generative_model: Regular #Seed # so far ErdosRenyi, Regular or BarabasiAlbert
         noise_model: ErdosRenyi
-        edge_density: 0.05 #0.05 #0.015 #0.025
+        edge_density: 0.2 #0.05 #0.015 #0.025
         vertex_proba: 1. # Parameter of the binomial distribution of vertices
         noise: 0.1 #0.3 #0.32 #0.2 #0.2 0.4 0.6 0.8 0.9
             
     test: #Test data generation parameters not used yet...
         num_examples_test: 1000
-        n_vertices: 100
+        n_vertices: 50
         #sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
         #custom: No #If No, keeps the data_generation from train, just a failsafe so people consciously have to activate custom test
         generative_model: Regular #Seed # so far ErdosRenyi, Regular or BarabasiAlbert
         noise_model: ErdosRenyi
-        edge_density: 0.05 #0.0125
+        edge_density: 0.2 #0.0125
         vertex_proba: 1. # Parameter of the binomial distribution of vertices
         noise: 0.1
         path_model: '/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_Regular_100_0.05/07-27-23-14-45/qap_expe_norm/prges07j/checkpoints/epoch=9-step=6250.ckpt'
@@ -34,8 +34,8 @@ data:
 
 
 train: # Training parameters
-    epochs: 10
-    batch_size:  32 #32 #10 #8 #32 #16 #64
+    epochs: 100
+    batch_size:  256 #32 #10 #8 #32 #16 #64
     lr: !!float 1e-3 #1e-3
     scheduler_step: 3
     scheduler_decay: 0.5

@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
 
 def get_config(filename='default_config.yaml') -> dict:
@@ -112,24 +112,19 @@ def train(config):
  """
     #model.to(device)
     # train model
+    checkpoint_callback = ModelCheckpoint(save_top_k=1, mode='max', monitor="val_acc")
+    lr_monitor = LearningRateMonitor(logging_interval='epoch')
     if config['observers']['wandb']:
         logger = WandbLogger(project=f"{config['problem']}_{config['name']}", log_model="all", save_dir=path_log)
         logger.experiment.config.update(config)
-        lr_monitor = LearningRateMonitor(logging_interval='epoch')
-        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,logger=logger,log_every_n_steps=log_freq,callbacks=[lr_monitor],precision=16)
+        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,logger=logger,log_every_n_steps=log_freq,callbacks=[lr_monitor, checkpoint_callback],precision=16)
     else:
-        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,log_every_n_steps=log_freq,precision=16)
+        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,log_every_n_steps=log_freq,callbacks=[lr_monitor, checkpoint_callback],precision=16)
     trainer.fit(model_pl, train_loader, val_loader)
 
     return trainer
 
-""" class ScheduleCallback(pl.Callback):
-    def __init__(self, max_epochs=8):
-        self.max_epochs = max_epochs
-    def on_train_epoch_end(self, trainer, pl_module):
-        pl_module.scalar = utils.schedule(trainer.current_epoch)
-        pl_module.log("training_epoch_scalar", pl_module.scalar)
-     """    
+
 def tune(config):
     """ Main func.
     """
