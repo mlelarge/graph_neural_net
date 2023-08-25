@@ -1,7 +1,8 @@
 import pytest
 import torch
-import metrics
-import losses
+from toolbox.metrics import accuracy_max
+
+from toolbox.losses import triplet_loss
 import maskedtensor
 import math
 import scipy.optimize
@@ -26,9 +27,9 @@ def batch(request):
 
 @pytest.mark.parametrize('batch', [False, True], indirect=['batch'])
 def test_hierarchy(batch):
-    correct, total = metrics.accuracy_max(batch)
+    correct, total = accuracy_max(batch)
     acc = correct/total
-    loss_func = losses.get_criterion(DEVICE, 'mean')
+    loss_func = triplet_loss(loss_reduction='mean')
     if OPT_SCALE:
         res = scipy.optimize.minimize_scalar(lambda x: loss_func(torch.mul(batch, x)), bracket=(1e-1, 1e2))
         scale = res.x

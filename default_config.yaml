@@ -1,58 +1,70 @@
 ---
-name: qap_res #qap_simpler qap_mp qap_res
+problem: qap # PB_DIR = experiments-gnn/$problem
+name: expe_norm # results will be stored in PB_DIR/$name
 cpu: No
 #root_dir: 'experiments-gnn' # not used...
-problem: 'qap' 
-test_enabled: Yes
-use_dgl: No
+#test_enabled: Yes
+#use_dgl: No
 #path_dataset: data # Path where datasets are stored, default data/
 
 data:
     train: # Train/Val data generation parameters
         num_examples_train: 20000
         num_examples_val: 1000
-        n_vertices: 200
+        n_vertices: 50
         sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
-        generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
+        generative_model: Regular #Seed # so far ErdosRenyi, Regular or BarabasiAlbert
         noise_model: ErdosRenyi
-        edge_density: 0.0015
+        edge_density: 0.2 #0.05 #0.015 #0.025
         vertex_proba: 1. # Parameter of the binomial distribution of vertices
-        noise: 0.1
+        noise: 0.1 #0.3 #0.32 #0.2 #0.2 0.4 0.6 0.8 0.9
             
-    test: #Test data generation parameters
+    test: #Test data generation parameters not used yet...
         num_examples_test: 1000
-        n_vertices: 200
-        sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
+        n_vertices: 50
+        #sparsify: None #Only works for not fgnns. Put to None if you don't want sparsifying
         #custom: No #If No, keeps the data_generation from train, just a failsafe so people consciously have to activate custom test
-        generative_model: ErdosRenyi # so far ErdosRenyi, Regular or BarabasiAlbert
+        generative_model: Regular #Seed # so far ErdosRenyi, Regular or BarabasiAlbert
         noise_model: ErdosRenyi
-        edge_density: 0.0015
+        edge_density: 0.2 #0.0125
         vertex_proba: 1. # Parameter of the binomial distribution of vertices
         noise: 0.1
+        path_model: '/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_Regular_100_0.05/07-27-23-14-45/qap_expe_norm/prges07j/checkpoints/epoch=9-step=6250.ckpt'
+        #path_model: '/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_RegularSeed_100_0.05/07-25-23-11-30/qap_expe_norm/mvki2vap/checkpoints/epoch=9-step=6250.ckpt' #'/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_Regular_100_0.05/07-19-23-11-54/qap_expe_norm/qye55q7e/checkpoints/epoch=7-step=5000.ckpt' #'/home/mlelarge/experiments-gnn/qap/expe_norm/node_embedding_rec_Regular_100_0.05/01-12-23-14-18/qap_expe_norm/262h3uh7/checkpoints/epoch=4-step=3125.ckpt'
 
 
 train: # Training parameters
-    epoch: 20
-    batch_size:  4 #10
+    epochs: 100
+    batch_size:  256 #32 #10 #8 #32 #16 #64
     lr: !!float 1e-3 #1e-3
     scheduler_step: 3
     scheduler_decay: 0.5
-    lr_stop: !!float 1e-7
-    print_freq: 100
+    lr_stop: !!float 1e-5
+    log_freq: 50
     anew: Yes
     start_model: '/home/mlelarge/experiments-gnn/qap/qap_res/gatedgcn_8_ErdosRenyi_64_0.09375/02-11-22-20-55/model_best.pth.tar' #'/home/mlelarge/experiments-gnn/qap/qap_res/fgnn_4_ErdosRenyi_64_0.09375/02-11-22-09-31/model_best.pth.tar'
 
 arch: # Architecture and model
-    arch_gnn: fgnn #fgnn, gcn, gatedgcn
-    arch_load: siamese #siamese or simple
-    embedding: rs_node #node or edge, rs_node
-    num_blocks: 4 #4
     original_features_num: 2 # 2 for fgnn 1 for mgnn
-    dim_features: 64 #64
-    depth_of_mlp: 3
-    input_embed: Yes
+    node_emb: 
+        type: node_embedding
+        block_init: block_emb
+        block_inside: block
+        num_blocks: 4
+        in_features: 32
+        out_features: 32
+        depth_of_mlp: 3
+        num_heads: 16
+    
+    #arch_gnn: fgnn #fgnn, gcn, gatedgcn
+    #arch_load: siamese #siamese or simple(to be done)
+    #embedding: node #node or edge, rs_node
+    #num_blocks: 4 #4
+    
+    #dim_features: 64 #64
+    #depth_of_mlp: 3 
+    #input_embed: No # No
 
 observers:
-    neptune:
-        enable: Yes
-        project: mlelarge/GNN-res
+    wandb: Yes
+

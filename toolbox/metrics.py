@@ -89,7 +89,7 @@ def make_meter_f1():
 
 #QAP
 
-def accuracy_linear_assignment(rawscores, dummy_target, labels=None, aggregate_score=True):
+def accuracy_linear_assignment(rawscores, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
@@ -115,7 +115,7 @@ def accuracy_linear_assignment(rawscores, dummy_target, labels=None, aggregate_s
     else:
         return all_acc
 
-def accuracy_max(weights,dummy_target, labels=None, aggregate_score=True):
+def accuracy_max(weights, labels=None, aggregate_score=True):
     """
     weights should be (bs,n,n) and labels (bs,n) numpy arrays
     """
@@ -146,21 +146,51 @@ def all_losses_acc(val_loader,model,criterion,
     #model.eval()
     all_losses =[]
     all_acc = []
+    model = model.to(device)
 
-    for (data, target) in val_loader:
-        data = data.to(device)
-        target_deviced = target.to(device)
-        output = model(data)
-        rawscores = output
+    for (data1, data2) in val_loader:
+        data1['input'] = data1['input'].to(device)
+        data2['input'] = data2['input'].to(device)
+        rawscores = model(data1, data2)
+        #n_vertices = output.shape[0]
+        #ide = torch.arange(n_vertices)
+        #target = ide.to(device)
             
-        loss = criterion(rawscores,target_deviced)
+        loss = criterion(rawscores)
         
         all_losses.append(loss.item())
     
         if eval_score is not None:
-            acc = eval_score(rawscores,target_deviced,aggregate_score=False)
+            acc = eval_score(rawscores,aggregate_score=False)
             all_acc += acc
     return np.array(all_losses), np.array(all_acc)
+
+def all_acc_qap(val_loader,model,device):
+    #model.eval()
+    all_qap = []
+    all_acc = []
+    all_planted = []
+    model = model.to(device)
+
+    for (data1, data2) in val_loader:
+        data1['input'] = data1['input'].to(device)
+        data2['input'] = data2['input'].to(device)
+        rawscores = model(data1, data2)
+        weights = torch.log_softmax(rawscores,-1)
+        g1 = data1['input'][:,0,:].cpu().detach().numpy()
+        g2 = data2['input'][:,0,:].cpu().detach().numpy()
+        for i, weight in enumerate(weights):
+            cost = -weight.cpu().detach().numpy()
+            row_ind, col_ind = linear_sum_assignment(cost)
+            qap = (g1[i]*(g2[i][col_ind,:][:,col_ind])).sum()
+            planted = (g1[i]*g2[i]).sum()
+            label = np.arange(len(weight))
+            acc = np.sum(col_ind == label)
+            all_qap.append(qap)
+            all_acc.append(acc)
+            all_planted.append(planted)
+    
+    return np.array(all_acc), np.array(all_qap), np.array(all_planted)
 
 # code below should be corrected/refactored...
 
